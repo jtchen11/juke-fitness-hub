@@ -1,0 +1,32 @@
+<view class="page-points">
+  <view class="points-header">
+    <text class="points-num">{{points}}</text>
+    <text class="points-label">当前积分</text>
+  </view>
+
+  <view class="section">
+    <text class="section-title">兑换积分</text>
+    <view class="redeem-card" wx:for="{{redeemOptions}}" wx:key="type" data-type="{{item.type}}" bindtap="onRedeem">
+      <view class="redeem-info">
+        <text class="redeem-name">{{item.name}}</text>
+        <text class="redeem-desc">{{item.desc}}</text>
+      </view>
+      <view class="redeem-cost">
+        <text class="cost-num">{{item.cost}}</text>
+        <text class="cost-label">积分</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <text class="section-title">积分明细</text>
+    <view class="history-item" wx:for="{{history}}" wx:key="id">
+      <view class="history-left">
+        <text class="history-type">{{item.remark || item.changeType}}</text>
+        <text class="history-time">{{item.createdAt}}</text>
+      </view>
+      <text class="history-points {{item.pointsChange > 0 ? 'add' : 'sub'}}">{{item.pointsChange > 0 ? '+' : ''}}{{item.pointsChange}}</text>
+    </view>
+    <view wx:if="{{history.length === 0}}" class="empty"><text>暂无积分记录</text></view>
+  </view>
+</view>

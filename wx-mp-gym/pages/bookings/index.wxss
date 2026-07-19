@@ -1,0 +1,18 @@
+.page-bookings{min-height:100vh;background:#F5F6FA}
+.tab-bar{display:flex;padding:24rpx 32rpx 0;margin-bottom:24rpx}
+.tab-item{flex:1;text-align:center;font-size:28rpx;color:#8A8AA0;padding:16rpx 0;background:#FFF;border-radius:8px;margin:0 6rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.tab-item.active{color:#FFF;background:#4A6CF7}
+.booking-card{background:#FFF;border-radius:12px;margin:0 32rpx 16rpx;padding:28rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.booking-name{font-size:30rpx;color:#1A1A2E;font-weight:600;display:block}
+.booking-time{font-size:24rpx;color:#8A8AA0;margin-top:6rpx;display:block}
+.booking-status{display:inline-block;padding:4rpx 16rpx;border-radius:4px;font-size:22rpx;margin-top:10rpx}
+.booking-status.scheduled{background:rgba(255,179,0,0.08);color:#FFB300}
+.booking-status.checked_in{background:rgba(0,200,83,0.08);color:#00C853}
+.booking-status.cancelled{background:rgba(255,82,82,0.08);color:#FF5252}
+.login-prompt{display:flex;flex-direction:column;align-items:center;padding:200rpx 64rpx 0}
+.prompt-title{font-size:34rpx;color:#1A1A2E;font-weight:600;margin-bottom:12rpx}
+.prompt-desc{font-size:26rpx;color:#8A8AA0;text-align:center;margin-bottom:48rpx}
+.btn-primary{width:100%;height:88rpx;background:#4A6CF7;border-radius:8px;color:#FFF;font-size:32rpx;font-weight:600;line-height:88rpx;border:none}
+.empty-state{text-align:center;padding:120rpx 0;font-size:28rpx;color:#8A8AA0}
+/* tab-bar bottom spacing */
+.page-home,.page-courses,.page-bookings,.page-mine,.page-bookings-list{padding-bottom:70px}

@@ -1,0 +1,12 @@
+<!-- 底部导航组件：根据 mode 渲染不同 Tab -->
+<view class="tab-bar {{mode === 'coach' ? 'coach-mode' : 'member-mode'}}">
+  <view class="tab-bar-inner">
+    <block wx:for="{{tabs}}" wx:key="index">
+      <view class="tab-item {{selectedIndex === index ? 'active' : ''}}" data-index="{{index}}" bindtap="onTabTap">
+        <image class="tab-icon" src="{{selectedIndex === index ? item.selectedIconPath : item.iconPath}}" />
+        <text class="tab-text">{{item.text}}</text>
+        <view class="tab-badge" wx:if="{{item.badge}}">{{item.badge}}</view>
+      </view>
+    </block>
+  </view>
+</view>

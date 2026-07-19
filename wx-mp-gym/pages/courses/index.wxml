@@ -1,0 +1,83 @@
+<view class="page-courses">
+  <view class="tab-bar three-tabs">
+    <view class="tab-item {{tab==='group' ? 'active' : ''}}" data-tab="group" bindtap="switchTab">团课</view>
+    <view class="tab-item {{tab==='pt' ? 'active' : ''}}" data-tab="pt" bindtap="switchTab">私教</view>
+    <view class="tab-item {{tab==='my' ? 'active' : ''}}" data-tab="my" bindtap="switchTab">我的预约</view>
+    <view class="tab-indicator {{tab==='pt' ? 'pt' : (tab==='my' ? 'my' : '')}}"></view>
+  </view>
+
+  <block wx:if="{{tab === 'group'}}">
+    <scroll-view class="date-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="date-list">
+        <view class="date-item {{dateIdx===idx ? 'active' : ''}}" wx:for="{{dates}}" wx:key="idx" data-idx="{{idx}}" bindtap="selectDate">
+          <text class="date-week">{{item.week}}</text>
+          <text class="date-day">{{item.day}}</text>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="filter-bar">
+      <view class="filter-chip {{typeFilter==='' ? 'active' : ''}}" data-type="" bindtap="filterType">全部</view>
+      <view class="filter-chip {{typeFilter==='free' ? 'active' : ''}}" data-type="free" bindtap="filterType">公益</view>
+      <view class="filter-chip {{typeFilter==='paid' ? 'active' : ''}}" data-type="paid" bindtap="filterType">付费</view>
+    </view>
+    <scroll-view class="list-area" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="course-card" wx:for="{{courses}}" wx:key="id" data-id="{{item.id}}" bindtap="goBooking">
+        <view class="card-left">
+          <text class="course-name">{{item.name}}</text>
+          <text class="course-time">{{item.startTime}} - {{item.endTime}}</text>
+          <text class="course-trainer">{{item.trainerName}}</text>
+        </view>
+        <view class="card-right">
+          <text class="course-price {{item.type==='free' ? 'free' : ''}}">{{item.type==='free' ? '免费' : '¥'+item.price}}</text>
+          <text class="course-cap">{{item.enrolled}}/{{item.maxCapacity}}</text>
+          <view class="tag {{item.type}}">{{item.type==='free' ? '公益' : '付费'}}</view>
+        </view>
+      </view>
+      <view wx:if="{{courses.length===0}}" class="empty-state"><text>暂无课程</text></view>
+    </scroll-view>
+  </block>
+
+  <block wx:elif="{{tab === 'pt'}}">
+    <view class="filter-bar">
+      <view class="filter-chip {{specFilter==='' ? 'active' : ''}}" data-spec="" bindtap="filterSpec">全部</view>
+      <view class="filter-chip {{specFilter==='增肌' ? 'active' : ''}}" data-spec="增肌" bindtap="filterSpec">增肌</view>
+      <view class="filter-chip {{specFilter==='减脂' ? 'active' : ''}}" data-spec="减脂" bindtap="filterSpec">减脂</view>
+      <view class="filter-chip {{specFilter==='康复' ? 'active' : ''}}" data-spec="康复" bindtap="filterSpec">康复</view>
+    </view>
+    <scroll-view class="list-area" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="coach-card" wx:for="{{coaches}}" wx:key="id" data-id="{{item.id}}" bindtap="goPTBooking">
+        <image class="coach-avatar" src="/images/default_avatar.png"></image>
+        <view class="coach-info">
+          <text class="coach-name">{{item.name}}</text>
+          <text class="coach-spec">{{item.specialty}}</text>
+          <text class="coach-price">¥{{item.pricePerHour}}/小时</text>
+        </view>
+        <view class="coach-status {{item.status}}">{{item.status==='active' ? '在岗' : '休假'}}</view>
+      </view>
+      <view wx:if="{{coaches.length===0}}" class="empty-state"><text>暂无教练</text></view>
+    </scroll-view>
+  </block>
+
+  <block wx:elif="{{tab === 'my'}}">
+    <scroll-view class="list-area" scroll-y enhanced show-scrollbar="{{false}}">
+      <block wx:if="{{!isLoggedIn}}">
+        <view class="empty-state"><text>登录后查看我的预约</text></view>
+      </block>
+      <block wx:elif="{{myBookings.length===0}}">
+        <view class="empty-state"><text>暂无预约记录</text></view>
+      </block>
+      <view class="booking-card" wx:for="{{myBookings}}" wx:key="id">
+        <view class="card-left">
+          <text class="course-name">{{item.name}}</text>
+          <text class="course-time">{{item.time}}</text>
+          <text class="course-trainer">{{item.trainerName}}</text>
+        </view>
+        <view class="card-right">
+          <view class="tag {{item.status}}">{{item.statusText}}</view>
+        </view>
+      </view>
+    </scroll-view>
+  </block>
+
+  <tab-bar/>
+</view>

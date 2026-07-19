@@ -1,0 +1,19 @@
+.page-booking{min-height:100vh;background:#F5F6FA;padding-bottom:160rpx}
+.detail-card{background:#FFF;border-radius:12px;margin:32rpx;padding:32rpx;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.detail-title{font-size:34rpx;font-weight:600;color:#1A1A2E;margin-bottom:24rpx;display:block}
+.detail-row{display:flex;justify-content:space-between;padding:16rpx 0;border-bottom:1rpx solid #E8E8E8}
+.label{font-size:28rpx;color:#8A8AA0}
+.value{font-size:28rpx;color:#1A1A2E}
+.price-area{padding-top:24rpx;text-align:center}
+.price{font-size:48rpx;color:#4A6CF7;font-weight:700}
+.price.free{color:#00C853}
+.section-title{font-size:28rpx;color:#8A8AA0;display:block;margin:20rpx 0 16rpx}
+.picker-row{display:flex;justify-content:space-between;padding:16rpx 0;border-bottom:1rpx solid #E8E8E8;font-size:28rpx;color:#1A1A2E}
+.picker-row .label{color:#8A8AA0}
+.slot-grid{display:flex;flex-wrap:wrap;gap:12rpx}
+.slot-item{padding:14rpx 28rpx;background:#F5F6FA;border-radius:8px;font-size:26rpx;color:#1A1A2E}
+.slot-item.active{background:#4A6CF7;color:#FFF}
+.pay-methods{margin-top:16rpx}
+.method-item{padding:24rpx;background:#F5F6FA;border-radius:8px;margin-bottom:12rpx;font-size:28rpx;color:#1A1A2E}
+.method-item.active{background:rgba(74,108,247,0.06);border:2rpx solid #4A6CF7}
+.fixed-btn{position:fixed;bottom:40rpx;left:32rpx;right:32rpx;width:auto;background:#4A6CF7;border-radius:8px;color:#FFF;font-size:32rpx;font-weight:600;height:88rpx;line-height:88rpx;border:none;box-shadow:0 4rpx 12rpx rgba(74,108,247,0.3)}

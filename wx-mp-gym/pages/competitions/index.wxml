@@ -1,0 +1,31 @@
+<view class="page-competitions">
+  <view class="banner">
+    <text class="banner-title">健身比赛</text>
+    <text class="banner-desc">参加比赛，挑战自己</text>
+  </view>
+
+  <view class="section">
+    <text class="section-title">进行中的比赛</text>
+    <view class="comp-card" wx:for="{{activeList}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <view class="comp-info">
+        <text class="comp-name">{{item.name}}</text>
+        <text class="comp-time">{{item.startDate}} ~ {{item.endDate}}</text>
+        <text class="comp-desc">{{item.description}}</text>
+      </view>
+      <view class="comp-status {{item.status}}">{{item.status === 'open' ? '招募中' : '进行中'}}</view>
+    </view>
+    <view wx:if="{{activeList.length === 0}}" class="empty"><text>暂无比赛</text></view>
+  </view>
+
+  <view class="section">
+    <text class="section-title">历史比赛</text>
+    <view class="comp-card history" wx:for="{{historyList}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <view class="comp-info">
+        <text class="comp-name">{{item.name}}</text>
+        <text class="comp-time">{{item.startDate}} ~ {{item.endDate}}</text>
+      </view>
+      <view class="comp-status ended">已结束</view>
+    </view>
+    <view wx:if="{{historyList.length === 0}}" class="empty"><text>暂无历史比赛</text></view>
+  </view>
+</view>

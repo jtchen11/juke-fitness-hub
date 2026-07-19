@@ -1,0 +1,32 @@
+﻿# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+
+# 编译产物
+target/
+build/
+*.class
+*.jar
+*.war
+
+# 日志
+*.log
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 前端 / 小程序
+node_modules/
+miniprogram_npm/
+dist/
+.DS_Store
+
+# 环境变量
+.env
+application-local.yml
+
+# 微信小程序私有配置
+project.private.config.json

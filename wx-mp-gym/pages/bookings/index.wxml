@@ -1,0 +1,23 @@
+<view class="page-bookings">
+  <block wx:if="{{isLoggedIn}}">
+    <view class="tab-bar">
+      <view class="tab-item {{tab==='group' ? 'active' : ''}}" data-tab="group" bindtap="switchTab">\u56e2\u8bfe</view>
+      <view class="tab-item {{tab==='pt' ? 'active' : ''}}" data-tab="pt" bindtap="switchTab">\u79c1\u6559</view>
+    </view>
+    <view wx:if="{{bookings.length===0}}" class="empty-state"><text>\u6682\u65e0\u9884\u7ea6\u8bb0\u5f55</text></view>
+    <view class="booking-card" wx:for="{{bookings}}" wx:key="id">
+      <text class="booking-name">{{item.name}}</text>
+      <text class="booking-time">{{item.time}}</text>
+      <view class="booking-status {{item.status}}">{{item.statusText}}</view>
+    </view>
+  </block>
+  <block wx:else>
+    <view class="login-prompt">
+      <text class="prompt-title">\u767b\u5f55\u540e\u67e5\u770b\u9884\u7ea6</text>
+      <text class="prompt-desc">\u70b9\u51fb\u767b\u5f55\uff0c\u67e5\u770b\u6211\u7684\u56e2\u8bfe\u548c\u79c1\u6559\u9884\u7ea6\u8bb0\u5f55</text>
+      <button class="btn-primary" bindtap="showLogin">\u7acb\u5373\u767b\u5f55</button>
+    </view>
+  </block>
+  
+  <tab-bar/>
+</view>

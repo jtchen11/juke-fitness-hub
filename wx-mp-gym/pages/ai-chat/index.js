@@ -1,0 +1,1 @@
+var app=getApp();Page({data:{inputText:'',scrollTarget:''},onInput(e){this.setData({inputText:e.detail.value})},onSend(){if(!this.data.inputText.trim())return;var msg=this.data.inputText;this.setData({inputText:'',scrollTarget:'bottom'});wx.showToast({title:'功能开发中',icon:'none'})}})

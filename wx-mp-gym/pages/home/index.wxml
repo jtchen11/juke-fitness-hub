@@ -1,0 +1,37 @@
+<view class="page-home">
+  <view class="header-area">
+    <view class="user-info" bindtap="onAvatarTap">
+      <view class="avatar {{isLoggedIn ? '' : 'guest'}}">
+        <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill"/>
+        <text wx:else class="avatar-text">{{isLoggedIn ? memberName[0] : '?'}}</text>
+      </view>
+      <view class="user-text">
+        <text class="greeting">{{isLoggedIn ? '你好,'+memberName : '登录/注册'}}</text>
+        <text class="level-tag" wx:if="{{isLoggedIn}}">{{level}}</text>
+      </view>
+      <view class="arrow" wx:if="{{!isLoggedIn}}">&gt;</view>
+    </view>
+    <view class="asset-cards">
+      <view class="asset-card" bindtap="onRequireLogin">
+        <text class="asset-num">{{isLoggedIn ? stats.bookingCount : '-'}}</text>
+        <text class="asset-label">???</text>
+      </view>
+      <view class="asset-card" bindtap="onRequireLogin">
+        <text class="asset-num">{{isLoggedIn ? stats.ptRemaining : '-'}}</text>
+        <text class="asset-label">????</text>
+      </view>
+      <view class="asset-card" bindtap="onRequireLogin">
+        <text class="asset-num">{{isLoggedIn ? stats.checkInMonth : '-'}}</text>
+        <text class="asset-label">????</text>
+      </view>
+    </view>
+  </view>
+  <view class="quick-actions">
+    <view class="action-card" bindtap="goCourses"><text class="action-icon">🏋</text><text class="action-text">????</text></view>
+    <view class="action-card" bindtap="goPT"><text class="action-icon">👤</text><text class="action-text">????</text></view>
+    <view class="action-card" bindtap="onRequireLogin"><text class="action-icon">📋</text><text class="action-text">????</text></view>
+    <view class="action-card" bindtap="onRequireLogin"><text class="action-icon">✅</text><text class="action-text">打卡</text></view>
+  </view>
+  
+  <tab-bar/>
+</view>

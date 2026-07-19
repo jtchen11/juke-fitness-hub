@@ -1,0 +1,6 @@
+<view class="page-ai-chat"><view class="chat-header"><text class="chat-title">AI智能助手</text><text class="chat-subtitle">桔刻健身 • 7x24小时在线</text></view><scroll-view class="chat-messages" scroll-into-view="{{scrollTarget}}" scroll-y><view class="msg msg-ai"><view class="msg-avatar">AI</view><view class="msg-bubble"><text>你好！我是桔刻健身的AI助手，可以帮你：</text><text>
+
+• 制定训练计划
+• 解答健身问题
+• 体测评估分析
+• 饮食建议</text></view></view><view id="bottom"></view></scroll-view><view class="chat-input-bar"><input class="chat-input" placeholder="输入你的问题..." bindinput="onInput" value="{{inputText}}"/><button class="btn-send" bindtap="onSend">发送</button></view><tab-bar/></view>

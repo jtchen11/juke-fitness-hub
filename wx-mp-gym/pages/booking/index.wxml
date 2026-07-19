@@ -1,0 +1,33 @@
+<view class="page-booking">
+  <view class="detail-card" wx:if="{{type==='group'}}">
+    <text class="detail-title">{{course.name}}</text>
+    <view class="detail-row"><text class="label">时间</text><text class="value">{{course.startTime}} - {{course.endTime}}</text></view>
+    <view class="detail-row"><text class="label">教练</text><text class="value">{{course.trainerName}}</text></view>
+    <view class="detail-row"><text class="label">名额</text><text class="value">{{course.enrolled}}/{{course.maxCapacity}}</text></view>
+    <view class="price-area" wx:if="{{course.type==='paid'}}"><text class="price">¥{{course.price}}</text></view>
+    <view class="price-area" wx:else><text class="price free">免费课程</text></view>
+  </view>
+
+  <view class="detail-card" wx:elif="{{type==='pt'}}">
+    <text class="detail-title">{{coach.name}}</text>
+    <view class="detail-row"><text class="label">专长</text><text class="value">{{coach.specialty}}</text></view>
+    <view class="detail-row"><text class="label">价格</text><text class="value">¥{{coach.pricePerHour}}/小时</text></view>
+    <picker mode="date" value="{{ptDate}}" start="{{minDate}}" bindchange="onDateChange">
+      <view class="picker-row"><text class="label">选择日期</text><text class="value">{{ptDate || '请选择'}}</text></view>
+    </picker>
+    <view class="slot-list" wx:if="{{slots.length>0}}">
+      <text class="section-title">选择时段</text>
+      <view class="slot-grid">
+        <view class="slot-item {{slotIdx===idx ? 'active' : ''}}" wx:for="{{slots}}" wx:key="idx" data-idx="{{idx}}" bindtap="selectSlot">{{item}}</view>
+      </view>
+    </view>
+    <view class="pay-methods" wx:if="{{slots.length>0}}">
+      <text class="section-title">支付方式</text>
+      <view class="method-item {{payMethod==='package' ? 'active' : ''}}" data-method="package" bindtap="selectPay">课程包（剩余{{pkgRemaining}}节）</view>
+      <view class="method-item {{payMethod==='free' ? 'active' : ''}}" data-method="free" bindtap="selectPay">免费次数（剩余{{freeRemaining}}次）</view>
+      <view class="method-item {{payMethod==='pay' ? 'active' : ''}}" data-method="pay" bindtap="selectPay">单次付费 ¥{{coach.pricePerHour}}</view>
+    </view>
+  </view>
+
+  <button class="btn-primary fixed-btn" bindtap="confirmBooking" loading="{{loading}}">确认预约</button>
+</view>

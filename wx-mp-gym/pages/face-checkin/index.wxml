@@ -1,0 +1,20 @@
+<view class="page-face-checkin">
+  <view class="camera-area">
+    <camera class="camera" device-position="front" flash="off" binderror="onCameraError"></camera>
+    <view class="camera-mask">
+      <view class="face-frame"></view>
+    </view>
+  </view>
+
+  <view class="status-bar">
+    <text class="status-text">{{statusText}}</text>
+  </view>
+
+  <view class="action-area">
+    <button class="btn-capture" bindtap="onCapture">
+      <image class="btn-icon" src="/images/icon_camera.png" wx:if="{{false}}"/>
+      <text>开始打卡</text>
+    </button>
+    <text class="action-hint" wx:if="{{!isRegistered}}">首次使用需先注册脸部信息</text>
+  </view>
+</view>

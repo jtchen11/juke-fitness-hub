@@ -1,0 +1,24 @@
+.page-home{min-height:100vh;background:#F5F6FA}
+.header-area{padding:100rpx 32rpx 32rpx}
+.user-info{display:flex;align-items:center;margin-bottom:32rpx}
+.avatar{width:80rpx;height:80rpx;border-radius:50%;background:#4A6CF7;display:flex;align-items:center;justify-content:center;margin-right:20rpx}
+.avatar.guest{background:#E8E8E8}
+.avatar-text{font-size:32rpx;color:#FFF;font-weight:600}
+.user-text{flex:1}
+.greeting{font-size:40rpx;font-weight:600;color:#1A1A2E;display:block}
+.level-tag{font-size:22rpx;color:#4A6CF7;background:rgba(74,108,247,0.08);padding:6rpx 16rpx;border-radius:4rpx;display:inline-block;margin-top:8rpx}
+.arrow{font-size:48rpx;color:#8A8AA0}
+.asset-cards{display:flex;gap:16rpx}
+.asset-card{flex:1;background:#FFF;border-radius:12px;padding:24rpx;box-shadow:0 2px 12px rgba(0,0,0,0.06);text-align:center}
+.asset-num{font-size:56rpx;font-weight:700;color:#4A6CF7;display:block}
+.asset-label{font-size:24rpx;color:#8A8AA0;margin-top:8rpx;display:block}
+.quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:16rpx;padding:0 32rpx 32rpx}
+.action-card{background:#FFF;border-radius:12px;padding:32rpx;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.action-icon{font-size:48rpx;display:block;margin-bottom:12rpx}
+.action-text{font-size:28rpx;color:#1A1A2E}
+/* tab-bar bottom spacing */
+.page-home,.page-courses,.page-bookings,.page-mine,.page-bookings-list{padding-bottom:70px}
+
+.avatar-img{width:80rpx;height:80rpx;border-radius:50%}
+.asset-cards.four-cards{gap:8px}
+.asset-num.highlight{color:#FFB300;font-size:48rpx}

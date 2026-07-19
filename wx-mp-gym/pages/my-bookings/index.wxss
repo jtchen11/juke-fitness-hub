@@ -1,0 +1,24 @@
+.page-my-bookings{min-height:100vh;background:#F5F6FA}
+.filter-scroll{white-space:nowrap;padding:24rpx 32rpx 16rpx;background:#FFF;border-bottom:1rpx solid #E8E8E8}
+.filter-list{display:inline-flex;gap:12rpx}
+.filter-item{display:inline-block;padding:12rpx 28rpx;font-size:26rpx;color:#8A8AA0;background:#F5F6FA;border-radius:8px}
+.filter-item.active{color:#FFF;background:#4A6CF7;font-weight:500}
+.list-area{padding:16rpx 32rpx}
+.booking-card{background:#FFF;border-radius:12px;padding:24rpx;margin-bottom:16rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start}
+.card-left{flex:1}
+.card-type{font-size:22rpx;color:#8A8AA0;display:block;margin-bottom:4rpx}
+.card-name{font-size:30rpx;color:#1A1A2E;font-weight:600;display:block;margin-bottom:6rpx}
+.card-trainer{font-size:24rpx;color:#8A8AA0;display:block;margin-bottom:4rpx}
+.card-time{font-size:24rpx;color:#8A8AA0;display:block}
+.status-tag{font-size:22rpx;padding:6rpx 16rpx;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.status-tag.booked{background:rgba(255,179,0,0.08);color:#FFB300}
+.status-tag.checked_in{background:rgba(0,200,83,0.08);color:#00C853}
+.status-tag.completed{background:rgba(74,144,217,0.08);color:#4A90D9}
+.status-tag.cancelled{background:#F5F6FA;color:#C0C0C0}
+.card-actions{display:flex;justify-content:flex-end;gap:16rpx;margin-top:16rpx;padding-top:16rpx;border-top:1rpx solid #E8E8E8}
+.btn-cancel{padding:12rpx 32rpx;font-size:24rpx;color:#8A8AA0;background:#F5F6FA;border-radius:8px;border:none;line-height:1}
+.btn-checkin{padding:12rpx 32rpx;font-size:24rpx;color:#FFF;background:#4A6CF7;border-radius:8px;border:none;line-height:1}
+.empty-state{text-align:center;padding:120rpx 0;font-size:28rpx;color:#8A8AA0}
+/* tab-bar bottom spacing */
+.page-home,.page-courses,.page-bookings,.page-mine,.page-bookings-list{padding-bottom:70px}
