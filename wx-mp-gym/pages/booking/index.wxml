@@ -1,4 +1,13 @@
 <view class="page-booking">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack">
+      <text class="back-icon-text">‹</text>
+      <text class="back-text">返回</text>
+    </view>
+    <text class="nav-title">{{type==='group' ? '预约团课' : '预约私教'}}</text>
+    <view class="nav-placeholder"></view>
+  </view>
+
   <view class="detail-card" wx:if="{{type==='group'}}">
     <text class="detail-title">{{course.name}}</text>
     <view class="detail-row"><text class="label">时间</text><text class="value">{{course.startTime}} - {{course.endTime}}</text></view>
@@ -30,4 +39,13 @@
   </view>
 
   <button class="btn-primary fixed-btn" bindtap="confirmBooking" loading="{{loading}}">确认预约</button>
+  
+  <view class="login-mask" wx:if="{{showLoginModal}}" bindtap="onLoginClose">
+    <view class="login-modal" catchtap="">
+      <text class="login-modal-title">请先登录</text>
+      <text class="login-modal-desc">登录后即可预约课程</text>
+      <button class="btn-primary" bindtap="onLogin">去登录</button>
+      <button class="btn-cancel" bindtap="onLoginClose">取消</button>
+    </view>
+  </view>
 </view>

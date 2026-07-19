@@ -1,1 +1,19 @@
-<view class="page-coach-students"><view class="page-header"><text class="page-title">我的学员</text></view><view class="search-bar"><input class="search-input" placeholder="搜索学员姓名/手机号" bindinput="onSearch"/></view><scroll-view class="student-list" scroll-y><view class="student-card" wx:for="{{students}}" wx:key="id"><image class="student-avatar" src="/images/default_avatar.png"/><view class="student-info"><text class="student-name">{{item.name}}</text><text class="student-phone">{{item.phone}}</text><text class="student-last">最近上课: {{item.lastClass || '暂无记录'}}</text></view><view class="student-arrow">></view></view><view wx:if="{{students.length===0}}" class="empty-state"><text>暂无学员</text></view></scroll-view><tab-bar/></view>
+<view class="page-coach-students">
+  <view class="page-header"><text class="page-title">我的学员</text></view>
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索学员姓名/手机号" bindinput="onSearch"/>
+  </view>
+  <scroll-view class="student-list" scroll-y>
+    <view class="student-card" wx:for="{{students}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <image class="student-avatar" src="/images/default_avatar.png"/>
+      <view class="student-info">
+        <text class="student-name">{{item.name}}</text>
+        <text class="student-phone">{{item.phone}}</text>
+        <text class="student-last">最近上课: {{item.lastClass || '暂无记录'}}</text>
+      </view>
+      <view class="student-arrow">></view>
+    </view>
+    <view wx:if="{{students.length===0}}" class="empty-state"><text>暂无学员</text></view>
+  </scroll-view>
+  <tab-bar/>
+</view>

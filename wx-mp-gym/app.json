@@ -1,33 +1,35 @@
 {
-  "pages": [
-    "pages/home/index",
-    "pages/face-checkin/index",
-    "pages/courses/index",
-    "pages/bookings/index",
-    "pages/mine/index",
-    "pages/my-bookings/index",
-    "pages/booking/index",
-    "pages/login/login",
-    "pages/ai-chat/index",
-    "pages/coach-home/index",
-    "pages/coach-appointments/index",
-    "pages/coach-students/index",
-    "pages/coach-mine/index",
-    "pages/points/index",
-    "pages/competitions/index",
-    "pages/competition-detail/index",
-    "pages/assessments/index",
-    "pages/assessment-detail/index"
-  ],
-  "window": {
-    "navigationStyle": "custom",
-    "backgroundColor": "#F5F6FA",
-    "backgroundTextStyle": "dark",
-    "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "桔刻健身"
-  },
-  "sitemapLocation": "sitemap.json",
-  "usingComponents": {
-    "tab-bar": "/custom-tab-bar/index"
-  }
+    "pages":  [
+                  "pages/home/index",
+                  "pages/face-checkin/index",
+                  "pages/courses/index",
+                  "pages/bookings/index",
+                  "pages/mine/index",
+                  "pages/my-bookings/index",
+                  "pages/booking/index",
+                  "pages/login/login",
+                  "pages/ai-chat/index",
+                  "pages/coach-home/index",
+                  "pages/coach-appointments/index",
+                  "pages/coach-students/index",
+                  "pages/coach-mine/index",
+                  "pages/points/index",
+                  "pages/competitions/index",
+                  "pages/competition-detail/index",
+                  "pages/assessments/index",
+                  "pages/assessment-detail/index",
+                  "pages/coach-students/detail/index",
+                  "pages/coach-mine/leave-request/index"
+              ],
+    "window":  {
+                   "navigationStyle":  "custom",
+                   "backgroundColor":  "#F5F6FA",
+                   "backgroundTextStyle":  "dark",
+                   "navigationBarTextStyle":  "black",
+                   "navigationBarTitleText":  "桔刻健身"
+               },
+    "sitemapLocation":  "sitemap.json",
+    "usingComponents":  {
+                            "tab-bar":  "/custom-tab-bar/index"
+                        }
 }

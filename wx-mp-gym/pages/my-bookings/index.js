@@ -11,31 +11,25 @@ Page({
   loadList() {
     if (!app.isLoggedIn()) { this.setData({ list: [] }); return; }
     request.get('/api/member/bookings', { status: this.data.filter }, (res) => {
-      this.setData({ list: res || [] });
+      var list = res.list || res || [];
+      this.setData({ list: list });
     });
   },
   statusText(s) {
-    const map = { booked: '???', checked_in: '???', completed: '???', cancelled: '???' };
+    const map = { booked: '已预约', checked_in: '已签到', completed: '已完成', cancelled: '已取消', scheduled: '待上课' };
     return map[s] || s;
   },
   onCheckin(e) {
-    const item = e.currentTarget.dataset;
-    if (item.type === 'group') {
-      request.post('/api/check-in/class/' + item.id, { memberId: app.globalData.userInfo.userId }, (res) => {
-        if (res.success) { wx.showToast({ title: '????', icon: 'success' }); this.loadList(); }
-        else { wx.showToast({ title: res.message || '????', icon: 'none' }); }
-      });
-    } else {
-      wx.showToast({ title: '????????', icon: 'none' });
-    }
+    var item = e.currentTarget.dataset;
+    wx.showToast({ title: '请到店后使用刷脸打卡', icon: 'none' });
   },
   onCancel(e) {
-    const item = e.currentTarget.dataset;
-    wx.showModal({ title: '????', content: '????????', success: (r) => {
+    var item = e.currentTarget.dataset;
+    wx.showModal({ title: '确认取消', content: '确定取消该预约吗？', success: function(r) {
       if (!r.confirm) return;
-      request.del('/api/class-bookings/' + item.id, null, (res) => {
-        if (res.success) { wx.showToast({ title: '???', icon: 'success' }); this.loadList(); }
-        else { wx.showToast({ title: res.message || '????', icon: 'none' }); }
+      request.post('/api/class-bookings/' + item.id + '/cancel', {}, function(res) {
+        if (res.success) { wx.showToast({ title: '已取消', icon: 'success' }); this.loadList(); }
+        else { wx.showToast({ title: res.message || '取消失败', icon: 'none' }); }
       });
     }});
   }

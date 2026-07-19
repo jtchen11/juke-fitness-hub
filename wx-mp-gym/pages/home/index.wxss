@@ -1,24 +1,63 @@
 .page-home{min-height:100vh;background:#F5F6FA}
-.header-area{padding:100rpx 32rpx 32rpx}
-.user-info{display:flex;align-items:center;margin-bottom:32rpx}
-.avatar{width:80rpx;height:80rpx;border-radius:50%;background:#4A6CF7;display:flex;align-items:center;justify-content:center;margin-right:20rpx}
-.avatar.guest{background:#E8E8E8}
+/* 1. Banner */
+.banner-swiper{height:300rpx;width:100vw;margin:0;border-radius:0;overflow:hidden}
+.banner-img{width:100%;height:300rpx}
+/* 2. 用户信息 */
+.header-area{padding:24rpx 32rpx 16rpx;background:linear-gradient(180deg,#4A6CF7 0%,#4A6CF7 60%,transparent 60%)}
+.user-info{display:flex;align-items:center;margin-bottom:20rpx}
+.avatar{width:80rpx;height:80rpx;border-radius:50%;background:rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;margin-right:20rpx;border:2rpx solid rgba(255,255,255,0.5)}
+.avatar.guest{background:rgba(255,255,255,0.2)}
 .avatar-text{font-size:32rpx;color:#FFF;font-weight:600}
-.user-text{flex:1}
-.greeting{font-size:40rpx;font-weight:600;color:#1A1A2E;display:block}
-.level-tag{font-size:22rpx;color:#4A6CF7;background:rgba(74,108,247,0.08);padding:6rpx 16rpx;border-radius:4rpx;display:inline-block;margin-top:8rpx}
-.arrow{font-size:48rpx;color:#8A8AA0}
-.asset-cards{display:flex;gap:16rpx}
-.asset-card{flex:1;background:#FFF;border-radius:12px;padding:24rpx;box-shadow:0 2px 12px rgba(0,0,0,0.06);text-align:center}
-.asset-num{font-size:56rpx;font-weight:700;color:#4A6CF7;display:block}
-.asset-label{font-size:24rpx;color:#8A8AA0;margin-top:8rpx;display:block}
-.quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:16rpx;padding:0 32rpx 32rpx}
-.action-card{background:#FFF;border-radius:12px;padding:32rpx;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
-.action-icon{font-size:48rpx;display:block;margin-bottom:12rpx}
-.action-text{font-size:28rpx;color:#1A1A2E}
-/* tab-bar bottom spacing */
-.page-home,.page-courses,.page-bookings,.page-mine,.page-bookings-list{padding-bottom:70px}
-
 .avatar-img{width:80rpx;height:80rpx;border-radius:50%}
-.asset-cards.four-cards{gap:8px}
-.asset-num.highlight{color:#FFB300;font-size:48rpx}
+.user-text{flex:1}
+.greeting{font-size:36rpx;font-weight:600;color:#FFF;display:block}
+.level-tag{font-size:20rpx;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.2);padding:4rpx 14rpx;border-radius:4rpx;display:inline-block;margin-top:6rpx}
+.arrow-icon{font-size:36rpx;color:rgba(255,255,255,0.6);padding:8rpx}
+.asset-cards{display:flex;gap:12rpx}
+.asset-card{flex:1;background:#FFF;border-radius:12px;padding:20rpx 12rpx;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center}
+.asset-num{font-size:44rpx;font-weight:700;color:#4A6CF7;display:block}
+.asset-label{font-size:20rpx;color:#8A8AA0;margin-top:4rpx;display:block}
+/* 3. 快捷入口 */
+.quick-actions{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:16rpx;padding:24rpx 32rpx 8rpx}
+.five-cards .action-card{padding:24rpx 8rpx}
+.action-card{background:#FFF;border-radius:12px;padding:24rpx 16rpx;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.action-icon{font-size:40rpx;display:block;margin-bottom:8rpx}
+.action-text{font-size:22rpx;color:#1A1A2E}
+/* 4. 今日课程 */
+.section{padding:0 32rpx;margin-top:24rpx}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16rpx}
+.section-title{font-size:30rpx;font-weight:600;color:#1A1A2E}
+.section-more{font-size:24rpx;color:#8A8AA0}
+.today-list{display:flex;flex-direction:column;gap:12rpx}
+.today-card{display:flex;align-items:center;background:#FFF;border-radius:12px;padding:20rpx 24rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.today-card.done{opacity:0.5}
+.today-time{font-size:24rpx;font-weight:600;color:#4A6CF7;width:100rpx;flex-shrink:0}
+.today-info{flex:1;min-width:0;margin:0 16rpx}
+.today-name{font-size:26rpx;color:#1A1A2E;font-weight:500;display:block}
+.today-type{font-size:20rpx;color:#8A8AA0;margin-top:4rpx;display:block}
+.today-status{font-size:20rpx;padding:4rpx 12rpx;border-radius:4rpx;flex-shrink:0}
+.today-status.completed{background:#E8F5E9;color:#00C853}
+.today-status.scheduled{background:#FFF3E0;color:#FFB300}
+/* 5. 课程推荐 */
+.recommend-scroll{white-space:nowrap;padding-bottom:8rpx}
+.recommend-card{display:inline-flex;flex-direction:column;width:260rpx;margin-right:16rpx;background:#FFF;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.recommend-img{width:260rpx;height:160rpx;background:#F5F6FA}
+.recommend-name{font-size:24rpx;color:#1A1A2E;font-weight:500;padding:12rpx 12rpx 4rpx;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recommend-meta{font-size:20rpx;color:#8A8AA0;padding:0 12rpx 12rpx;display:block}
+/* 6. 优惠课程包 */
+.package-scroll{white-space:nowrap;padding-bottom:8rpx}
+.package-card{display:inline-flex;flex-direction:column;width:280rpx;margin-right:16rpx;background:linear-gradient(135deg,#667eea,#4A6CF7);border-radius:12px;padding:24rpx;position:relative;overflow:hidden}
+.package-name{font-size:26rpx;font-weight:600;color:#FFF;display:block}
+.package-sessions{font-size:22rpx;color:rgba(255,255,255,0.8);margin-top:6rpx;display:block}
+.package-price{margin-top:16rpx}
+.price-current{font-size:36rpx;font-weight:700;color:#FFF}
+.price-original{font-size:22rpx;color:rgba(255,255,255,0.5);text-decoration:line-through;margin-left:8rpx}
+.package-tag{position:absolute;top:0;right:0;background:#FF6B6B;color:#FFF;font-size:20rpx;padding:6rpx 16rpx;border-radius:0 12px 0 12px}
+/* 7. 体测数据 */
+.fitness-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12rpx;background:#FFF;border-radius:12px;padding:24rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.fitness-item{text-align:center}
+.fitness-value{font-size:36rpx;font-weight:700;color:#4A6CF7;display:inline}
+.fitness-unit{font-size:20rpx;color:#8A8AA0;margin-left:2rpx}
+.fitness-label{font-size:20rpx;color:#8A8AA0;margin-top:4rpx;display:block}
+/* 底部 TabBar 间距 */
+.page-home,.page-courses,.page-bookings,.page-mine,.page-bookings-list{padding-bottom:70px}

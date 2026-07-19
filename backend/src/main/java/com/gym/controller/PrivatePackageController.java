@@ -204,4 +204,12 @@ public class PrivatePackageController {
         result.put("cancelledBookings", ptList.size());
         return result;
     }
+
+    /**
+     * 获取上架套餐列表（首页优惠课程包展示）
+     */
+    @GetMapping("/list")
+    public List<PrivatePackage> listActive(@RequestParam(required = false) Boolean active) {
+        return privatePackageService.getActivePackages();
+    }
 }

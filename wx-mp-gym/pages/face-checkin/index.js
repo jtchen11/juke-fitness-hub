@@ -6,13 +6,36 @@ Page({
   onShow() {
     var u = app.globalData.userInfo || {};
     this.setData({ memberId: u.memberId || 0 });
-    // 检查是否已注册人脸
+    this.checkPermission();
     if (this.data.memberId) {
       var _this = this;
       request.get('/api/face/check', { userId: this.data.memberId }, function(r) {
         if (r && r.registered) _this.setData({ isRegistered: true, statusText: '请点击开始打卡' });
       });
     }
+  },
+
+  checkPermission() {
+    var _this = this;
+    wx.getSetting({
+      success: function(res) {
+        if (!res.authSetting['scope.camera']) {
+          wx.authorize({
+            scope: 'scope.camera',
+            fail: function() {
+              _this.setData({ statusText: '请授权摄像头权限后使用' });
+              wx.showModal({
+                title: '提示',
+                content: '需要摄像头权限才能使用刷脸打卡功能',
+                success: function(r) {
+                  if (r.confirm) wx.openSetting();
+                }
+              });
+            }
+          });
+        }
+      }
+    });
   },
 
   onCameraError(e) {
@@ -37,7 +60,7 @@ Page({
   verifyFace(imagePath) {
     var _this = this;
     wx.uploadFile({
-      url: (app.globalData.apiBaseUrl || 'http://192.168.10.8:8080') + '/api/face/verify',
+      url: (app.globalData.apiBaseUrl || 'http://localhost:8080') + '/api/face/verify',
       filePath: imagePath,
       name: 'image',
       formData: { userId: String(this.data.memberId) },
@@ -75,7 +98,6 @@ Page({
         });
       },
       fail: function() {
-        // 定位失败时允许打卡
         request.post('/api/check-in/member/' + _this.data.memberId, {}, function(r) {
           if (r && r.success) {
             wx.showToast({ title: '打卡成功' });

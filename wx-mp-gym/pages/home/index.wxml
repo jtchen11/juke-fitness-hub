@@ -1,4 +1,12 @@
 <view class="page-home">
+  <!-- 1. 顶部广告 Banner -->
+  <swiper class="banner-swiper" indicator-dots="{{true}}" autoplay="{{true}}" interval="{{4000}}" circular="{{true}}" indicator-color="rgba(255,255,255,0.4)" indicator-active-color="#4A6CF7">
+    <swiper-item wx:for="{{banners}}" wx:key="index">
+      <image class="banner-img" src="{{item.image}}" mode="scaleToFill"/>
+    </swiper-item>
+  </swiper>
+
+  <!-- 2. 用户信息 + 资产卡片 -->
   <view class="header-area">
     <view class="user-info" bindtap="onAvatarTap">
       <view class="avatar {{isLoggedIn ? '' : 'guest'}}">
@@ -6,32 +14,90 @@
         <text wx:else class="avatar-text">{{isLoggedIn ? memberName[0] : '?'}}</text>
       </view>
       <view class="user-text">
-        <text class="greeting">{{isLoggedIn ? '你好,'+memberName : '登录/注册'}}</text>
+        <text class="greeting">{{isLoggedIn ? '你好, '+memberName : '登录/注册'}}</text>
         <text class="level-tag" wx:if="{{isLoggedIn}}">{{level}}</text>
       </view>
-      <view class="arrow" wx:if="{{!isLoggedIn}}">&gt;</view>
+      <text wx:if="{{!isLoggedIn}}" class="arrow-icon">›</text>
     </view>
     <view class="asset-cards">
-      <view class="asset-card" bindtap="onRequireLogin">
+      <view class="asset-card" bindtap="goMyBookings">
         <text class="asset-num">{{isLoggedIn ? stats.bookingCount : '-'}}</text>
-        <text class="asset-label">???</text>
+        <text class="asset-label">我的预约</text>
       </view>
-      <view class="asset-card" bindtap="onRequireLogin">
+      <view class="asset-card" bindtap="goPackages">
         <text class="asset-num">{{isLoggedIn ? stats.ptRemaining : '-'}}</text>
-        <text class="asset-label">????</text>
+        <text class="asset-label">剩余课时</text>
+      </view>
+      <view class="asset-card" bindtap="goCompetitions">
+        <text class="asset-num">{{isLoggedIn ? stats.competitions : '-'}}</text>
+        <text class="asset-label">近期比赛</text>
       </view>
       <view class="asset-card" bindtap="onRequireLogin">
         <text class="asset-num">{{isLoggedIn ? stats.checkInMonth : '-'}}</text>
-        <text class="asset-label">????</text>
+        <text class="asset-label">本月打卡</text>
       </view>
     </view>
   </view>
-  <view class="quick-actions">
-    <view class="action-card" bindtap="goCourses"><text class="action-icon">🏋</text><text class="action-text">????</text></view>
-    <view class="action-card" bindtap="goPT"><text class="action-icon">👤</text><text class="action-text">????</text></view>
-    <view class="action-card" bindtap="onRequireLogin"><text class="action-icon">📋</text><text class="action-text">????</text></view>
-    <view class="action-card" bindtap="onRequireLogin"><text class="action-icon">✅</text><text class="action-text">打卡</text></view>
+
+  <!-- 3. 快捷入口（5个） -->
+  <view class="quick-actions five-cards">
+    <view class="action-card" bindtap="goPT"><text class="action-icon">👤</text><text class="action-text">预约私教</text></view>
+    <view class="action-card" bindtap="goCourses"><text class="action-icon">🏋️</text><text class="action-text">预约团课</text></view>
+    <view class="action-card" bindtap="onRequireLogin"><text class="action-icon">✅</text><text class="action-text">打卡训练</text></view>
+    <view class="action-card" bindtap="goCompetitions"><text class="action-icon">🏆</text><text class="action-text">近期比赛</text></view>
+    <view class="action-card" bindtap="goPointsMall"><text class="action-icon">🎁</text><text class="action-text">积分商城</text></view>
   </view>
-  
+
+  <!-- 4. 今日课程提醒 -->
+  <view class="section" wx:if="{{isLoggedIn && todayCourses.length>0}}">
+    <view class="section-header"><text class="section-title">今日课程</text><text class="section-more" bindtap="goMyBookings">查看全部 ></text></view>
+    <view class="today-list">
+      <view class="today-card {{item.status==='completed' ? 'done' : ''}}" wx:for="{{todayCourses}}" wx:key="id" data-id="{{item.id}}" bindtap="goBookingDetail">
+        <view class="today-time">{{item.time}}</view>
+        <view class="today-info">
+          <text class="today-name">{{item.name}}</text>
+          <text class="today-type">{{item.type==='pt'?'私教':'团课'}} · {{item.trainerName}}</text>
+        </view>
+        <text class="today-status {{item.status}}">{{item.status==='completed'?'已完成':'待上课'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 5. 课程推荐（横向滚动） -->
+  <view class="section">
+    <view class="section-header"><text class="section-title">课程推荐</text><text class="section-more" bindtap="goCourses">更多 ></text></view>
+    <scroll-view class="recommend-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="recommend-card" wx:for="{{recommendedCourses}}" wx:key="id" data-id="{{item.id}}" bindtap="goBooking">
+        <image class="recommend-img" src="{{item.cover || '/images/default_course.png'}}" mode="aspectFill"/>
+        <text class="recommend-name">{{item.name}}</text>
+        <text class="recommend-meta">{{item.enrolled}}人预约 · {{item.trainerName}}</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 6. 优惠课程包 -->
+  <view class="section" wx:if="{{packages.length>0}}">
+    <view class="section-header"><text class="section-title">优惠课程包</text><text class="section-more" bindtap="goPackages">更多 ></text></view>
+    <scroll-view class="package-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="package-card" wx:for="{{packages}}" wx:key="id" data-id="{{item.id}}" bindtap="buyPackage">
+        <text class="package-name">{{item.name}}</text>
+        <text class="package-sessions">{{item.sessions}}节课</text>
+        <view class="package-price"><text class="price-current">¥{{item.price}}</text><text class="price-original" wx:if="{{item.originalPrice}}">¥{{item.originalPrice}}</text></view>
+        <view class="package-tag" wx:if="{{item.discount}}">{{item.discount}}折</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 7. 体测数据 -->
+  <view class="section" wx:if="{{isLoggedIn && fitnessData.weight>0}}">
+    <view class="section-header"><text class="section-title">体测趋势</text><text class="section-more" bindtap="goFitnessTest">查看详情 ></text></view>
+    <view class="fitness-grid">
+      <view class="fitness-item"><text class="fitness-value">{{fitnessData.weight}}</text><text class="fitness-unit">kg</text><text class="fitness-label">体重</text></view>
+      <view class="fitness-item"><text class="fitness-value">{{fitnessData.bodyFat}}</text><text class="fitness-unit">%</text><text class="fitness-label">体脂率</text></view>
+      <view class="fitness-item"><text class="fitness-value">{{fitnessData.bmi}}</text><text class="fitness-unit"></text><text class="fitness-label">BMI</text></view>
+      <view class="fitness-item"><text class="fitness-value">{{fitnessData.muscle}}</text><text class="fitness-unit">kg</text><text class="fitness-label">肌肉量</text></view>
+    </view>
+  </view>
+
   <tab-bar/>
 </view>

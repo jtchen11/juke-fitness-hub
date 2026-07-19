@@ -1,16 +1,16 @@
 <view class="page-my-bookings">
   <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
     <view class="filter-list">
-      <view class="filter-item {{filter==='all' ? 'active' : ''}}" data-filter="all" bindtap="onFilter">??</view>
-      <view class="filter-item {{filter==='booked' ? 'active' : ''}}" data-filter="booked" bindtap="onFilter">???</view>
-      <view class="filter-item {{filter==='checked_in' ? 'active' : ''}}" data-filter="checked_in" bindtap="onFilter">???</view>
-      <view class="filter-item {{filter==='completed' ? 'active' : ''}}" data-filter="completed" bindtap="onFilter">???</view>
-      <view class="filter-item {{filter==='cancelled' ? 'active' : ''}}" data-filter="cancelled" bindtap="onFilter">???</view>
+      <view class="filter-item {{filter==='all' ? 'active' : ''}}" data-filter="all" bindtap="onFilter">全部</view>
+      <view class="filter-item {{filter==='booked' ? 'active' : ''}}" data-filter="booked" bindtap="onFilter">已预约</view>
+      <view class="filter-item {{filter==='checked_in' ? 'active' : ''}}" data-filter="checked_in" bindtap="onFilter">已签到</view>
+      <view class="filter-item {{filter==='completed' ? 'active' : ''}}" data-filter="completed" bindtap="onFilter">已完成</view>
+      <view class="filter-item {{filter==='cancelled' ? 'active' : ''}}" data-filter="cancelled" bindtap="onFilter">已取消</view>
     </view>
   </scroll-view>
 
   <view class="list-area">
-    <view wx:if="{{list.length===0}}" class="empty-state"><text>??????</text></view>
+    <view wx:if="{{list.length===0}}" class="empty-state"><text>暂无预约记录</text></view>
     <view class="booking-card" wx:for="{{list}}" wx:key="id">
       <view class="card-top">
         <view class="card-left">
@@ -22,8 +22,8 @@
         <view class="status-tag {{item.status}}">{{statusText(item.status)}}</view>
       </view>
       <view class="card-actions" wx:if="{{item.status==='booked'}}">
-        <button class="btn-cancel" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="onCancel">????</button>
-        <button class="btn-checkin" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="onCheckin">??</button>
+        <button class="btn-cancel" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="onCancel">取消预约</button>
+        <button class="btn-checkin" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="onCheckin">签到</button>
       </view>
     </view>
   </view>

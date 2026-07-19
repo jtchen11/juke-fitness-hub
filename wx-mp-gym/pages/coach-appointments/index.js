@@ -6,11 +6,20 @@ Page({
   filterStatus(e) { this.setData({ statusFilter: e.currentTarget.dataset.status }); this.loadAppointments(); },
   loadAppointments() {
     var _this = this;
-    var url = (app.globalData.apiBaseUrl || 'http://192.168.10.8:8080') + '/api/trainers/' + (app.globalData.userInfo?.trainerId || 0) + '/appointments?status=' + this.data.statusFilter;
-    wx.request({
-      url: url,
-      success: function(r) { if (r.data) _this.setData({ appointments: r.data }); },
-      fail: function() {}
+    var params = {};
+    if (this.data.statusFilter) params.status = this.data.statusFilter;
+    var trainerId = (app.globalData.userInfo && app.globalData.userInfo.trainerId) || 0;
+    request.get('/api/trainers/' + trainerId + '/appointments', params, function(r) {
+      if (r) {
+        var list = r.list || r || [];
+        // 对缺失 memberName 的记录做兜底显示
+        list.forEach(function(item) {
+          if (!item.memberName || item.memberName.indexOf('#') >= 0) {
+            item.memberName = item.memberNameDisplay || item.memberName || '会员';
+          }
+        });
+        _this.setData({ appointments: list });
+      }
     });
   },
   onCheckIn(e) {
@@ -21,9 +30,8 @@ Page({
       content: '请确认会员已到场，是否开始上课？',
       success: function(res) {
         if (res.confirm) {
-          // 直接标记为已完成（人脸模块可后续对接）
           wx.showLoading({ title: '正在打卡...' });
-          request.patch('/api/personal-training/' + id + '/status', { status: 'completed' }, function(r) {
+          request.post('/api/check-in/pt/' + id, { action: 'start' }, function(r) {
             wx.hideLoading();
             if (r && r.success) {
               wx.showToast({ title: '打卡成功', icon: 'success' });
@@ -44,7 +52,7 @@ Page({
       content: '确定取消该预约吗？',
       success: function(r) {
         if (r.confirm) {
-          request.patch('/api/personal-training/' + id + '/status', { status: 'cancelled' }, function(r) {
+          request.post('/api/personal-trainings/' + id + '/cancel', {}, function(r) {
             if (r && r.success) { wx.showToast({ title: '已取消', icon: 'success' }); _this.loadAppointments(); }
             else { wx.showToast({ title: r.message || '操作失败', icon: 'none' }); }
           });
