@@ -4,9 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.gym.entity.ClassBooking;
 import com.gym.entity.GroupClass;
 import com.gym.entity.PersonalTraining;
+import com.gym.entity.Trainer;
+import com.gym.entity.CheckIn;
 import com.gym.mapper.ClassBookingMapper;
 import com.gym.mapper.GroupClassMapper;
 import com.gym.mapper.MemberMapper;
+import com.gym.mapper.CheckInMapper;
 import com.gym.mapper.PersonalTrainingMapper;
 import com.gym.mapper.TrainerMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,9 @@ public class DashboardController {
 
     @Autowired
     private TrainerMapper trainerMapper;
+
+    @Autowired
+    private CheckInMapper checkInMapper;
 
     @Autowired
     private ClassBookingMapper bookingMapper;

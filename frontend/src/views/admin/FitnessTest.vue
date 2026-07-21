@@ -268,6 +268,44 @@
       </template>
     </el-dialog>
 
+    <!-- ====== 评分引擎弹窗 ====== -->
+    <el-dialog v-model="scoreVisible" title="体测评分" width="500px" destroy-on-close>
+      <div v-if="scoreData">
+        <el-row :gutter="16" style="text-align:center;margin-bottom:20px">
+          <el-col :span="8" v-for="s in scoreData.items" :key="s.label">
+            <div :style="{ background: s.color, color: '#fff', borderRadius: '12px', padding: '16px 8px' }">
+              <div style="font-size:28px;font-weight:bold">{{ s.score }}</div>
+              <div style="font-size:13px;margin-top:4px">{{ s.label }}</div>
+              <div style="font-size:11px;opacity:0.8">{{ s.value }}</div>
+            </div>
+          </el-col>
+        </el-row>
+        <el-divider />
+        <div style="text-align:center">
+          <div style="font-size:36px;font-weight:bold;color:#4A6CF7">{{ scoreData.total }}</div>
+          <div style="color:#666;font-size:14px">综合评分</div>
+          <div style="margin-top:8px;font-size:13px;color:#999">{{ scoreData.evaluation }}</div>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- ====== AI报告弹窗 ====== -->
+    <el-dialog v-model="reportVisible" title="AI健康报告" width="600px" destroy-on-close>
+      <div v-if="reportLoading" style="text-align:center;padding:40px">
+        <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+        <p>AI正在分析体测数据，请稍候...</p>
+      </div>
+      <div v-else-if="reportContent" style="white-space:pre-wrap;line-height:1.8;font-size:14px">
+        <div style="background:#f0f7ff;border-radius:8px;padding:16px;margin-bottom:16px">
+          <div style="font-weight:bold;margin-bottom:8px">{{ reportContent.memberName }} | 体测日期：{{ reportContent.testDate }}</div>
+          <div>身高：{{ reportContent.height }}cm | 体重：{{ reportContent.weight }}kg | BMI：{{ reportContent.bmi }}</div>
+        </div>
+        <div v-if="reportContent.report">{{ reportContent.report }}</div>
+        <div v-else style="color:#999;text-align:center;padding:40px">暂无AI报告</div>
+      </div>
+      <div v-else style="text-align:center;padding:40px;color:#999">暂无数据</div>
+    </el-dialog>
+
     <!-- ====== 详情抽屉 ====== -->
     <el-drawer
         v-model="detailVisible"
@@ -316,7 +354,6 @@
     </el-drawer>
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
@@ -695,6 +732,62 @@ const renderChart = () => {
 // =============================================
 
 // 点击表格行 → 自动切换趋势图
+// ====== 评分引擎 ======
+const showScoring = async (row) => {
+  scoreVisible.value = true
+  try {
+    const res = await axios.post("/api/assessment/score", {
+      memberId: row.memberId,
+      weightKg: row.weightKg || row.weight || 70,
+      bodyFatPercent: row.bodyFatPercent || row.bodyFat || 20,
+      muscleMassKg: row.muscleMassKg || 30
+    })
+    if (res.data.success) {
+      const d = res.data.data
+      const total = d.totalScore || 0
+      let evaluation = "体测数据良好，请保持健康饮食和规律运动。"
+      if (total < 60) {
+        evaluation = "体测数据偏低，建议咨询专业教练制定训练计划。"
+      } else if (total < 80) {
+        evaluation = "体测数据有改善空间，建议加强有氧运动和力量训练。"
+      }
+      scoreData.value = {
+        total: total,
+        evaluation: evaluation,
+        items: [
+          { label: "BMI", value: d.bmi || "-", score: d.bmiScore || 0, color: (d.bmiScore || 0) >= 40 ? "#67C23A" : (d.bmiScore || 0) >= 25 ? "#E6A23C" : "#F56C6C" },
+          { label: "体脂率", value: (d.fatScore || 0) + "%", score: d.fatScore || 0, color: (d.fatScore || 0) >= 40 ? "#67C23A" : (d.fatScore || 0) >= 25 ? "#E6A23C" : "#F56C6C" },
+          { label: "综合得分", value: total, score: total, color: total >= 80 ? "#67C23A" : total >= 60 ? "#E6A23C" : "#F56C6C" }
+        ]
+      }
+    }
+  } catch (error) {
+    console.error("评分失败", error)
+  }
+}
+
+// ====== AI报告 ======
+const generateAIReport = async (row) => {
+  reportVisible.value = true
+  reportLoading.value = true
+  reportContent.value = null
+  try {
+    const res = await axios.get("/api/fitness-tests/" + row.id + "/ai-report")
+    reportContent.value = res.data
+  } catch (error) {
+    reportContent.value = {
+      memberName: row.memberName || "未知",
+      testDate: row.testDate || "",
+      height: row.height || "-",
+      weight: row.weight || "-",
+      bmi: row.bmi || "-",
+      report: "暂无AI分析报告，请确认AI服务已启动。"
+    }
+  } finally {
+    reportLoading.value = false
+  }
+}
+
 const onRowClick = (row) => {
   if (filterMemberId.value !== row.memberId) {
     filterMemberId.value = row.memberId

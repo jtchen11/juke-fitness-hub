@@ -15,6 +15,7 @@ public class CheckIn {
     private Long id;
     private Long memberId;
     private LocalDateTime checkInTime;
+    private LocalDateTime checkOutTime;
     private String checkInType;
     private Long classId;
     private String remark;

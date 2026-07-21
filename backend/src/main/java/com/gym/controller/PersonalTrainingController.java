@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gym.entity.Member;
+import com.gym.entity.CheckIn;
 import com.gym.entity.PersonalTraining;
 import com.gym.entity.Trainer;
 import com.gym.entity.TrainerLeave;
 import com.gym.mapper.MemberMapper;
 import com.gym.mapper.PersonalTrainingMapper;
+import com.gym.mapper.CheckInMapper;
 import com.gym.mapper.TrainerMapper;
 import com.gym.mapper.TrainerLeaveMapper;
 import com.gym.service.PersonalTrainingService;
@@ -44,7 +46,10 @@ public class PersonalTrainingController {
     private TrainerLeaveMapper trainerLeaveMapper;
 
     @Autowired
-    private PersonalTrainingService personalTrainingService;  // ← 注入 Service
+    private PersonalTrainingService personalTrainingService;
+
+    @Autowired
+    private CheckInMapper ptCheckInMapper;  // ← 注入 Service
 
     @GetMapping
     public Map<String, Object> list(
@@ -318,5 +323,38 @@ public class PersonalTrainingController {
             case "cancelled_by_trainer": return "已取消";
             default: return status;
         }
+    }
+    @PostMapping("/{id}/check-in")
+    @Transactional
+    public Map<String, Object> manualCheckIn(@PathVariable Long id) {
+        PersonalTraining pt = ptMapper.selectById(id);
+        Map<String, Object> result = new HashMap<>();
+        if (pt == null) {
+            result.put("success", false);
+            result.put("message", "预约记录不存在");
+            return result;
+        }
+        if (!"scheduled".equals(pt.getStatus())) {
+            result.put("success", false);
+            result.put("message", "当前状态不可核销");
+            return result;
+        }
+
+        // 记录签到
+        CheckIn ci = new CheckIn();
+        ci.setMemberId(pt.getMemberId());
+        ci.setPtId(pt.getId());
+        ci.setCheckInType("pt");
+        ci.setCheckInTime(LocalDateTime.now());
+        ci.setRemark("manual_checkin");
+        ptCheckInMapper.insert(ci);
+
+        // 更新预约状态
+        pt.setStatus("completed");
+        ptMapper.updateById(pt);
+
+        result.put("success", true);
+        result.put("message", "核销成功");
+        return result;
     }
 }

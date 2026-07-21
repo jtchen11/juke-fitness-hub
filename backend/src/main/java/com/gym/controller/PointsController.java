@@ -3,6 +3,8 @@ package com.gym.controller;
 import com.gym.entity.PointsHistory;
 import com.gym.entity.PointsRedemption;
 import com.gym.service.PointsService;
+import com.gym.mapper.PointsRewardMapper;
+import com.gym.entity.PointsReward;
 import com.gym.auth.LoginContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,7 @@ import java.util.Map;
 public class PointsController {
 
     @Autowired private PointsService pointsService;
+    @Autowired private PointsRewardMapper rewardMapper;
 
     /** 查询当前积分 */
     @GetMapping
@@ -41,23 +44,28 @@ public class PointsController {
         return r;
     }
 
+    /** 积分商品列表（会员端） */
+    @GetMapping("/rewards")
+    public Map<String, Object> getRewards(@RequestParam(defaultValue = "true") Boolean active) {
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PointsReward> w =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        if (active) w.eq(PointsReward::getIsActive, true);
+        w.orderByAsc(PointsReward::getSortOrder);
+        List<PointsReward> list = rewardMapper.selectList(w);
+        Map<String, Object> r = new HashMap<>();
+        r.put("list", list);
+        return r;
+    }
+
     /** 创建兑换申请 */
     @PostMapping("/redeem")
-    public Map<String, Object> redeem(@RequestBody Map<String, String> params) {
+    public Map<String, Object> redeem(@RequestBody Map<String, Object> params) {
         Long memberId = LoginContext.getUserId();
         if (memberId == null) { Map<String, Object> e = new HashMap<>(); e.put("success", false); e.put("message", "未登录"); return e; }
-        String type = params.get("type");
-        String remark = params.get("remark");
-        PointsRedemption r = pointsService.createRedemption(memberId, type, remark);
-        Map<String, Object> result = new HashMap<>();
-        if (r != null) {
-            result.put("success", true);
-            result.put("message", "兑换申请已提交");
-            result.put("data", r);
-        } else {
-            result.put("success", false);
-            result.put("message", "积分不足");
-        }
+        Long rewardId = params.get("rewardId") != null ? Long.valueOf(params.get("rewardId").toString()) : null;
+        if (rewardId == null) { Map<String, Object> e = new HashMap<>(); e.put("success", false); e.put("message", "缺少rewardId"); return e; }
+        String remark = (String) params.getOrDefault("remark", "");
+        Map<String, Object> result = pointsService.redeemReward(memberId, rewardId, remark);
         return result;
     }
 

@@ -134,6 +134,36 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- ====== 教练统计 ====== -->
+    <el-row :gutter="20" style="margin-top:20px">
+      <el-col :span="24">
+        <el-card shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <span>👨‍🏫 教练本月统计</span>
+              <el-button size="small" type="primary" plain @click="loadCoachStats">刷新</el-button>
+            </div>
+          </template>
+          <el-table :data="coachStats" border style="width:100%" v-loading="coachLoading" size="small">
+            <el-table-column prop="name" label="教练姓名" width="120" />
+            <el-table-column prop="sessionsThisMonth" label="本月上课数" width="110" align="center" />
+            <el-table-column prop="checkInsThisMonth" label="本月核销数" width="110" align="center" />
+            <el-table-column prop="checkInRate" label="核销率" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.checkInRate &gt;= 0.8 ? 'success' : row.checkInRate &gt;= 0.5 ? 'warning' : 'danger'" size="small">
+                  {{ (row.checkInRate * 100).toFixed(1) }}%
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="totalStudents" label="学员数" width="80" align="center" />
+            <el-table-column prop="avgRating" label="平均评分" width="80" align="center">
+              <template #default="{ row }">{{ row.avgRating ? row.avgRating.toFixed(1) : '-' }}</template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -142,7 +172,7 @@ import { ref, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
-import { User, UserFilled, Calendar, Notebook, ChatDotRound } from '@element-plus/icons-vue'
+import { User, UserFilled, Calendar, Notebook, Checked, ChatDotRound } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
@@ -156,6 +186,8 @@ const stats = ref([
 
 const recentBookings = ref([])
 const hotClasses = ref([])
+const coachStats = ref([])
+const coachLoading = ref(false)
 const trendRange = ref('7')
 
 // ============ ECharts 图表 ============
@@ -197,6 +229,18 @@ const loadRecentBookings = async () => {
     const res = await axios.get('/api/personal-trainings?page=1&size=5')
     recentBookings.value = res.data.list || []
   } catch (error) {}
+}
+
+const loadCoachStats = async () => {
+  coachLoading.value = true
+  try {
+    const res = await axios.get('/api/dashboard/coach-stats')
+    coachStats.value = res.data || []
+  } catch (error) {
+    console.error('加载教练统计失败', error)
+  } finally {
+    coachLoading.value = false
+  }
 }
 
 const loadHotClasses = async () => {

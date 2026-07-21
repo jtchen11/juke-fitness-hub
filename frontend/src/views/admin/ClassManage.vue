@@ -175,6 +175,9 @@
             <el-button size="small" type="warning" plain @click="handleCopy(row)">
               复制
             </el-button>
+            <el-button size="small" type="success" plain @click="showCheckIns(row)">
+              核销记录
+            </el-button>
             <el-button size="small" type="primary" plain @click="handleEdit(row)">
               编辑
             </el-button>
@@ -296,6 +299,10 @@
               style="width:100%"
           />
         </el-form-item>
+        <el-form-item label="允许访客体验">
+          <el-switch v-model="formData.allowVisitor" active-color="#4A6CF7" />
+          <span class="switch-desc">{{ formData.allowVisitor ? '允许' : '不允许' }}</span>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -403,6 +410,39 @@
       </div>
     </el-drawer>
   </div>
+
+    <!-- ====== 核销记录弹窗 ====== -->
+    <el-dialog v-model="checkInVisible" title="核销记录" width="600px" destroy-on-close>
+      <div v-if="checkInLoading" style="text-align:center;padding:40px">
+        <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+        <p>加载中...</p>
+      </div>
+      <div v-else>
+        <div style="margin-bottom:16px">
+          <span style="font-weight:bold">课程：</span>{{ checkInClassData?.name }}
+          <span style="margin-left:16px;font-weight:bold">日期：</span>{{ checkInClassData?.classDate }}
+        </div>
+        <el-table :data="checkInRecords" border style="width:100%" size="small">
+          <el-table-column prop="memberName" label="会员姓名" width="100" />
+          <el-table-column prop="checkInTime" label="签到时间" width="160" />
+          <el-table-column prop="checkInType" label="签到方式" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.checkInType === 'code' ? 'success' : 'info'" size="small">
+                {{ row.checkInType === "code" ? "签到码" : "手动" }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="状态" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'checked_in' ? 'success' : 'warning'" size="small">
+                {{ row.status === "checked_in" ? "已签到" : "待签到" }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!checkInRecords.length && !checkInLoading" description="暂无核销记录" />
+      </div>
+    </el-dialog>
 </template>
 
 <script setup>
@@ -460,7 +500,8 @@ const formData = ref({
   status: 'scheduled',
   type: 'paid',        // 新增：paid / free
   price: 99.00,        // 新增：价格
-  description: ''      // 新增：课程介绍
+  description: '',
+  allowVisitor: false 
 })
 
 // 详情抽屉
@@ -837,6 +878,7 @@ onMounted(() => {
 .stat-sub {
   margin-top: 2px;
 }
+.switch-desc { margin-left: 8px; font-size: 13px; color: #999; }
 .card-header {
   display: flex;
   justify-content: space-between;

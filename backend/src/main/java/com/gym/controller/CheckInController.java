@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -73,8 +74,7 @@ public class CheckInController {
         checkIn.setCheckInType("normal");
         checkInMapper.insert(checkIn);
 
-        // 训练签到 +1 积分
-        pointsService.addPoints(memberId, 1, "check_in", checkIn.getId(), "训练打卡签到");
+        // 积分在签退时根据时长和次数发放
 
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
@@ -83,6 +83,53 @@ public class CheckInController {
         result.put("checkInTime", LocalDateTime.now());
         return result;
     }
+
+    /**
+     * 自主训练签退：计算时长，符合条件发放积分
+     */
+    @PostMapping("/member/{memberId}/check-out")
+    @Transactional
+    public Map<String, Object> checkOut(@PathVariable Long memberId) {
+        // 1. 查找最近一条无签退时间的 normal 签到记录
+        LambdaQueryWrapper<CheckIn> w = new LambdaQueryWrapper<>();
+        w.eq(CheckIn::getMemberId, memberId)
+                .eq(CheckIn::getCheckInType, "normal")
+                .isNull(CheckIn::getCheckOutTime)
+                .orderByDesc(CheckIn::getCheckInTime)
+                .last("LIMIT 1");
+        CheckIn ci = checkInMapper.selectOne(w);
+        if (ci == null) {
+            return errorResponse("未找到进行中的训练记录");
+        }
+
+        // 2. 记录签退时间
+        LocalDateTime now = LocalDateTime.now();
+        ci.setCheckOutTime(now);
+        checkInMapper.updateById(ci);
+
+        // 3. 计算训练时长（分钟）
+        long duration = java.time.Duration.between(ci.getCheckInTime(), now).toMinutes();
+        if (duration < 40) {
+            return successResponse("训练时长" + duration + "分钟，不足40分钟不计积分");
+        }
+
+        // 4. 统计今日已签退次数
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LambdaQueryWrapper<CheckIn> countW = new LambdaQueryWrapper<>();
+        countW.eq(CheckIn::getMemberId, memberId)
+                .eq(CheckIn::getCheckInType, "normal")
+                .isNotNull(CheckIn::getCheckOutTime)
+                .ge(CheckIn::getCheckOutTime, todayStart);
+        long todayCheckOuts = checkInMapper.selectCount(countW);
+
+        if (todayCheckOuts <= 2) {
+            pointsService.addPoints(memberId, 1, "NORMAL_TRAINING", ci.getId(), "自主训练积分");
+            return successResponse("训练时长" + duration + "分钟，积分+1");
+        }
+
+        return successResponse("训练时长" + duration + "分钟，当日已获2次积分，不再累计");
+    }
+
 
     /**
      * 团课签到
@@ -96,6 +143,13 @@ public class CheckInController {
         checkIn.setClassId(classId);
         checkInMapper.insert(checkIn);
 
+        // 团课签到 +1 积分
+        try {
+            GroupClass gc = groupClassMapper.selectById(classId);
+            int points = 1;
+            if (gc != null && "paid".equals(gc.getType())) points += 10;
+            pointsService.addPoints(memberId, points, "CLASS_CHECKIN", classId, "团课签到");
+        } catch (Exception ignored) {}
         return successResponse("团课签到成功");
     }
 
@@ -283,6 +337,10 @@ public class CheckInController {
         if ("end".equals(action)) {
             pt.setStatus("completed");
             personalTrainingMapper.updateById(pt);
+            // 私教完成 +1 积分
+            try {
+                pointsService.addPoints(memberId, 1, "PT_COMPLETED", ptId, "私教签到");
+            } catch (Exception ignored) {}
         } else {
             // 上课打卡：可记录上课时间，但暂不改变状态
             // 可选：设置 pt.setStatus("ongoing")，但需要数据库加字段
@@ -368,6 +426,45 @@ public class CheckInController {
         Map<String, Object> result = new HashMap<>();
         result.put("success", false);
         result.put("message", msg);
+        return result;
+    }
+    @GetMapping("/coach-stats")
+    public List<Map<String, Object>> getCoachCheckInStats() {
+        List<Trainer> trainers = trainerMapper.selectList(null);
+        List<Map<String, Object>> result = new ArrayList<>();
+        LocalDateTime monthStart = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0);
+
+        for (Trainer t : trainers) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("trainerId", t.getId());
+            item.put("trainerName", t.getName());
+
+            // 该教练所有 personal_training 的 ptId
+            List<PersonalTraining> pts = personalTrainingMapper.selectList(
+                new LambdaQueryWrapper<PersonalTraining>().eq(PersonalTraining::getTrainerId, t.getId())
+            );
+            long ptCheckIns = 0;
+            long ptTotal = pts.size();
+            for (PersonalTraining pt : pts) {
+                LambdaQueryWrapper<CheckIn> ciw = new LambdaQueryWrapper<>();
+                ciw.eq(CheckIn::getPtId, pt.getId());
+                long cnt = checkInMapper.selectCount(ciw);
+                if (cnt > 0) ptCheckIns++;
+            }
+            item.put("total", ptTotal);
+            item.put("checkIns", ptCheckIns);
+
+            // 本月签到数
+            long monthTotal = 0;
+            for (PersonalTraining pt : pts) {
+                if (pt.getAppointmentTime() != null && pt.getAppointmentTime().isAfter(monthStart)) {
+                    monthTotal++;
+                }
+            }
+            item.put("monthTotal", monthTotal);
+
+            result.add(item);
+        }
         return result;
     }
 }

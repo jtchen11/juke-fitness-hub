@@ -5,7 +5,7 @@
   </view>
   <scroll-view class="student-list" scroll-y>
     <view class="student-card" wx:for="{{students}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
-      <image class="student-avatar" src="/images/default_avatar.png"/>
+      <image class="student-avatar" src="{{item.avatarUrl || '/images/default_avatar.png'}}" mode="aspectFill"/>
       <view class="student-info">
         <text class="student-name">{{item.name}}</text>
         <text class="student-phone">{{item.phone}}</text>

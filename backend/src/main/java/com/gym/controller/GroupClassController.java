@@ -4,8 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gym.entity.GroupClass;
+import com.gym.entity.Member;
+import com.gym.entity.CheckIn;
+import com.gym.entity.ClassBooking;
 import com.gym.entity.Trainer;
 import com.gym.mapper.GroupClassMapper;
+import com.gym.mapper.ClassBookingMapper;
+import com.gym.mapper.MemberMapper;
+import com.gym.mapper.CheckInMapper;
 import com.gym.mapper.TrainerMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -30,7 +37,16 @@ public class GroupClassController {
     private GroupClassMapper groupClassMapper;
 
     @Autowired
+    private ClassBookingMapper classBookingMapper;
+
+    @Autowired
+    private CheckInMapper checkInMapperForClass;
+
+    @Autowired
     private TrainerMapper trainerMapper;
+
+    @Autowired
+    private MemberMapper memberMapper;
 
     /**
      * 分页查询团课列表（支持关键词、教练、状态、类型筛选）
@@ -273,5 +289,34 @@ public class GroupClassController {
             case "cancelled": return "已取消";
             default: return status;
         }
+    }
+    @GetMapping("/{id}/check-ins")
+    public List<Map<String, Object>> getClassCheckIns(@PathVariable Long id) {
+        List<ClassBooking> bookings = classBookingMapper.selectList(
+            new LambdaQueryWrapper<ClassBooking>().eq(ClassBooking::getClassId, id)
+        );
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ClassBooking cb : bookings) {
+            Map<String, Object> item = new HashMap<>();
+            Member member = memberMapper.selectById(cb.getMemberId());
+            item.put("memberName", member != null ? member.getName() : "未知");
+            item.put("status", cb.getStatus());
+
+            List<CheckIn> checkIns = checkInMapperForClass.selectList(
+                new LambdaQueryWrapper<CheckIn>()
+                    .eq(CheckIn::getClassId, id)
+                    .eq(CheckIn::getMemberId, cb.getMemberId())
+            );
+            if (!checkIns.isEmpty()) {
+                CheckIn ci = checkIns.get(0);
+                item.put("checkInTime", ci.getCheckInTime() != null ? ci.getCheckInTime().toString() : "");
+                item.put("checkInType", ci.getCheckInType());
+            } else {
+                item.put("checkInTime", "");
+                item.put("checkInType", "");
+            }
+            result.add(item);
+        }
+        return result;
     }
 }

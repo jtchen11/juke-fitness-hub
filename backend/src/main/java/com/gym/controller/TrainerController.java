@@ -8,6 +8,7 @@ import com.gym.entity.*;
 import com.gym.mapper.PersonalTrainingMapper;
 import com.gym.mapper.TrainerLeaveMapper;
 import com.gym.mapper.TrainerMapper;
+import com.gym.entity.TrainerLeave;
 import com.gym.mapper.UserMessageMapper;
 import com.gym.mapper.MemberMapper;
 import com.gym.mapper.GroupClassMapper;
@@ -540,5 +541,41 @@ public class TrainerController {
                     return !bookedTimes.contains(slotTime);
                 })
                 .collect(Collectors.toList());
+    }
+    @GetMapping("/leaves/pending")
+    public List<Map<String, Object>> getPendingLeaves() {
+        List<TrainerLeave> leaves = trainerLeaveMapper.selectList(
+            new LambdaQueryWrapper<TrainerLeave>().orderByDesc(TrainerLeave::getCreatedAt)
+        );
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (TrainerLeave l : leaves) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", l.getId());
+            item.put("trainerId", l.getTrainerId());
+            item.put("leaveDate", l.getLeaveDate() != null ? l.getLeaveDate().toString() : "");
+            item.put("reason", l.getReason());
+            item.put("createdAt", l.getCreatedAt() != null ? l.getCreatedAt().toString() : "");
+            item.put("status", l.getStatus() != null ? l.getStatus() : "pending");
+
+            Trainer trainer = trainerMapper.selectById(l.getTrainerId());
+            item.put("trainerName", trainer != null ? trainer.getName() : "未知");
+            result.add(item);
+        }
+        return result;
+    }
+
+    @PutMapping("/leaves/{id}/approve")
+    public Map<String, Object> approveLeave(@PathVariable Long id, @RequestParam String status) {
+        TrainerLeave leave = trainerLeaveMapper.selectById(id);
+        Map<String, Object> result = new HashMap<>();
+        if (leave == null) {
+            result.put("success", false);
+            result.put("message", "请假记录不存在");
+            return result;
+        }
+        leave.setStatus(status);
+        trainerLeaveMapper.updateById(leave);
+        result.put("success", true);
+        return result;
     }
 }

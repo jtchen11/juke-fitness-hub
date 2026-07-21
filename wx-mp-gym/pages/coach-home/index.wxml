@@ -1,7 +1,11 @@
 <view class="page-coach-home">
   <view class="page-header">
     <text class="page-title">今日课表</text>
-    <text class="page-date">{{today}}</text>
+    <text class="page-date">{{dateDisplay}}</text>
+  </view>
+  <view class="summary-bar">
+    <text class="summary-count">{{schedules.length}}</text>
+    <text class="summary-label">节课 · {{completedCount}}节已完成</text>
   </view>
   <scroll-view class="schedule-list" scroll-y>
     <view class="schedule-card" wx:for="{{schedules}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">

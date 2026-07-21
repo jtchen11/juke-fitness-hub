@@ -44,6 +44,10 @@ Page({
       }
     });
   },
+  goDetail(e) {
+    var id = e.currentTarget.dataset.id;
+    wx.navigateTo({ url: '/pages/coach-appointments/detail?id=' + id });
+  },
   onCancel(e) {
     var id = e.currentTarget.dataset.id;
     var _this = this;

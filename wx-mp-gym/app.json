@@ -19,7 +19,7 @@
                   "pages/assessments/index",
                   "pages/assessment-detail/index",
                   "pages/coach-students/detail/index",
-                  "pages/coach-mine/leave-request/index"
+                  "pages/coach-mine/leave-request/index", "pages/coach-appointments/detail/index"
               ],
     "window":  {
                    "navigationStyle":  "custom",

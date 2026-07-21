@@ -81,6 +81,8 @@ const routes = [
             { path: 'bookings', name: 'AdminBookingManage', component: () => import('@/views/admin/BookingManage.vue'), meta: { title: '私教预约' } },
             { path: 'fitness-tests', name: 'AdminFitnessTest', component: () => import('@/views/admin/FitnessTest.vue'), meta: { title: '体测记录' } },
             { path: 'check-in-records', name: 'AdminCheckInRecord', component: () => import('@/views/admin/CheckInRecord.vue'), meta: { title: '签到记录' } },
+            { path: 'diet-record', name: 'AdminDietRecord', component: () => import('@/views/admin/DietRecord.vue'), meta: { title: '饮食记录' } },
+            { path: 'points-rewards', name: 'AdminPointsRewards', component: () => import('@/views/admin/PointsRewardManage.vue'), meta: { title: '积分商品管理' } },
             { path: 'packages', name: 'AdminPackageManage', component: () => import('@/views/admin/PackageManage.vue'), meta: { title: '私教套餐管理' } },
             {
                 path: 'competitions',

@@ -24,6 +24,8 @@
           <el-menu-item index="/admin/members"><el-icon><User /></el-icon><span>会员列表</span></el-menu-item>
           <el-menu-item index="/admin/fitness-tests"><el-icon><TrendCharts /></el-icon><span>体测记录</span></el-menu-item>
           <el-menu-item index="/admin/check-in-records"><el-icon><Checked /></el-icon><span>打卡记录</span></el-menu-item>
+          <el-menu-item index="/admin/diet-record"><el-icon><Food /></el-icon><span>饮食记录</span></el-menu-item>
+          <el-menu-item index="/admin/points-rewards"><el-icon><Goods /></el-icon><span>积分商品</span></el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="/admin/packages">
           <template #title>
@@ -84,7 +86,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import {
   DataLine, User, Calendar, Notebook, TrendCharts,
-  Checked, Goods, Trophy, Setting, Tools, Fold, Search, Bell, Coin
+  Checked, Goods, Trophy, Setting, Tools, Fold, Search, Bell, Coin, Food
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

@@ -166,10 +166,17 @@ public class MemberController {
             member.setExpireDate(null);
         }
         member.setId(id);
+
+        // 读取旧 expire_date，仅变更时才发站内信
+        Member oldMember = memberMapper.selectById(id);
+        LocalDate oldExpire = oldMember != null ? oldMember.getExpireDate() : null;
+
         memberMapper.updateById(member);
 
-        // 发送站内信（expire_date变更时）
-        if (member.getExpireDate() != null) {
+        boolean expireChanged = member.getExpireDate() != null
+                && (oldExpire == null || !oldExpire.equals(member.getExpireDate()));
+
+        if (expireChanged) {
             String msg;
             UserMessage um = new UserMessage();
             um.setMemberId(id);

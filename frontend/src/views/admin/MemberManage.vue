@@ -156,6 +156,9 @@
             <el-button size="small" type="warning" plain @click="showBenefits(row)">
               权益
             </el-button>
+            <el-button size="small" type="info" plain @click="goDietRecord(row)">
+              饮食记录
+            </el-button>
             <el-button size="small" type="danger" plain @click="handleDelete(row)">
               删除
             </el-button>
@@ -386,6 +389,11 @@ const showBenefits = async (row) => {
     console.error('获取权益失败', error);
     ElMessage.error('获取权益信息失败');
   }
+}
+
+// ====== 饮食记录 ======
+const goDietRecord = (row) => {
+  router.push("/admin/diet-record?memberId=" + row.id + "&name=" + encodeURIComponent(row.name))
 };
 
 // ============ 加载数据 ============

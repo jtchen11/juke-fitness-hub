@@ -32,9 +32,44 @@
       </el-col>
     </el-row>
 
+    <!-- ====== 教练签到统计 ====== -->
+    <el-card style="margin-bottom:20px">
+      <template #header><span>👨‍🏫 教练签到统计</span></template>
+      <el-row :gutter="16">
+        <el-col :span="6" v-for="cs in coachStats" :key="cs.trainerId">
+          <el-card shadow="hover" :body-style="{ padding: '12px' }" style="margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <el-avatar :size="36">{{ cs.trainerName?.charAt(0) }}</el-avatar>
+              <div>
+                <div style="font-weight:bold;font-size:14px">{{ cs.trainerName }}</div>
+                <div style="font-size:12px;color:#666">签到 {{ cs.total }} | 核销 {{ cs.checkIns }} | 本月 {{ cs.monthTotal }}</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </el-card>
+
     <!-- ====== 筛选条件 ====== -->
     <el-card style="margin-bottom: 20px">
       <el-row :gutter="16" align="middle">
+        <el-col :span="5">
+          <el-select
+              v-model="filterTrainerId"
+              placeholder="全部教练"
+              clearable
+              @change="loadRecords"
+              style="width:100%"
+              filterable
+          >
+            <el-option
+                v-for="t in trainerList"
+                :key="t.id"
+                :label="t.name"
+                :value="t.id"
+            />
+          </el-select>
+        </el-col>
         <el-col :span="5">
           <el-select
               v-model="filterMemberId"
@@ -173,6 +208,9 @@ import { Refresh } from '@element-plus/icons-vue'
 // =============================================
 
 // 统计数据（4个核心指标）
+const coachStats = ref([])
+const filterTrainerId = ref('')
+const trainerList = ref([])
 const stats = ref([
   { title: '总签到', value: 0, icon: 'Document', color: '#409EFF' },
   { title: '今日签到', value: 0, icon: 'Clock', color: '#67C23A' },
@@ -246,6 +284,20 @@ const loadStats = async () => {
   } catch (error) {
     console.error('加载统计数据失败', error)
   }
+}
+
+const loadCoachStats = async () => {
+  try {
+    const res = await axios.get('/api/check-in/coach-stats')
+    coachStats.value = res.data || []
+  } catch (error) {}
+}
+
+const loadTrainerList = async () => {
+  try {
+    const res = await axios.get('/api/trainers?size=200')
+    trainerList.value = res.data.list || (res.data || [])
+  } catch (error) {}
 }
 
 const loadRecords = async () => {

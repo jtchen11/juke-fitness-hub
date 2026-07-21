@@ -2,6 +2,7 @@ package com.gym.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -16,5 +17,9 @@ public class TrainerLeave {
     private Long trainerId;
     private LocalDate leaveDate;
     private String reason;
+    private String status;  // pending, approved, rejected
     private LocalDateTime createdAt;
+
+    @TableField(exist = false)
+    private String trainerName;
 }

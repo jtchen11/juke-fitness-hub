@@ -3,6 +3,10 @@
     <el-card class="setting-card">
       <template #header><span>功能开关</span></template>
       <el-form label-width="160px">
+        <el-form-item label="饮食记录功能">
+          <el-switch v-model="config.DIET_RECORD_ENABLED" active-value="ON" inactive-value="OFF" active-color="#4A6CF7" />
+          <span class="switch-desc">{{ config.DIET_RECORD_ENABLED === "ON" ? "已开启" : "已关闭" }}</span>
+        </el-form-item>
         <el-form-item label="16+8 断食法">
           <el-switch v-model="config.IF_16_8" active-value="ON" inactive-value="OFF" active-color="#4A6CF7" />
           <span class="switch-desc">{{ config.IF_16_8 === 'ON' ? '已开启' : '已关闭' }}</span>
@@ -28,7 +32,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
-const config = ref({ IF_16_8: 'OFF', CARB_CYCLE: 'OFF', VISITOR_EXPERIENCE_ENABLED: 'OFF' })
+const config = ref({ DIET_RECORD_ENABLED: 'OFF', IF_16_8: 'OFF', CARB_CYCLE: 'OFF', VISITOR_EXPERIENCE_ENABLED: 'OFF' })
 const loading = ref(false)
 const saved = ref(false)
 

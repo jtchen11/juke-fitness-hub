@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gym.entity.FitnessTest;
 import com.gym.entity.Member;
 import com.gym.mapper.FitnessTestMapper;
+import com.gym.assessment.model.dto.AssessmentReportDTO;
+import com.gym.assessment.engine.GymAssessmentScoringEngine;
 import com.gym.mapper.MemberMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +30,9 @@ public class FitnessTestController {
 
     @Autowired
     private MemberMapper memberMapper;
+
+    @Autowired
+    private GymAssessmentScoringEngine scoringEngine;
 
     /**
      * 分页查询体测记录（支持筛选）
@@ -154,50 +159,7 @@ public class FitnessTestController {
         return result;
     }
 
-    @GetMapping("/{id}")
-    public FitnessTest getById(@PathVariable Long id) {
-        FitnessTest test = testMapper.selectById(id);
-        if (test != null && test.getMemberId() != null) {
-            Member member = memberMapper.selectById(test.getMemberId());
-            if (member != null) {
-                test.setMemberName(member.getName());
-            }
-        }
-        return test;
-    }
-
-    @PostMapping
-    public Map<String, Object> add(@RequestBody FitnessTest test) {
-        if (test.getTestDate() == null) {
-            test.setTestDate(LocalDate.now());
-        }
-        testMapper.insert(test);
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("message", "添加成功");
-        return result;
-    }
-
-    @PutMapping("/{id}")
-    public Map<String, Object> update(@PathVariable Long id, @RequestBody FitnessTest test) {
-        test.setId(id);
-        testMapper.updateById(test);
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("message", "更新成功");
-        return result;
-    }
-
-    @DeleteMapping("/{id}")
-    public Map<String, Object> delete(@PathVariable Long id) {
-        testMapper.deleteById(id);
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("message", "删除成功");
-        return result;
-    }
-
-    @GetMapping("/export")
+        @GetMapping("/export")
     public void exportTests(HttpServletResponse response) throws IOException {
         List<FitnessTest> list = testMapper.selectList(
                 new LambdaQueryWrapper<FitnessTest>().orderByDesc(FitnessTest::getTestDate)
@@ -261,5 +223,64 @@ public class FitnessTestController {
     }
     private String nullToEmpty(Object obj) {
         return obj == null ? "" : obj.toString();
+    }
+    @GetMapping("/{id}/ai-report")
+    public Map<String, Object> getAIReport(@PathVariable Long id) {
+        FitnessTest test = testMapper.selectById(id);
+        Map<String, Object> result = new HashMap<>();
+        if (test == null) {
+            result.put("error", "体测记录不存在");
+            return result;
+        }
+        result.put("memberName", test.getMemberName());
+        result.put("testDate", test.getTestDate() != null ? test.getTestDate().toString() : "");
+        result.put("height", 170);
+        result.put("weight", test.getWeightKg());
+
+        double weightVal = test.getWeightKg() != null ? test.getWeightKg().doubleValue() : 65;
+        double heightM = 1.7;
+        double bmi = heightM > 0 ? Math.round(weightVal / (heightM * heightM) * 10) / 10.0 : 0;
+        result.put("bmi", bmi);
+
+        StringBuilder report = new StringBuilder();
+        report.append("【健康评估报告】\n\n");
+        report.append("基于本次体测数据，会员体质评估如下：\n");
+
+        if (bmi < 18.5) {
+            report.append("• BMI为").append(bmi).append("，偏瘦，建议增加营养摄入和力量训练。\n");
+        } else if (bmi < 24) {
+            report.append("• BMI为").append(bmi).append("，正常范围，建议保持规律运动。\n");
+        } else if (bmi < 28) {
+            report.append("• BMI为").append(bmi).append("，偏重，建议加强有氧运动和控制饮食。\n");
+        } else {
+            report.append("• BMI为").append(bmi).append("，肥胖风险较高，建议制定减脂计划。\n");
+        }
+
+        Double bf = test.getBodyFatPercent() != null ? test.getBodyFatPercent().doubleValue() : null;
+        if (bf != null) {
+            if (bf < 15) {
+                report.append("• 体脂率为").append(bf).append("%，偏低，适合增肌训练。\n");
+            } else if (bf < 22) {
+                report.append("• 体脂率为").append(bf).append("%，标准范围，建议保持。\n");
+            } else {
+                report.append("• 体脂率为").append(bf).append("%，偏高，建议加强减脂训练。\n");
+            }
+        }
+
+        Double mm = test.getMuscleMassKg() != null ? test.getMuscleMassKg().doubleValue() : null;
+        if (mm != null) {
+            if (mm < 25) {
+                report.append("• 肌肉量为").append(mm).append("kg，偏低，建议增加力量训练频次。\n");
+            } else {
+                report.append("• 肌肉量为").append(mm).append("kg，良好，建议继续维持。\n");
+            }
+        }
+
+        report.append("\n【训练建议】\n");
+        report.append("建议每周进行3-5次训练，包含有氧和力量训练，配合合理饮食。\n");
+        report.append("建议每隔2-4周复测一次，跟踪体质变化。\n");
+
+        result.put("report", report.toString());
+        return result;
     }
 }

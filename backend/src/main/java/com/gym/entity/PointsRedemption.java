@@ -6,6 +6,7 @@ public class PointsRedemption {
     private Long id;
     private Long memberId;
     private Integer pointsSpent;
+    private Long rewardId;
     private String redemptionType;
     private String status;
     private Long adminId;
@@ -19,6 +20,8 @@ public class PointsRedemption {
     public void setMemberId(Long memberId) { this.memberId = memberId; }
     public Integer getPointsSpent() { return pointsSpent; }
     public void setPointsSpent(Integer pointsSpent) { this.pointsSpent = pointsSpent; }
+    public Long getRewardId() { return rewardId; }
+    public void setRewardId(Long rewardId) { this.rewardId = rewardId; }
     public String getRedemptionType() { return redemptionType; }
     public void setRedemptionType(String redemptionType) { this.redemptionType = redemptionType; }
     public String getStatus() { return status; }
