@@ -15,9 +15,13 @@
     <view class="info-row"><text class="info-label">教练</text><text class="info-value">{{appt.trainerName || '我'}}</text></view>
     <view class="info-row"><text class="info-label">备注</text><text class="info-value">{{appt.remark || '无'}}</text></view>
   </view>
-  <view class="action-bar" wx:if="{{appt.status==='scheduled'}}">
+    <view class="action-bar" wx:if="{{appt.status==='scheduled'}}">
     <button class="btn-checkin" bindtap="onCheckIn">上课打卡</button>
+    <button class="btn-checkout" bindtap="onCheckOut">下课打卡</button>
     <button class="btn-cancel" bindtap="onCancel">取消预约</button>
+  </view>
+  <view class="action-bar" wx:elif="{{appt.status==='completed'}}">
+    <text class="done-text">课程已完成</text>
   </view>
   <view wx:if="{{!appt.id}}" class="empty-state"><text>加载中...</text></view>
 </view>

@@ -1,0 +1,70 @@
+<view class="page-coach-detail">
+  <!-- Cover Image -->
+  <view class="cover-wrap">
+    <image class="cover-img" src="{{coachAvatarUrl}}" mode="aspectFill"/>
+    <view class="cover-back" bindtap="goBack">
+      <text class="back-icon">‹</text>
+    </view>
+  </view>
+
+  <!-- Coach Name -->
+  <view class="name-section">
+    <text class="coach-name">{{coach.name}}</text>
+  </view>
+
+  <!-- 3 Stat Cards -->
+  <view class="stat-row">
+    <view class="stat-card">
+      <text class="stat-num">{{totalClasses || 0}}</text>
+      <text class="stat-label">累计上课</text>
+      <text class="stat-unit">节</text>
+    </view>
+    <view class="stat-card">
+      <text class="stat-num stat-spec">{{coach.specialty || '未设置'}}</text>
+      <text class="stat-label">专长</text>
+    </view>
+    <view class="stat-card">
+      <text class="stat-num stat-price">¥{{coach.pricePerHour || 0}}</text>
+      <text class="stat-label">价格</text>
+      <text class="stat-unit">/小时</text>
+    </view>
+  </view>
+
+  <!-- Personal Experience -->
+  <view class="section-card" wx:if="{{coach.intro}}">
+    <text class="section-title">个人经历</text>
+    <text class="section-text">{{coach.intro}}</text>
+  </view>
+
+  <!-- Specialty -->
+  <view class="section-card" wx:if="{{coach.specialty}}">
+    <text class="section-title">擅长领域</text>
+    <text class="section-text">{{coach.specialty}}</text>
+  </view>
+
+  <!-- Date & Time Slots -->
+  <view class="section-card">
+    <text class="section-title">预约日期</text>
+    <text class="date-display">{{ptDateDisplay}}</text>
+    <text class="section-title slot-title">选择时段</text>
+    <view class="slot-grid" wx:if="{{slots.length > 0}}">
+      <view class="slot-item {{slotIdx === idx ? 'active' : ''}}" wx:for="{{slots}}" wx:key="*this" data-idx="{{idx}}" bindtap="selectSlot">{{item}}</view>
+    </view>
+    <text wx:if="{{slots.length === 0}}" class="empty-slots">该日暂无可用时段</text>
+  </view>
+
+  <!-- Bottom Bar -->
+  <view class="bottom-bar">
+    <button class="btn-confirm" bindtap="confirmBooking" loading="{{loading}}">确认预约</button>
+  </view>
+
+  <!-- Login Modal -->
+  <view class="login-mask" wx:if="{{showLoginModal}}" bindtap="onLoginClose">
+    <view class="login-modal" catchtap="">
+      <text class="login-modal-title">请先登录</text>
+      <text class="login-modal-desc">登录后即可预约教练</text>
+      <button class="btn-primary" bindtap="onLogin">去登录</button>
+      <button class="btn-cancel" bindtap="onLoginClose">取消</button>
+    </view>
+  </view>
+</view>

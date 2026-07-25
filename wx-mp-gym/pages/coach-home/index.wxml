@@ -14,6 +14,7 @@
         <text class="schedule-name">{{item.name}}</text>
         <text class="schedule-member">{{item.memberName || '待确认'}}</text>
         <view class="schedule-status {{item.status}}">{{item.statusText}}</view>
+        <button wx:if="{{item.type==='group' && item.status==='scheduled'}}" class="btn-code" data-id="{{item.id}}" bindtap="generateCode" catchtap>生成签到码</button>
       </view>
     </view>
     <view wx:if="{{schedules.length===0}}" class="empty-state"><text>今日暂无课程安排</text></view>

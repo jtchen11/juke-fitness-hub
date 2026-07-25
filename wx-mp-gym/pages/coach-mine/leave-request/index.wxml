@@ -1,2 +1,24 @@
-<!--pages/coach-mine/leave-request/index.wxml-->
-<text>pages/coach-mine/leave-request/index.wxml</text>
+<view class="page-leave">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text>&lt;</text><text>请假申请</text></view>
+  </view>
+  <view class="form">
+    <view class="form-item">
+      <text class="form-label">请假日期</text>
+      <picker mode="date" value="{{leaveDate}}" bindchange="onDateChange">
+        <view class="picker-value">{{leaveDate}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">请假时段</text>
+      <view class="period-list">
+        <view class="period-item {{periodIdx===idx ? 'active' : ''}}" wx:for="{{periods}}" wx:key="idx" data-idx="{{idx}}" bindtap="onPeriodSelect">{{item}}</view>
+      </view>
+    </view>
+    <view class="form-item">
+      <text class="form-label">请假原因</text>
+      <textarea class="reason-input" placeholder="请输入请假原因..." value="{{reason}}" bindinput="onReasonInput"></textarea>
+    </view>
+    <button class="btn-submit" bindtap="onSubmit" loading="{{submitting}}">提交申请</button>
+  </view>
+</view>

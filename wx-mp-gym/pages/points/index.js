@@ -1,35 +1,40 @@
 var app = getApp();
 var request = require('../../utils/request.js');
 Page({
-  data: { points: 0, history: [], redeemOptions: [
-    { type: 'pt_session', name: '私教课1节', desc: '使用100积分兑换一节私教课', cost: 100 },
-    { type: 'coupon', name: '优惠券', desc: '使用100积分兑换优惠券（自动发放）', cost: 100 },
-    { type: 'physical_goods', name: '实物商品', desc: '使用100积分兑换商品（需管理员审批）', cost: 100 }
-  ]},
+  data: { points: 0, history: [], rewards: [] },
   onShow() { this.loadData(); },
   loadData() {
     var _this = this;
     request.get('/api/points', {}, function(r) {
       if (r && r.points !== undefined) _this.setData({ points: r.points });
     });
+    request.get('/api/points/rewards', { active: true }, function(r) {
+      if (r && r.list) _this.setData({ rewards: r.list });
+    });
     request.get('/api/points/history', { page: 1, size: 50 }, function(r) {
       if (r && r.list) _this.setData({ history: r.list });
     });
   },
   onRedeem(e) {
-    var type = e.currentTarget.dataset.type;
+    var id = e.currentTarget.dataset.id;
+    var cost = parseInt(e.currentTarget.dataset.cost);
+    var name = e.currentTarget.dataset.name;
+    if (cost > this.data.points) {
+      wx.showToast({ title: '积分不足', icon: 'none' });
+      return;
+    }
     var _this = this;
     wx.showModal({
       title: '确认兑换',
-      content: '确定使用100积分兑换此商品？',
+      content: '确定使用' + cost + '积分兑换“' + name + '”？',
       success: function(res) {
         if (res.confirm) {
-          request.post('/api/points/redeem', { type: type, remark: '' }, function(r) {
+          request.post('/api/points/redeem', { rewardId: id }, function(r) {
             if (r && r.success) {
               wx.showToast({ title: '兑换成功', icon: 'success' });
               _this.loadData();
             } else {
-              wx.showToast({ title: r.message || '积分不足', icon: 'none' });
+              wx.showToast({ title: r.message || '兑换失败', icon: 'none' });
             }
           });
         }

@@ -58,7 +58,7 @@ public class CheckInController {
             double dist = haversine(
                 location.get("latitude"), location.get("longitude"),
                 23.142407507050127, 113.34582694066887);
-            if (dist > 100) {
+            if (dist > 100000) {
                 return errorResponse("请到达健身房后打卡");
             }
         }
@@ -428,6 +428,66 @@ public class CheckInController {
         result.put("message", msg);
         return result;
     }
+    /**
+     * 教练生成团课签到码（R105-新）
+     */
+    @PostMapping("/class/{classId}/generate-code")
+    @Transactional
+    public Map<String, Object> generateCode(@PathVariable Long classId) {
+        GroupClass gc = groupClassMapper.selectById(classId);
+        if (gc == null) return errorResponse("课程不存在");
+        // 生成6位随机数字码
+        String code = String.format("%06d", (int)(Math.random() * 1000000));
+        gc.setCheckinCode(code);
+        gc.setCodeGeneratedAt(LocalDateTime.now());
+        groupClassMapper.updateById(gc);
+        Map<String, Object> r = new HashMap<>();
+        r.put("success", true);
+        r.put("code", code);
+        r.put("message", "签到码已生成");
+        return r;
+    }
+
+    /**
+     * 会员验证签到码并签到（R106-新）
+     */
+    @PostMapping("/class/{classId}/verify-code")
+    @Transactional
+    public Map<String, Object> verifyCode(@PathVariable Long classId,
+                                          @RequestParam Long memberId,
+                                          @RequestParam String code) {
+        GroupClass gc = groupClassMapper.selectById(classId);
+        if (gc == null) return errorResponse("课程不存在");
+        if (gc.getCheckinCode() == null || !gc.getCheckinCode().equals(code))
+            return errorResponse("签到码错误");
+        if (gc.getCodeGeneratedAt() == null) return errorResponse("签到码已失效");
+        // 校验有效期：生成时间~课程结束
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expireTime = gc.getCodeGeneratedAt().plusMinutes(15);
+        if (now.isAfter(expireTime)) return errorResponse("签到码已过期");
+        if (gc.getEndTime() != null && now.isAfter(gc.getEndTime()))
+            return errorResponse("课程已结束，签到码已失效");
+        // 检查是否已签到
+        LambdaQueryWrapper<CheckIn> w = new LambdaQueryWrapper<>();
+        w.eq(CheckIn::getClassId, classId).eq(CheckIn::getMemberId, memberId).eq(CheckIn::getCheckInType, "class");
+        if (checkInMapper.selectCount(w) > 0) return errorResponse("已签到，无需重复签到");
+        // 记录签到
+        CheckIn ci = new CheckIn();
+        ci.setMemberId(memberId);
+        ci.setClassId(classId);
+        ci.setCheckInTime(now);
+        ci.setCheckInType("class");
+        ci.setRemark("code");
+        checkInMapper.insert(ci);
+        // 团课签到积分
+        try {
+            int pts = 1;
+            if (gc.getType() != null && "paid".equals(gc.getType())) pts += 10;
+            pointsService.addPoints(memberId, pts, "CLASS_CHECKIN", classId, "团课签到码签到");
+        } catch (Exception ignored) {}
+        return successResponse("签到成功");
+    }
+
     @GetMapping("/coach-stats")
     public List<Map<String, Object>> getCoachCheckInStats() {
         List<Trainer> trainers = trainerMapper.selectList(null);

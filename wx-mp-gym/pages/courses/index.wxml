@@ -1,8 +1,8 @@
 <view class="page-courses">
   <view class="tab-bar three-tabs">
-    <view class="tab-item {{tab==='group' ? 'active' : ''}}" data-tab="group" bindtap="switchTab">团课</view>
-    <view class="tab-item {{tab==='pt' ? 'active' : ''}}" data-tab="pt" bindtap="switchTab">私教</view>
-    <view class="tab-item {{tab==='my' ? 'active' : ''}}" data-tab="my" bindtap="switchTab">我的预约</view>
+    <view class="tab-item {{tab==='group' ? 'active' : ''}}" data-tab="group" bindtap="onTabChange">团课</view>
+    <view class="tab-item {{tab==='pt' ? 'active' : ''}}" data-tab="pt" bindtap="onTabChange">私教</view>
+    <view class="tab-item {{tab==='my' ? 'active' : ''}}" data-tab="my" bindtap="onTabChange">我的预约</view>
     <view class="tab-indicator {{tab==='pt' ? 'pt' : (tab==='my' ? 'my' : '')}}"></view>
   </view>
 
@@ -10,37 +10,26 @@
   <block wx:if="{{tab === 'group'}}">
     <scroll-view class="date-scroll" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="date-list">
-        <view class="date-item {{dateIdx===idx ? 'active' : ''}}" wx:for="{{dates}}" wx:key="idx" data-idx="{{idx}}" bindtap="selectDate">
+        <view class="date-item {{dateIdx===index ? 'active' : ''}}" wx:for="{{dates}}" wx:key="full" data-idx="{{index}}" bindtap="selectDate">
           <text class="date-week">{{item.week}}</text>
           <text class="date-day">{{item.day}}</text>
         </view>
       </view>
     </scroll-view>
-    <view class="filter-row">
-      <view class="filter-bar">
-        <view class="filter-chip {{typeFilter==='' ? 'active' : ''}}" data-type="" bindtap="filterType">全部</view>
-        <view class="filter-chip {{typeFilter==='free' ? 'active' : ''}}" data-type="free" bindtap="filterType">公益</view>
-        <view class="filter-chip {{typeFilter==='paid' ? 'active' : ''}}" data-type="paid" bindtap="filterType">付费</view>
-      </view>
-      <!-- 时段筛选 -->
-      <scroll-view class="time-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-        <view class="time-filter-list">
-          <view class="filter-chip {{timeFilter==='' ? 'active' : ''}}" data-time="" bindtap="filterTime">全部时段</view>
-          <view class="filter-chip {{timeFilter==='morning' ? 'active' : ''}}" data-time="morning" bindtap="filterTime">早上 6-9</view>
-          <view class="filter-chip {{timeFilter==='am' ? 'active' : ''}}" data-time="am" bindtap="filterTime">上午 9-12</view>
-          <view class="filter-chip {{timeFilter==='pm' ? 'active' : ''}}" data-time="pm" bindtap="filterTime">下午 12-18</view>
-          <view class="filter-chip {{timeFilter==='evening' ? 'active' : ''}}" data-time="evening" bindtap="filterTime">晚上 18-22</view>
-        </view>
-      </scroll-view>
+    <view class="filter-bar">
+      <view class="filter-chip {{typeFilter==='' ? 'active' : ''}}" data-type="" bindtap="filterType">全部</view>
+      <view class="filter-chip {{typeFilter==='free' ? 'active' : ''}}" data-type="free" bindtap="filterType">公益</view>
+      <view class="filter-chip {{typeFilter==='paid' ? 'active' : ''}}" data-type="paid" bindtap="filterType">付费</view>
     </view>
     <scroll-view class="list-area" scroll-y enhanced show-scrollbar="{{false}}">
       <view class="course-card" wx:for="{{courses}}" wx:key="id" data-id="{{item.id}}" bindtap="goBooking">
-        <image class="course-cover" src="{{item.cover || '/images/default_course.png'}}" mode="aspectFill"/>
+        <image class="course-cover" src="{{item.coverImage || '/images/default_course.png'}}" mode="aspectFill"/>
         <view class="card-body">
           <text class="course-name">{{item.name}}</text>
-          <text class="course-time">{{item.startTime}} - {{item.endTime}}</text>
+          <text class="course-time">{{item.timeDisplay}}</text>
           <text class="course-trainer">{{item.trainerName}}</text>
           <view class="course-tags">
+            <text wx:if="{{item.allowVisitor}}" class="tag experience">体验</text>
             <text class="tag {{item.type}}">{{item.type==='free' ? '公益' : '付费'}}</text>
             <text class="course-cap">{{item.enrolled}}/{{item.maxCapacity}}</text>
           </view>
@@ -55,7 +44,7 @@
   <block wx:elif="{{tab === 'pt'}}">
     <scroll-view class="date-scroll" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="date-list">
-        <view class="date-item {{ptDateIdx===idx ? 'active' : ''}}" wx:for="{{ptDates}}" wx:key="idx" data-idx="{{idx}}" bindtap="selectPtDate">
+        <view class="date-item {{ptDateIdx===index ? 'active' : ''}}" wx:for="{{ptDates}}" wx:key="full" data-idx="{{index}}" bindtap="selectPtDate">
           <text class="date-week">{{item.week}}</text>
           <text class="date-day">{{item.day}}</text>
         </view>
@@ -69,7 +58,7 @@
     </view>
     <scroll-view class="list-area" scroll-y enhanced show-scrollbar="{{false}}">
       <view class="coach-card" wx:for="{{coaches}}" wx:key="id" data-id="{{item.id}}" bindtap="goPTBooking">
-        <image class="coach-avatar" src="{{item.avatarUrl || '/images/default_avatar.png'}}" mode="aspectFill"/>
+        <image class="coach-avatar" src="{{item.avatar || '/images/default_avatar.png'}}" mode="aspectFill"/>
         <view class="coach-info">
           <text class="coach-name">{{item.name}}</text>
           <text class="coach-spec">{{item.specialty}}</text>

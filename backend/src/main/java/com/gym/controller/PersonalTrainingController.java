@@ -153,28 +153,37 @@ public class PersonalTrainingController {
 
     // ====== 修改：调用 Service 处理课程包扣减 ======
     @PostMapping
-    public Map<String, Object> add(@RequestBody PersonalTraining pt) {
-        Long packageId = pt.getPackageId();
-        boolean useFree = pt.getUseFree() != null && pt.getUseFree();
+    public Map<String, Object> add(@RequestBody Map<String, Object> params) {
+        try {
+            Long memberId = params.get("memberId") != null ? Long.valueOf(params.get("memberId").toString()) : null;
+            Long trainerId = params.get("trainerId") != null ? Long.valueOf(params.get("trainerId").toString()) : null;
+            String appointmentTimeStr = (String) params.get("appointmentTime");
+            Integer durationMinutes = params.get("durationMinutes") != null ? Integer.valueOf(params.get("durationMinutes").toString()) : 60;
+            Long packageId = params.get("packageId") != null ? Long.valueOf(params.get("packageId").toString()) : null;
+            boolean useFree = params.get("useFree") != null && Boolean.TRUE.equals(params.get("useFree"));
 
-        String result = personalTrainingService.bookPersonalTraining(
-                pt.getMemberId(),
-                pt.getTrainerId(),
-                pt.getAppointmentTime(),
-                pt.getDurationMinutes(),
-                packageId,
-                useFree
-        );
+            LocalDateTime appointmentTime = LocalDateTime.parse(appointmentTimeStr.replace(" ", "T"));
 
-        Map<String, Object> response = new HashMap<>();
-        if (result.startsWith("私教预约成功")) {
-            response.put("success", true);
-            response.put("message", result);
-        } else {
-            response.put("success", false);
-            response.put("message", result);
+            String result = personalTrainingService.bookPersonalTraining(
+                    memberId, trainerId, appointmentTime, durationMinutes, packageId, useFree
+            );
+
+            Map<String, Object> response = new HashMap<>();
+            if (result.startsWith("私教预约成功")) {
+                response.put("success", true);
+                response.put("message", result);
+            } else {
+                response.put("success", false);
+                response.put("message", result);
+            }
+            return response;
+        } catch (Exception e) {
+            System.err.println("Personal training booking error: " + e.getMessage());
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return error;
         }
-        return response;
     }
 
     @PutMapping("/{id}")

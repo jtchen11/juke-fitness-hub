@@ -1,0 +1,44 @@
+.page-coach-detail{min-height:100vh;background:#F5F6FA;padding-bottom:160rpx}
+
+/* Cover */
+.cover-wrap{position:relative;width:100%;height:35vh;overflow:hidden}
+.cover-img{width:100%;height:100%}
+.cover-back{position:absolute;top:calc(40rpx + env(safe-area-inset-top));left:24rpx;width:64rpx;height:64rpx;background:rgba(0,0,0,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center}
+.back-icon{font-size:40rpx;color:#FFF;line-height:1}
+
+/* Name */
+.name-section{background:#FFF;padding:28rpx 32rpx 24rpx}
+.coach-name{font-size:44rpx;font-weight:700;color:#1A1A2E;display:block}
+
+/* 3 Stat Cards */
+.stat-row{display:flex;gap:16rpx;padding:0 32rpx 24rpx;margin-top:-16rpx}
+.stat-card{flex:1;background:#FFF;border-radius:12px;padding:20rpx 12rpx;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.06);min-width:0}
+.stat-num{font-size:32rpx;font-weight:700;color:#1A1A2E;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stat-spec{font-size:24rpx;color:#4A6CF7}
+.stat-price{font-size:28rpx;color:#4A6CF7}
+.stat-label{font-size:22rpx;color:#8A8AA0;display:block;margin-top:8rpx}
+.stat-unit{font-size:20rpx;color:#8A8AA0;display:block;margin-top:2rpx}
+
+/* Section Cards */
+.section-card{background:#FFF;border-radius:12px;margin:0 32rpx 20rpx;padding:28rpx 32rpx;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.section-title{font-size:28rpx;font-weight:600;color:#1A1A2E;display:block;margin-bottom:12rpx}
+.section-text{font-size:26rpx;color:#8A8AA0;line-height:1.6}
+
+/* Date & Slots */
+.date-display{font-size:32rpx;font-weight:600;color:#4A6CF7;display:block;margin-bottom:8rpx}
+.slot-title{margin-top:20rpx}
+.slot-grid{display:flex;flex-wrap:wrap;gap:16rpx}
+.slot-item{padding:16rpx 32rpx;background:#F5F6FA;border-radius:8px;font-size:26rpx;color:#1A1A2E;text-align:center;min-width:140rpx}
+.slot-item.active{background:#4A6CF7;color:#FFF}
+.empty-slots{font-size:26rpx;color:#8A8AA0;display:block;padding:20rpx 0;text-align:center}
+
+/* Bottom Bar */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;padding:16rpx 32rpx;padding-bottom:calc(16rpx + env(safe-area-inset-bottom));background:#FFF;box-shadow:0 -2rpx 12rpx rgba(0,0,0,0.04);z-index:100}
+.btn-confirm{width:100%;height:88rpx;background:#4A6CF7;border-radius:8px;color:#FFF;font-size:32rpx;font-weight:600;line-height:88rpx;border:none;box-shadow:0 4rpx 12rpx rgba(74,108,247,0.3)}
+
+/* Login Modal */
+.login-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:999}
+.login-modal{background:#FFF;border-radius:16px;padding:40rpx 48rpx;width:560rpx;text-align:center}
+.login-modal-title{font-size:36rpx;font-weight:600;color:#1A1A2E;display:block;margin-bottom:12rpx}
+.login-modal-desc{font-size:28rpx;color:#8A8AA0;display:block;margin-bottom:40rpx}
+.btn-primary{width:100%;height:88rpx;background:#4A6CF7;border-radius:8px;color:#FFF;font-size:32rpx;font-weight:600;line-height:88rpx;border:none;margin-bottom:16rpx}

@@ -9,22 +9,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AiModelConfig {
 
-    @Value("${ai.llm.api-key}")
-    private String apiKey;
-
-    @Value("${ai.llm.model}")
-    private String modelName;
-
-    @Value("${ai.llm.base-url}")
+    @Value("${langchain4j.open-ai.chat-model.base-url}")
     private String baseUrl;
 
+    @Value("${langchain4j.open-ai.chat-model.api-key}")
+    private String apiKey;
+
+    @Value("${langchain4j.open-ai.chat-model.model-name}")
+    private String modelName;
+
+    @Value("${langchain4j.open-ai.chat-model.temperature}")
+    private double temperature;
+
     @Bean
-    public ChatLanguageModel dashScopeChatModel() {
+    public ChatLanguageModel chatLanguageModel() {
         return OpenAiChatModel.builder()
+                .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .modelName(modelName)
-                .baseUrl(baseUrl)
-                .temperature(0.7)
+                .temperature(temperature)
                 .build();
     }
 }

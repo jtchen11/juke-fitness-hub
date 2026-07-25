@@ -16,7 +16,6 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.service.AiServices;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
@@ -49,11 +48,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/ai/chat")
 public class AIController {
 
-    @Value("${ai.llm.api-key}")
-    private String apiKey;
 
-    @Value("${ai.llm.model}")
-    private String modelName;
     @Autowired
     private MemberMapper memberMapper;
     @Autowired
@@ -63,11 +58,9 @@ public class AIController {
 
     @Autowired
     private MemberPrivatePackageMapper memberPrivatePackageMapper;
-    @Value("${ai.llm.base-url}")
-    private String baseUrl;
 
-    @Value("${dashscope.api-key}")
-    private String dashscopeApiKey;
+    @Autowired
+    private ChatLanguageModel chatLanguageModel;
 
     @Autowired
     private MongoChatMemoryStore memoryStore;
@@ -90,7 +83,6 @@ public class AIController {
     @Autowired
     private HttpSession session;
 
-    private final Map<String, ChatLanguageModel> sessionModels = new ConcurrentHashMap<>();
     private final Map<String, Assistant> sessionAssistants = new ConcurrentHashMap<>();
 
     private final OkHttpClient httpClient = new OkHttpClient();
@@ -124,7 +116,12 @@ public class AIController {
 
     // ========== 获取当前登录会员ID ==========
     private Long getCurrentMemberId() {
-        Long memberId = (Long) session.getAttribute("memberId");
+        Long memberId = com.gym.auth.LoginContext.getUserId();
+        if (memberId == null) {
+            try {
+                memberId = (Long) session.getAttribute("memberId");
+            } catch (Exception e) {}
+        }
         if (memberId == null) {
             throw new RuntimeException("用户未登录或会话已过期");
         }
@@ -169,7 +166,6 @@ public class AIController {
         try {
             String memoryId = getMemoryId(sessionId);
             memoryStore.deleteMessages(memoryId);
-            sessionModels.remove(sessionId);
             sessionAssistants.remove(sessionId);
             result.put("success", true);
             result.put("message", "聊天记录已清空！");
@@ -186,7 +182,6 @@ public class AIController {
         Map<String, Object> result = new HashMap<>();
         try {
             mongoTemplate.getCollection("chat_histories").deleteMany(new Document());
-            sessionModels.clear();
             sessionAssistants.clear();
             result.put("success", true);
             result.put("message", "所有聊天历史已清理！");
@@ -296,6 +291,7 @@ public class AIController {
         String lowerMsg = userMessage.toLowerCase();
         log.info("🔍 [意图识别] 原始消息: '{}'", userMessage);
 
+        log.info("🔍 [意图识别] memberId={}, sessionId={}, lowerMsg={}", memberId, sessionId, lowerMsg);
         // ---- 1. 查询我的私教课 ----
         if (lowerMsg.contains("我的私教") || lowerMsg.contains("我的预约") ||
                 (lowerMsg.contains("私教") && (lowerMsg.contains("查询") || lowerMsg.contains("看看")))) {
@@ -380,7 +376,12 @@ public class AIController {
             if (memberId == null || memberId <= 0) {
                 return "请先登录，以便根据您的会员等级推荐合适的教练。";
             }
-            return gymTools.recommendTrainerByLevel(memberId);
+            try {
+                return gymTools.recommendTrainerByLevel(memberId);
+            } catch (Exception e) {
+                log.error("推荐教练异常 memberId={}", memberId, e);
+                return "推荐教练时出现异常，请稍后再试。";
+            }
         }
 
         // ---- 11. 教练列表（宽匹配） ----
@@ -388,7 +389,6 @@ public class AIController {
             log.info("✅ 命中【教练列表】分支（宽匹配）");
             return gymTools.listAllTrainers();
         }
-
         // ---- 12. 预约私教 ----
         if ((lowerMsg.contains("约") || lowerMsg.contains("预约") || lowerMsg.contains("订"))
                 && (lowerMsg.contains("教练") || lowerMsg.contains("私教"))) {
@@ -455,14 +455,7 @@ public class AIController {
     // ========== 获取或创建 Assistant（注入工具和记忆） ==========
     private Assistant getOrCreateAssistant(String sessionId, String memoryId) {
         return sessionAssistants.computeIfAbsent(sessionId, id -> {
-            ChatLanguageModel model = sessionModels.computeIfAbsent(id, k ->
-                    OpenAiChatModel.builder()
-                            .apiKey(apiKey)
-                            .modelName(modelName)
-                            .baseUrl(baseUrl)
-                            .temperature(0.7)
-                            .build()
-            );
+            ChatLanguageModel model = chatLanguageModel;
 
             ChatMemory chatMemory = MessageWindowChatMemory.builder()
                     .maxMessages(10)
@@ -482,8 +475,7 @@ public class AIController {
     private void saveToMemory(String memoryId, String userMessage, String assistantReply, String imageUrl) {
         List<ChatMessage> existing = memoryStore.getMessages(memoryId);
         boolean lastIsSameUser = !existing.isEmpty() &&
-                existing.get(existing.size() - 1) instanceof UserMessage &&
-                existing.get(existing.size() - 1).text().equals(userMessage);
+                existing.get(existing.size() - 1) instanceof UserMessage && ((UserMessage) existing.get(existing.size() - 1)).singleText().equals(userMessage);
         if (!lastIsSameUser) {
             memoryStore.saveMessageRecord(memoryId, "user", userMessage, null);
             memoryStore.saveMessageRecord(memoryId, "assistant", assistantReply, imageUrl);
@@ -493,76 +485,7 @@ public class AIController {
     // ========== 以下为所有原有辅助方法（完全保留） ==========
 
     private String generateImage(String prompt) {
-        if (dashscopeApiKey == null || dashscopeApiKey.isEmpty()) {
-            log.warn("百炼 API Key 未配置，图片生成不可用");
-            return null;
-        }
-        String[] imageModels = {
-                "wan2.6-t2i",
-                "wan2.7-image",
-                "wan2.7-image-pro",
-                "qwen-image-2.0",
-                "qwen-image-2.0-pro"
-        };
-        for (String model : imageModels) {
-            try {
-                Map<String, Object> requestBody = new HashMap<>();
-                requestBody.put("model", model);
-                Map<String, Object> input = new HashMap<>();
-                List<Map<String, Object>> messages = new ArrayList<>();
-                Map<String, Object> message = new HashMap<>();
-                message.put("role", "user");
-                List<Map<String, String>> content = new ArrayList<>();
-                Map<String, String> textContent = new HashMap<>();
-                textContent.put("text", "健身动作示意图：" + prompt + "，请生成一张清晰的健身指导图片。");
-                content.add(textContent);
-                message.put("content", content);
-                messages.add(message);
-                input.put("messages", messages);
-                requestBody.put("input", input);
-                Map<String, Object> parameters = new HashMap<>();
-                parameters.put("n", 1);
-                parameters.put("size", "1024*1024");
-                requestBody.put("parameters", parameters);
-                String jsonBody = objectMapper.writeValueAsString(requestBody);
-                Request request = new Request.Builder()
-                        .url("https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation")
-                        .header("Authorization", "Bearer " + dashscopeApiKey)
-                        .header("Content-Type", "application/json")
-                        .post(okhttp3.RequestBody.create(jsonBody, MediaType.parse("application/json")))
-                        .build();
-                try (Response response = httpClient.newCall(request).execute()) {
-                    String responseBody = response.body().string();
-                    if (!response.isSuccessful()) {
-                        log.warn("图片生成模型 {} HTTP错误: {}", model, response.code());
-                        continue;
-                    }
-                    JsonNode root = objectMapper.readTree(responseBody);
-                    JsonNode output = root.path("output");
-                    if (output.isMissingNode() || !output.has("choices")) {
-                        continue;
-                    }
-                    JsonNode choices = output.path("choices");
-                    if (choices.isArray() && choices.size() > 0) {
-                        JsonNode firstChoice = choices.get(0);
-                        JsonNode messageNode = firstChoice.path("message");
-                        if (messageNode.has("content")) {
-                            JsonNode contentArray = messageNode.path("content");
-                            if (contentArray.isArray() && contentArray.size() > 0) {
-                                String imageUrl = contentArray.get(0).path("image").asText();
-                                if (imageUrl != null && !imageUrl.isEmpty()) {
-                                    log.info("图片生成成功，模型: {}, URL: {}", model, imageUrl);
-                                    return imageUrl;
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("图片生成模型 {} 异常: {}", model, e.getMessage());
-            }
-        }
-        log.error("所有图片生成模型均失败");
+        log.warn("图片生成已禁用：当前使用 Ollama 文本模型，不支持图片生成");
         return null;
     }
 

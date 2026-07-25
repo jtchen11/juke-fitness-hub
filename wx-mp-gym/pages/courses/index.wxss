@@ -10,29 +10,24 @@
 .date-item.active .date-week{color:#FFF;opacity:0.9}
 .date-day{font-size:26rpx;color:#1A1A2E;font-weight:600;margin-top:4rpx}
 .date-item.active .date-day{color:#FFF}
-.filter-row{display:flex;flex-direction:column;gap:8rpx;padding:0 0 12rpx}
-.filter-bar{display:flex;gap:12rpx;padding:0 32rpx}
+.filter-bar{display:flex;gap:12rpx;padding:0 32rpx 12rpx}
 .filter-chip{padding:10rpx 24rpx;background:#FFF;border-radius:8px;font-size:24rpx;color:#8A8AA0;box-shadow:0 2px 8px rgba(0,0,0,0.04);white-space:nowrap;flex-shrink:0}
 .filter-chip.active{background:rgba(74,108,247,0.08);color:#4A6CF7;font-weight:500}
-.time-scroll{white-space:nowrap;padding:0 32rpx}
-.time-filter-list{display:inline-flex;gap:12rpx}
-.list-area{height:calc(100vh - 380rpx);padding:0 32rpx}
-/* 团课卡片（含封面图） */
-.course-card{display:flex;align-items:center;background:#FFF;border-radius:12px;padding:20rpx;margin-bottom:16rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04);box-sizing:border-box}
+.list-area{height:calc(100vh - 280rpx);padding:0 32rpx;box-sizing:border-box}
+.course-card{overflow:hidden;display:flex;align-items:center;background:#FFF;border-radius:12px;padding:20rpx;margin-bottom:16rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04);box-sizing:border-box;width:100%;max-width:100%}
 .course-cover{width:160rpx;height:120rpx;border-radius:8px;background:#F5F6FA;flex-shrink:0;margin-right:16rpx}
-.card-body{flex:1;min-width:0;margin-right:12rpx}
+.card-body{flex:1;min-width:0}
 .course-name{font-size:28rpx;color:#1A1A2E;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .course-time{font-size:22rpx;color:#8A8AA0;margin-top:4rpx;display:block}
 .course-trainer{font-size:22rpx;color:#8A8AA0;margin-top:2rpx;display:block}
 .course-tags{display:flex;align-items:center;gap:8rpx;margin-top:6rpx}
 .course-cap{font-size:20rpx;color:#8A8AA0}
-.card-price{flex-shrink:0}
-.course-price{font-size:34rpx;color:#4A6CF7;font-weight:700;display:block}
+.card-price{flex-shrink:0;margin-left:auto}
+.course-price{font-size:32rpx;color:#4A6CF7;font-weight:700;display:block;white-space:nowrap}
 .course-price.free{color:#00C853}
 .tag{display:inline-block;padding:4rpx 12rpx;border-radius:4px;font-size:20rpx}
 .tag.free{background:rgba(0,200,83,0.08);color:#00C853}
 .tag.paid{background:rgba(74,108,247,0.08);color:#4A6CF7}
-/* 教练卡片 */
 .coach-card{display:flex;align-items:center;background:#FFF;border-radius:12px;padding:20rpx;margin-bottom:16rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04);box-sizing:border-box}
 .coach-avatar{width:100rpx;height:100rpx;border-radius:50%;background:#F5F6FA;flex-shrink:0;margin-right:16rpx}
 .coach-info{flex:1;min-width:0;margin-right:12rpx}
@@ -46,10 +41,8 @@
 .coach-status.active{background:rgba(0,200,83,0.08);color:#00C853}
 .coach-status.vacation{background:rgba(255,179,0,0.08);color:#FFB300}
 .empty-state{text-align:center;padding:80rpx 0;font-size:28rpx;color:#8A8AA0}
-.page-home,.page-courses,.page-bookings,.page-mine,.page-bookings-list{padding-bottom:70px}
 .tab-bar.three-tabs{justify-content:space-between}
 .tab-indicator.my{transform:translateX(200%)}
-/* 我的预约卡片 */
 .booking-card{display:flex;align-items:center;justify-content:space-between;background:#FFF;border-radius:12px;padding:12px 16px;margin-bottom:10px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
 .booking-card .card-left{flex:1}
 .booking-card .card-right{flex-shrink:0;margin-left:12px}
@@ -58,3 +51,4 @@
 .booking-card .tag.cancelled{background:#F5F5F5;color:#BDBDBD}
 .booking-card .tag.completed{background:#EEF0FF;color:#4A6CF7}
 .booking-card .tag.scheduled{background:#FFF3E0;color:#FFB300}
+.tag.experience{background:#FF9500;color:#FFF}

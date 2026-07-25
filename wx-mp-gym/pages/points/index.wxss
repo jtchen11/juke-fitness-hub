@@ -4,18 +4,21 @@
 .points-label{font-size:14px;color:rgba(255,255,255,0.8);display:block;margin-top:8px}
 .section{margin-bottom:20px}
 .section-title{font-size:18px;font-weight:600;color:#1A1A2E;display:block;margin-bottom:12px}
-.redeem-card{background:#FFF;border-radius:12px;padding:16px;display:flex;align-items:center;margin-bottom:10px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.redeem-card{background:#FFF;border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.redeem-card.disabled{opacity:0.5}
 .redeem-info{flex:1}
-.redeem-name{font-size:16px;font-weight:500;color:#1A1A2E;display:block}
-.redeem-desc{font-size:12px;color:#8A8AA0;display:block;margin-top:4px}
-.redeem-cost{text-align:center;flex-shrink:0;margin-left:12px}
-.cost-num{font-size:24px;font-weight:700;color:#FFB300;display:block}
-.cost-label{font-size:12px;color:#8A8AA0;display:block}
-.history-item{background:#FFF;border-radius:12px;padding:12px 16px;display:flex;align-items:center;margin-bottom:8px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.redeem-name{font-size:16px;font-weight:600;color:#1A1A2E;display:block}
+.redeem-desc{font-size:13px;color:#8E8E93;display:block;margin-top:4px}
+.redeem-cost{text-align:center;min-width:80px}
+.cost-num{font-size:24px;font-weight:700;color:#FF4757;display:block}
+.cost-label{font-size:12px;color:#8E8E93;display:block}
+.stock-label{font-size:11px;color:#FF9500;display:block;margin-top:2px}
+.stock-label.sold-out{color:#8E8E93}
+.history-item{background:#FFF;border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .history-left{flex:1}
 .history-type{font-size:14px;color:#1A1A2E;display:block}
-.history-time{font-size:12px;color:#8A8AA0;display:block;margin-top:2px}
-.history-points{font-size:18px;font-weight:600}
-.history-points.add{color:#00C853}
-.history-points.sub{color:#FF5252}
-.empty{text-align:center;padding:40px 0;color:#8A8AA0;font-size:14px}
+.history-time{font-size:12px;color:#8E8E93;display:block;margin-top:2px}
+.history-points{font-size:18px;font-weight:700}
+.history-points.add{color:#34C759}
+.history-points.sub{color:#FF4757}
+.empty{font-size:14px;color:#8E8E93;text-align:center;padding:20px 0}

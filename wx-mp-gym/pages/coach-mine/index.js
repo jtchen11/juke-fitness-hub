@@ -17,17 +17,7 @@ Page({
   goSchedule() { wx.reLaunch({ url: '/pages/coach-home/index' }); },
   goAppointments() { wx.reLaunch({ url: '/pages/coach-appointments/index' }); },
   goStudents() { wx.reLaunch({ url: '/pages/coach-students/index' }); },
-  goLeaveRequest() {
-    wx.showModal({
-      title: '提交请假申请',
-      content: '请假申请将提交给管理员审批，确认提交？',
-      success: function(r) {
-        if (r.confirm) {
-          wx.navigateTo({ url: '/pages/coach-mine/leave-request' });
-        }
-      }
-    });
-  },
+  goLeaveRequest() { wx.navigateTo({ url: '/pages/coach-mine/leave-request/index' }); },
   onLogout() {
     wx.showModal({ title: '确认退出', content: '确定退出登录吗？', success: function(r) { if (r.confirm) { app.logout(); wx.reLaunch({ url: '/pages/home/index' }); } } });
   }

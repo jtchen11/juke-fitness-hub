@@ -15,6 +15,7 @@ public class Trainer {
     private Long id;
     private String name;
     private String phone;
+    private String avatar;
     private String specialty;
     private String intro;
     private BigDecimal pricePerHour;

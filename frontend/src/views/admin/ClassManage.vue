@@ -215,6 +215,21 @@
           ref="formRef"
           label-width="100px"
       >
+                <el-form-item label="封面图" prop="coverImage">
+          <el-upload
+              class="cover-uploader"
+              action="#"
+              :auto-upload="false"
+              :show-file-list="false"
+              :on-change="(file) => { formData.coverImage = URL.createObjectURL(file.raw); }"
+          >
+            <img v-if="formData.coverImage" :src="formData.coverImage" class="cover-preview" />
+            <div v-else class="upload-placeholder">
+              <span style="font-size:32px">+</span>
+              <span>上传封面图</span>
+            </div>
+          </el-upload>
+        </el-form-item>
         <el-form-item label="课程名称" prop="name" required>
           <el-input v-model="formData.name" placeholder="如：热力搏击" />
         </el-form-item>
@@ -298,6 +313,16 @@
               :step="10"
               style="width:100%"
           />
+        </el-form-item>
+        <el-form-item label="难度等级" prop="difficulty">
+          <el-select v-model="formData.difficulty" placeholder="选择难度" style="width:100%">
+            <el-option label="初级" value="初级" />
+            <el-option label="中级" value="中级" />
+            <el-option label="高级" value="高级" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="教室位置" prop="classroom">
+          <el-input v-model="formData.classroom" placeholder="如：综合操房" />
         </el-form-item>
         <el-form-item label="允许访客体验">
           <el-switch v-model="formData.allowVisitor" active-color="#4A6CF7" />

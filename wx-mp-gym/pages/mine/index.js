@@ -1,18 +1,19 @@
 var app = getApp();
 Page({
   data: { isLoggedIn: false, isActiveMember: false, isVisitor: false, isExpired: false, memberName: "", level: "", avatarUrl: "", canSwitchToCoach: false, role: "", benefits: { discount: '无', freeRemaining: 0, points: 0 } },
-  onShow() { this.checkLogin(); if (this.data.isLoggedIn) this.loadBenefits(); },
+  onShow() { this.checkLogin(); if (app.isLoggedIn()) this.loadBenefits(); },
   checkLogin() {
     var u = app.globalData.userInfo || {};
     var loggedIn = app.isLoggedIn();
     var role = u.role || "";
+    var name = u.memberName || u.nickname || "";
+    if (!name) name = u.phone ? u.phone.substr(0,3) + "****" + u.phone.substr(7) : "健身用户";
+    var memberLevel = u.level || "访客";
     this.setData({
       isLoggedIn: loggedIn,
-      isActiveMember: u.isActiveMember || false,
-      isVisitor: loggedIn && !u.isActiveMember && !u.expireDate,
-      isExpired: loggedIn && !u.isActiveMember && !!u.expireDate,
-      memberName: u.memberName || u.nickname || "",
-      level: u.level || "",
+      isExpired: loggedIn && !!u.expireDate && new Date(u.expireDate) < new Date(),
+      memberName: name,
+      level: memberLevel,
       avatarUrl: u.avatarUrl || "",
       role: role,
       canSwitchToCoach: role === "trainer" || role === "both"
@@ -38,7 +39,7 @@ Page({
   goCompetitions() { wx.navigateTo({ url: "/pages/competitions/index" }); },
   goMessage() { wx.showToast({ title: '功能开发中', icon: 'none' }); },
   goPointsMall() { wx.showToast({ title: '功能开发中', icon: 'none' }); },
-  goDietRecord() { wx.showToast({ title: '功能开发中', icon: 'none' }); },
+  goDietRecord() { wx.navigateTo({ url: '/pages/diet-record/index' }); },
   goSportsRecord() { wx.showToast({ title: '功能开发中', icon: 'none' }); },  switchToCoach() { app.switchToCoachMode(); },
   onLogout() {
     wx.showModal({ title: "提示", content: "确定退出登录？", success: function(r) { if (r.confirm) { app.logout(); wx.reLaunch({ url: "/pages/home/index" }); } } });

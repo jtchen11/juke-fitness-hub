@@ -1,1 +1,17 @@
-/* pages/coach-students/detail/index.wxss */
+.page-student-detail{min-height:100vh;background:#F5F6FA;padding:20px 16px 70px}
+.profile-card{background:linear-gradient(135deg,#4A6CF7,#8B5CF6);border-radius:16px;padding:24px;display:flex;align-items:center;gap:16px;margin-bottom:20px;color:#FFF}
+.avatar{width:60px;height:60px;border-radius:30px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.profile-info{flex:1}
+.student-name{font-size:20px;font-weight:700;display:block}
+.student-phone{font-size:13px;opacity:0.8;display:block;margin-top:2px}
+.student-level{font-size:12px;background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:4px;display:inline-block;margin-top:6px}
+.section{margin-bottom:16px}
+.section-title{font-size:16px;font-weight:600;color:#1A1A2E;display:block;margin-bottom:10px}
+.fitness-card,.booking-card{background:#FFF;border-radius:10px;padding:14px;margin-bottom:8px;box-shadow:0 1px 6px rgba(0,0,0,.04)}
+.fitness-date{font-size:14px;font-weight:600;color:#1A1A2E;display:block;margin-bottom:6px}
+.fitness-metrics{display:flex;gap:12px;font-size:13px;color:#666}
+.metric{flex:1}
+.booking-name{font-size:14px;font-weight:500;color:#1A1A2E;display:block}
+.booking-time{font-size:12px;color:#8E8E93;display:block;margin-top:2px}
+.booking-status{font-size:11px;padding:2px 6px;border-radius:3px;display:inline-block;margin-top:4px}
+.empty{font-size:14px;color:#8E8E93;text-align:center;padding:20px 0}

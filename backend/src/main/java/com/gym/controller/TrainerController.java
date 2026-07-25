@@ -121,7 +121,12 @@ public class TrainerController {
     public Trainer getById(@PathVariable Long id) {
         Trainer trainer = trainerMapper.selectById(id);
         if (trainer != null) {
-            trainer.setBookingCount(0);
+            long count = personalTrainingMapper.selectCount(
+                new LambdaQueryWrapper<com.gym.entity.PersonalTraining>()
+                    .eq(com.gym.entity.PersonalTraining::getTrainerId, id)
+                    .eq(com.gym.entity.PersonalTraining::getStatus, "completed")
+            );
+            trainer.setBookingCount((int) count);
         }
         return trainer;
     }
@@ -221,8 +226,9 @@ public class TrainerController {
     @PostMapping("/{trainerId}/leave")
     @Transactional
     public Map<String, Object> setLeave(@PathVariable Long trainerId,
-                                        @RequestParam String leaveDate,
-                                        @RequestParam(required = false) String reason) {
+                                        @RequestBody Map<String, Object> params) {
+        String leaveDate = (String) params.get("leaveDate");
+        String reason = (String) params.get("reason");
         Map<String, Object> result = new HashMap<>();
 
         // 1. 校验教练是否存在
@@ -326,6 +332,43 @@ public class TrainerController {
     /**
      * 获取教练今日课表（团课 + 私教）
      */
+        @GetMapping("/{trainerId}/stats")
+    public Map<String, Object> getTrainerStats(@PathVariable Long trainerId) {
+        Map<String, Object> result = new HashMap<>();
+        LocalDate now = LocalDate.now();
+        LocalDateTime monthStart = now.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime monthEnd = now.withDayOfMonth(now.lengthOfMonth()).atTime(23, 59, 59);
+
+        // 本月私教上课数（completed）
+        LambdaQueryWrapper<PersonalTraining> ptWrapper = new LambdaQueryWrapper<>();
+        ptWrapper.eq(PersonalTraining::getTrainerId, trainerId)
+                .eq(PersonalTraining::getStatus, "completed")
+                .ge(PersonalTraining::getAppointmentTime, monthStart)
+                .le(PersonalTraining::getAppointmentTime, monthEnd);
+        long completedSessions = personalTrainingMapper.selectCount(ptWrapper);
+
+        // 本月私教预约数（scheduled + completed）
+        LambdaQueryWrapper<PersonalTraining> bookingWrapper = new LambdaQueryWrapper<>();
+        bookingWrapper.eq(PersonalTraining::getTrainerId, trainerId)
+                .ge(PersonalTraining::getAppointmentTime, monthStart)
+                .le(PersonalTraining::getAppointmentTime, monthEnd)
+                .in(PersonalTraining::getStatus, "scheduled", "completed");
+        long totalBookings = personalTrainingMapper.selectCount(bookingWrapper);
+
+        // 本月团课核销数
+        LambdaQueryWrapper<GroupClass> gcWrapper = new LambdaQueryWrapper<>();
+        gcWrapper.eq(GroupClass::getTrainerId, trainerId)
+                .eq(GroupClass::getStatus, "completed")
+                .ge(GroupClass::getStartTime, monthStart)
+                .le(GroupClass::getStartTime, monthEnd);
+        long classCheckins = groupClassMapper.selectCount(gcWrapper);
+
+        result.put("thisMonthSessions", completedSessions);
+        result.put("thisMonthBookings", totalBookings);
+        result.put("thisMonthCheckins", classCheckins);
+        return result;
+    }
+
     @GetMapping("/{trainerId}/today-schedule")
     public List<Map<String, Object>> getTodaySchedule(@PathVariable Long trainerId) {
         List<Map<String, Object>> result = new ArrayList<>();
@@ -440,6 +483,12 @@ public class TrainerController {
             }
         }
 
+        // Count class sessions per member
+        java.util.Map<Long, Long> classCountMap = new java.util.HashMap<>();
+        for (PersonalTraining pt : pts) {
+            classCountMap.merge(pt.getMemberId(), 1L, Long::sum);
+        }
+
         List<Map<String, Object>> result = new ArrayList<>();
         for (Long memberId : memberIds) {
             Member m = memberMapper.selectById(memberId);
@@ -458,7 +507,9 @@ public class TrainerController {
             item.put("id", m.getId());
             item.put("name", m.getName());
             item.put("phone", m.getPhone());
+            item.put("avatarUrl", null);
             item.put("lastClass", lastClassMap.get(memberId));
+            item.put("classCount", classCountMap.getOrDefault(memberId, 0L));
             result.add(item);
         }
         return result;

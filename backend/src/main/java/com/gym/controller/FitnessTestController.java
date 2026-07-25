@@ -81,6 +81,11 @@ public class FitnessTestController {
     /**
      * 获取统计数据
      */
+    @GetMapping("/{id}")
+    public FitnessTest getById(@PathVariable Long id) {
+        return testMapper.selectById(id);
+    }
+
     @GetMapping("/stats")
     public Map<String, Object> getStats() {
         List<FitnessTest> all = testMapper.selectList(null);
@@ -220,6 +225,18 @@ public class FitnessTestController {
         result.put("latestBodyFat", latest.getBodyFatPercent());
         result.put("latestMuscle", latest.getMuscleMassKg());
         return result;
+    }
+
+    @GetMapping("/member/{memberId}")
+    public Map<String, Object> getMemberRecords(@PathVariable Long memberId) {
+        LambdaQueryWrapper<FitnessTest> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FitnessTest::getMemberId, memberId)
+                .orderByDesc(FitnessTest::getTestDate);
+        List<FitnessTest> list = testMapper.selectList(wrapper);
+        Map<String, Object> r = new HashMap<>();
+        r.put("records", list);
+        r.put("total", list.size());
+        return r;
     }
     private String nullToEmpty(Object obj) {
         return obj == null ? "" : obj.toString();

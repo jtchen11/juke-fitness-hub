@@ -92,6 +92,14 @@ public class AuthController {
             }
         } else if (member == null && trainer != null) {
             role = "trainer";
+            // 自动为教练创建会员记录（memberId 不为 null 才能使用会员端）
+            member = new Member();
+            member.setPhone(phone);
+            member.setName(trainer.getName());
+            member.setLevel("普通会员");
+            member.setExpireDate(java.time.LocalDate.now().plusYears(10));
+            member.setCreatedAt(LocalDateTime.now());
+            memberMapper.insert(member);
         } else {
             role = "both";
             if (nickname != null && !nickname.isEmpty()) {

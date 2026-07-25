@@ -1,4 +1,4 @@
-server:
+﻿server:
   address: 0.0.0.0
   port: 8080
 
@@ -25,14 +25,15 @@ mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
-ai:
-  llm:
-    api-key: ${AI_API_KEY:default-key}         # 从环境变量读取
-    model: qwen-max
-    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-
-dashscope:
-  api-key: ${AI_API_KEY:default-key}   # 给一个非空默认值
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://api.deepseek.com/v1
+      api-key: ${DEEPSEEK_API_KEY:}
+      model-name: deepseek-chat
+      temperature: 0.7
+      timeout: 60s
+      max-tokens: 4096
 
 face:
   service:
@@ -45,10 +46,10 @@ sms:
   enabled: false
   mock-code: '123456'
 
-
 gym:
   location:
     latitude: 23.142407507050127
     longitude: 113.34582694066887
     radius: 100
+
 

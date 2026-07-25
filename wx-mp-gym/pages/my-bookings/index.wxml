@@ -11,7 +11,7 @@
 
   <view class="list-area">
     <view wx:if="{{list.length===0}}" class="empty-state"><text>暂无预约记录</text></view>
-    <view class="booking-card" wx:for="{{list}}" wx:key="id">
+    <view class="booking-card" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="goDetail">
       <view class="card-top">
         <view class="card-left">
           <text class="card-type">{{item.typeLabel}}</text>
@@ -22,10 +22,24 @@
         <view class="status-tag {{item.status}}">{{statusText(item.status)}}</view>
       </view>
       <view class="card-actions" wx:if="{{item.status==='booked'}}">
-        <button class="btn-cancel" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="onCancel">取消预约</button>
-        <button class="btn-checkin" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="onCheckin">签到</button>
+        <button class="btn-cancel" data-id="{{item.id}}" data-type="{{item.type}}" catchtap="onCancel">取消预约</button>
+        <button class="btn-checkin" data-id="{{item.id}}" data-type="{{item.type}}" catchtap="onCheckin">签到</button>
       </view>
     </view>
   </view>
+
+  <!-- 签到码弹窗 -->
+  <view class="code-mask" wx:if="{{showCodeInput}}" catchtap="hideCodeInput">
+    <view class="code-modal" catchtap="stopPropagation">
+      <view class="code-modal-content">
+        <text class="code-modal-title">签到验证</text>
+        <text class="code-modal-desc">请输入教练提供的6位签到码</text>
+        <input class="code-input" type="text" maxlength="6" value="{{checkinCode}}" bindinput="onCodeInput" placeholder="输入6位签到码" catchtap="stopPropagation"/>
+        <button class="btn-primary" bindtap="submitCheckinCode" loading="{{codeLoading}}">确认签到</button>
+        <button class="btn-cancel" catchtap="hideCodeInput">取消</button>
+      </view>
+    </view>
+  </view>
+
   <tab-bar/>
 </view>

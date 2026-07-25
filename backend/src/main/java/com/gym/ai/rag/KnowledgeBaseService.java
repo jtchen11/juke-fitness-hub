@@ -59,7 +59,12 @@ public class KnowledgeBaseService {
             return "知识库暂未加载。";
         }
         try {
-            var relevant = embeddingStore.findRelevant(embeddingModel.embed(query).content(), 2);
+            var searchRequest = dev.langchain4j.store.embedding.EmbeddingSearchRequest.builder()
+    .queryEmbedding(embeddingModel.embed(query).content())
+    .maxResults(2)
+    .build();
+            var searchResult = embeddingStore.search(searchRequest);
+            var relevant = searchResult.matches();
             if (relevant.isEmpty()) {
                 return "未找到相关知识。";
             }

@@ -51,11 +51,9 @@ public class MongoChatMemoryStore implements ChatMemoryStore {
         String id = memoryId.toString();
         List<MessageRecord> records = messages.stream()
                 .map(msg -> {
-                    if (msg == null || msg.text() == null) return null;
-                    if (msg instanceof UserMessage) {
-                        return new MessageRecord("user", msg.text(), null);
-                    } else if (msg instanceof AiMessage) {
-                        return new MessageRecord("assistant", msg.text(), null);
+                    if (msg == null) return null;
+                    if (msg instanceof UserMessage) { String t = ((UserMessage) msg).singleText(); if (t == null || t.isEmpty()) return null; return new MessageRecord("user", t, null);
+                    } else if (msg instanceof AiMessage) { String t = ((AiMessage) msg).text(); if (t == null || t.isEmpty()) return null; return new MessageRecord("assistant", t, null);
                     } else {
                         return null;
                     }

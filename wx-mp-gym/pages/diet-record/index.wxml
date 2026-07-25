@@ -1,0 +1,31 @@
+<view class="page-diet">
+  <view class="add-card">
+    <text class="section-title">记录饮食</text>
+    <picker mode="date" bindchange="onDateChange">
+      <view class="picker-row"><text class="label">日期</text><text class="value">{{date || '今天'}}</text></view>
+    </picker>
+    <view class="meal-select">
+      <view class="meal-item {{mealType==='breakfast' ? 'active' : ''}}" data-type="breakfast" bindtap="onMealSelect">早餐</view>
+      <view class="meal-item {{mealType==='lunch' ? 'active' : ''}}" data-type="lunch" bindtap="onMealSelect">午餐</view>
+      <view class="meal-item {{mealType==='dinner' ? 'active' : ''}}" data-type="dinner" bindtap="onMealSelect">晚餐</view>
+      <view class="meal-item {{mealType==='snack' ? 'active' : ''}}" data-type="snack" bindtap="onMealSelect">加餐</view>
+    </view>
+    <input class="food-input" placeholder="食物名称" value="{{foodName}}" bindinput="onFoodInput"/>
+    <input class="food-input" placeholder="热量(卡路里)" type="number" value="{{calories}}" bindinput="onCaloriesInput"/>
+    <button class="btn-submit" bindtap="onSubmit">添加记录</button>
+  </view>
+
+  <view class="record-list">
+    <text class="section-title">记录列表</text>
+    <view wx:if="{{records.length===0}}" class="empty">暂无饮食记录</view>
+    <view class="record-card" wx:for="{{records}}" wx:key="id">
+      <view class="record-top">
+        <text class="record-meal">{{mealLabels[item.mealType] || item.mealType}}</text>
+        <text class="record-date">{{item.date}}</text>
+      </view>
+      <text class="record-food">{{item.foodName}}</text>
+      <text class="record-calories" wx:if="{{item.calories}}">{{item.calories}}卡路里</text>
+      <text class="del-btn" data-id="{{item.id}}" bindtap="onDelete">删除</text>
+    </view>
+  </view>
+</view>

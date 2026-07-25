@@ -286,6 +286,11 @@ public class ClassBookingController {
     /**
      * 取消预约（未支付/已支付均可取消）
      */
+    @PostMapping("/{id}/cancel")
+    public Map<String, Object> cancelViaPost(@PathVariable Long id) {
+        return cancel(id);
+    }
+
     @DeleteMapping("/{id}")
     @Transactional
     public Map<String, Object> cancel(@PathVariable Long id) {
@@ -329,6 +334,18 @@ public class ClassBookingController {
             classBookingMapper.updateById(booking);
             return successResponse("退课退款成功");
         } else {
+                                    if (gc != null && gc.getEnrolled() != null && gc.getEnrolled() > 0) {
+                gc.setEnrolled(gc.getEnrolled() - 1);
+                groupClassMapper.updateById(gc);
+            }
+            // 访客取消体验课，归还体验机会
+            Member cancelMember = memberMapper.selectById(booking.getMemberId());
+            if (cancelMember != null && cancelMember.isVisitor()
+                && gc.getAllowVisitor() != null && gc.getAllowVisitor()
+                && cancelMember.getExperienceUsed() != null && cancelMember.getExperienceUsed()) {
+                cancelMember.setExperienceUsed(false);
+                memberMapper.updateById(cancelMember);
+            }
             booking.setPaymentStatus("cancelled");
             booking.setStatus("cancelled");
             classBookingMapper.updateById(booking);

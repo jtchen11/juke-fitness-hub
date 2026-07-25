@@ -34,7 +34,10 @@ public class GroupClass {
 
     @TableField(exist = false)
     private String trainerName;
-    private String description;  // 课程介绍
+    private String description;
+    private String difficulty;
+    private String classroom;
+    private String coverImage;  // 课程介绍
     private Boolean allowVisitor;
     private String checkinCode;  // 6位随机签到码
     private LocalDateTime codeGeneratedAt;  // 签到码生成时间 // 是否允许准会员预约
