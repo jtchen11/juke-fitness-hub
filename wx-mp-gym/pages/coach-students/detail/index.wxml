@@ -1,32 +1,55 @@
 <view class="page-student-detail">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack">←</view>
+    <text class="nav-title">会员档案</text>
+    <view class="nav-placeholder"></view>
+  </view>
   <view class="profile-card">
     <view class="avatar">{{student.name ? student.name[0] : '?'}}</view>
-    <view class="profile-info">
-      <text class="student-name">{{student.name}}</text>
-      <text class="student-phone">{{student.phone || '暂无'}}</text>
-      <text class="student-level">{{student.level || '普通会员'}}</text>
+    <view class="profile-body">
+      <view class="profile-top">
+        <text class="profile-name">{{student.name}}</text>
+        <text class="profile-level">{{student.level || '普通会员'}}</text>
+      </view>
+      <text class="profile-phone">{{student.phone || '暂无手机号'}}</text>
     </view>
   </view>
-
+  <view class="stats-row">
+    <view class="stat-card">
+      <text class="stat-number">{{stats.totalClasses}}</text>
+      <text class="stat-label">总上课</text>
+    </view>
+    <view class="stat-card">
+      <text class="stat-number">{{stats.remainingSessions}}</text>
+      <text class="stat-label">剩余课时</text>
+    </view>
+    <view class="stat-card">
+      <text class="stat-number">{{stats.monthlyCheckins}}</text>
+      <text class="stat-label">本月打卡</text>
+    </view>
+  </view>
   <view class="section">
-    <text class="section-title">体测历史</text>
-    <view class="fitness-card" wx:for="{{fitnessRecords}}" wx:key="id">
-      <text class="fitness-date">{{item.testDate}}</text>
-      <view class="fitness-metrics">
-        <text class="metric">体重: {{item.weightKg || '-'}}kg</text>
-        <text class="metric">体脂: {{item.bodyFatPercent || '-'}}%</text>
-        <text class="metric">肌肉: {{item.muscleMassKg || '-'}}kg</text>
+    <text class="section-title">📊 体测历史</text>
+    <view class="record-card" wx:for="{{fitnessRecords}}" wx:key="id">
+      <text class="record-date">{{item.testDate}}</text>
+      <view class="record-metrics">
+        <text class="metric">体重 {{item.weightKg || '-'}}kg</text>
+        <text class="metric-divider">|</text>
+        <text class="metric">体脂 {{item.bodyFatPercent || '-'}}%</text>
+        <text class="metric-divider">|</text>
+        <text class="metric">肌肉 {{item.muscleMassKg || '-'}}kg</text>
       </view>
     </view>
     <view wx:if="{{fitnessRecords.length===0}}" class="empty">暂无体测记录</view>
   </view>
-
   <view class="section">
-    <text class="section-title">上课记录</text>
-    <view class="booking-card" wx:for="{{bookings}}" wx:key="id">
-      <text class="booking-name">{{item.name || item.typeLabel}}</text>
-      <text class="booking-time">{{item.bookingTime || item.appointmentTime}}</text>
-      <text class="booking-status {{item.status}}">{{item.status}}</text>
+    <text class="section-title">📋 最近上课记录</text>
+    <view class="record-card" wx:for="{{bookings}}" wx:key="id">
+      <view class="booking-row">
+        <text class="booking-date">{{item.displayDate || item.bookingTime || item.appointmentTime}}</text>
+        <text class="booking-name">{{item.name || item.typeLabel || '课程'}}</text>
+        <text class="booking-status {{item.status}}">{{item.statusText || item.status}}</text>
+      </view>
     </view>
     <view wx:if="{{bookings.length===0}}" class="empty">暂无上课记录</view>
   </view>

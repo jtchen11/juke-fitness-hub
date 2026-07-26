@@ -8,7 +8,7 @@
     <text class="summary-label">节课 · {{completedCount}}节已完成</text>
   </view>
   <scroll-view class="schedule-list" scroll-y>
-    <view class="schedule-card" wx:for="{{schedules}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+    <view class="schedule-card" wx:for="{{schedules}}" wx:key="id" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="goDetail">
       <view class="schedule-time">{{item.time}}</view>
       <view class="schedule-info">
         <text class="schedule-name">{{item.name}}</text>

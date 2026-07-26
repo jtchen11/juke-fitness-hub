@@ -4,7 +4,7 @@
     <input class="search-input" placeholder="搜索学员姓名/手机号" bindinput="onSearch"/>
   </view>
   <scroll-view class="student-list" scroll-y>
-    <view class="student-card" wx:for="{{students}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+    <view class="student-card" wx:for="{{students}}" wx:key="id" data-id="{{item.id}}" hover-class="student-card-tap" catchtap="goDetail">
       <image class="student-avatar" src="{{item.avatarUrl || '/images/default_avatar.png'}}" mode="aspectFill"/>
       <view class="student-info">
         <text class="student-name">{{item.name}}</text>

@@ -12,6 +12,7 @@ Page({
   },
   goDetail(e) {
     var id = e.currentTarget.dataset.id;
-    wx.navigateTo({ url: '/pages/coach-students/detail?id=' + id });
+    if (!id) { console.log('goDetail: id is undefined'); return; }
+    wx.navigateTo({ url: '/pages/coach-students/detail/index?id=' + id });
   }
 });

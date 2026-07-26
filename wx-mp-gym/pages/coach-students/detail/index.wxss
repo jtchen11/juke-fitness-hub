@@ -1,17 +1,37 @@
-.page-student-detail{min-height:100vh;background:#F5F6FA;padding:20px 16px 70px}
-.profile-card{background:linear-gradient(135deg,#4A6CF7,#8B5CF6);border-radius:16px;padding:24px;display:flex;align-items:center;gap:16px;margin-bottom:20px;color:#FFF}
-.avatar{width:60px;height:60px;border-radius:30px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
-.profile-info{flex:1}
-.student-name{font-size:20px;font-weight:700;display:block}
-.student-phone{font-size:13px;opacity:0.8;display:block;margin-top:2px}
-.student-level{font-size:12px;background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:4px;display:inline-block;margin-top:6px}
-.section{margin-bottom:16px}
-.section-title{font-size:16px;font-weight:600;color:#1A1A2E;display:block;margin-bottom:10px}
-.fitness-card,.booking-card{background:#FFF;border-radius:10px;padding:14px;margin-bottom:8px;box-shadow:0 1px 6px rgba(0,0,0,.04)}
-.fitness-date{font-size:14px;font-weight:600;color:#1A1A2E;display:block;margin-bottom:6px}
-.fitness-metrics{display:flex;gap:12px;font-size:13px;color:#666}
-.metric{flex:1}
-.booking-name{font-size:14px;font-weight:500;color:#1A1A2E;display:block}
-.booking-time{font-size:12px;color:#8E8E93;display:block;margin-top:2px}
-.booking-status{font-size:11px;padding:2px 6px;border-radius:3px;display:inline-block;margin-top:4px}
-.empty{font-size:14px;color:#8E8E93;text-align:center;padding:20px 0}
+.page-student-detail{min-height:100vh;background:#f5f6fa;padding:0 32rpx 70rpx;box-sizing:border-box}
+/* nav bar */
+.nav-bar{display:flex;align-items:center;justify-content:space-between;height:88rpx;background:#FFF;margin:0 -32rpx;padding:0 32rpx;border-bottom:2rpx solid #e8e8e8;position:relative}
+.nav-back{width:60rpx;height:60rpx;display:flex;align-items:center;justify-content:center;font-size:36rpx;color:#1A1A2E;font-weight:500}
+.nav-title{font-size:32rpx;font-weight:600;color:#1A1A2E;position:absolute;left:50%;transform:translateX(-50%)}
+.nav-placeholder{width:60rpx}
+/* profile card */
+.profile-card{background:#FFF;border-radius:16rpx;padding:24rpx;margin-top:16rpx;display:flex;align-items:center;gap:20rpx;box-shadow:0 2rpx 12rpx rgba(0,0,0,0.06)}
+.avatar{width:80rpx;height:80rpx;border-radius:50%;background:linear-gradient(135deg,#4A6CF7,#8B5CF6);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:32rpx;font-weight:700;flex-shrink:0}
+.profile-body{flex:1;min-width:0}
+.profile-top{display:flex;align-items:center;gap:12rpx;flex-wrap:wrap}
+.profile-name{font-size:34rpx;font-weight:700;color:#1A1A2E}
+.profile-level{font-size:22rpx;color:#FFF;background:#4A6CF7;padding:4rpx 14rpx;border-radius:20rpx;display:inline-block}
+.profile-phone{font-size:26rpx;color:#8A8AA0;margin-top:8rpx;display:block}
+/* stats row */
+.stats-row{display:flex;gap:16rpx;margin-top:16rpx}
+.stat-card{flex:1;background:#f0f0f0;border-radius:12rpx;padding:20rpx 8rpx;text-align:center}
+.stat-number{font-size:44rpx;font-weight:700;color:#4A6CF7;display:block;line-height:1.2}
+.stat-label{font-size:24rpx;color:#8A8AA0;margin-top:8rpx;display:block}
+/* sections */
+.section{margin-top:24rpx}
+.section-title{font-size:30rpx;font-weight:600;color:#1A1A2E;display:block;margin-bottom:12rpx}
+.record-card{background:#FFF;border-radius:16rpx;padding:20rpx 24rpx;margin-bottom:12rpx;box-shadow:0 2rpx 8rpx rgba(0,0,0,0.04)}
+.record-date{font-size:26rpx;font-weight:600;color:#1A1A2E;display:block;margin-bottom:8rpx}
+.record-metrics{display:flex;align-items:center;gap:12rpx;font-size:24rpx;color:#666;flex-wrap:wrap}
+.metric{white-space:nowrap}
+.metric-divider{color:#ddd}
+.booking-row{display:flex;align-items:center;justify-content:space-between;gap:12rpx}
+.booking-date{font-size:24rpx;color:#8A8AA0;flex-shrink:0}
+.booking-name{font-size:26rpx;color:#1A1A2E;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.booking-status{font-size:22rpx;padding:4rpx 14rpx;border-radius:20rpx;flex-shrink:0}
+.booking-status.checked_in{background:#e8f8ee;color:#00C853}
+.booking-status.cancelled{background:#fde8e8;color:#FF5252}
+.booking-status.booked{background:#fff3e0;color:#FFB300}
+.booking-status.scheduled{background:#e3f2fd;color:#4A6CF7}
+.booking-status.completed{background:#e8f8ee;color:#00C853}
+.empty{font-size:26rpx;color:#8A8AA0;text-align:center;padding:30rpx 0}

@@ -1,4 +1,4 @@
-var app = getApp();
+﻿var app = getApp();
 Page({
   data: { today: '', dateDisplay: '', schedules: [], completedCount: 0 },
   onShow() {
@@ -20,7 +20,12 @@ Page({
   },
   goDetail(e) {
     var id = e.currentTarget.dataset.id;
-    wx.navigateTo({ url: '/pages/coach-appointments/index?highlight=' + id });
+    var type = e.currentTarget.dataset.type;
+    if (type === 'group') {
+      wx.navigateTo({ url: '/pages/booking/index?id=' + id });
+    } else {
+      wx.navigateTo({ url: '/pages/coach-appointments/index?highlight=' + id });
+    }
   },
   generateCode(e) {
     var id = e.currentTarget.dataset.id;

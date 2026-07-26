@@ -1,4 +1,4 @@
-const app = getApp();
+﻿const app = getApp();
 const request = require('../../utils/request.js');
 Page({
   data: { tab: 'group', dateIdx: 0, ptDateIdx: 0, dates: [], ptDates: [], typeFilter: '', specFilter: '', courses: [], coaches: [], showLoginModal: false, isLoggedIn: false },
@@ -94,7 +94,18 @@ Page({
   },
 
   goBooking(e) { if (!app.isLoggedIn()) { this.setData({ showLoginModal: true }); return; } wx.navigateTo({ url: '/pages/booking/index?id=' + e.currentTarget.dataset.id }); },
-  goPTBooking(e) { if (!app.isLoggedIn()) { this.setData({ showLoginModal: true }); return; } var date = this.data.ptDates[this.data.ptDateIdx].full; wx.navigateTo({ url: '/pages/coach-detail/index?id=' + e.currentTarget.dataset.id + '&date=' + date }); },
+  goPTBooking(e) {
+    if (!app.isLoggedIn()) { this.setData({ showLoginModal: true }); return; }
+    var id = e.currentTarget.dataset.id;
+    var ptDates = this.data.ptDates;
+    var ptDateIdx = this.data.ptDateIdx;
+    var date = (ptDates && ptDates[ptDateIdx]) ? ptDates[ptDateIdx].full : '';
+    if (!date) {
+      var d = new Date();
+      date = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    wx.navigateTo({ url: '/pages/coach-detail/index?id=' + id + '&date=' + date });
+  },
   onTabChange(e) { var tab = e.currentTarget.dataset.tab; this.setData({ tab: tab }); },
   onLoginClose() { this.setData({ showLoginModal: false }); },
   onLoginSuccess() { this.setData({ showLoginModal: false }); },
