@@ -1,8 +1,11 @@
 .page-competitions{min-height:100vh;background:#F5F6FA;padding-bottom:70px}
-.banner{background:linear-gradient(135deg,#4A6CF7,#8B5CF6);padding:40px 24px 32px;text-align:center}
-.banner-title{font-size:24px;font-weight:700;color:#FFF;display:block}
-.banner-desc{font-size:14px;color:rgba(255,255,255,.7);display:block;margin-top:8px}
-.section{padding:20px 16px 0}
+.nav-bar{display:flex;align-items:center;padding:calc(20rpx + env(safe-area-inset-top)) 20rpx 12rpx;background:#FFF}
+.nav-back{display:flex;align-items:center}
+.back-icon{font-size:48rpx;color:#4A6CF7;line-height:1}
+.back-text{font-size:28rpx;color:#4A6CF7;margin-left:4rpx}
+.nav-title{flex:1;text-align:center;font-size:32rpx;font-weight:600;color:#1A1A2E}
+.nav-placeholder{width:80rpx}
+.section{padding:20rpx 16rpx 0}
 .section-title{font-size:18px;font-weight:600;color:#1A1A2E;display:block;margin-bottom:12px}
 .comp-card{background:#FFF;border-radius:12px;padding:16px;margin-bottom:10px;display:flex;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.06)}
 .comp-info{flex:1}
@@ -10,7 +13,7 @@
 .comp-time{font-size:12px;color:#8A8AA0;display:block;margin-top:4px}
 .comp-desc{font-size:12px;color:#8A8AA0;display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .comp-status{font-size:12px;padding:4px 10px;border-radius:4px}
-.comp-status.open{background:#E8F5E9;color:#00C853}
+.comp-status.open{background:#EEF0FF;color:#4A6CF7}
 .comp-status.active{background:#EEF0FF;color:#4A6CF7}
 .comp-status.ended{background:#F5F5F5;color:#BDBDBD}
 .comp-card.history{opacity:.7}

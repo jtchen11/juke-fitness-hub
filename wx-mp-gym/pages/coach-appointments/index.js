@@ -24,23 +24,41 @@ Page({
   },
   onCheckIn(e) {
     var id = e.currentTarget.dataset.id;
+    var memberId = e.currentTarget.dataset.memberid;
     var _this = this;
-    wx.showModal({
-      title: '教练端打卡',
-      content: '请确认会员已到场，是否开始上课？',
+    // 1. 拍照获取会员正脸照片
+    wx.chooseImage({
+      sourceType: ['camera'],
+      count: 1,
       success: function(res) {
-        if (res.confirm) {
-          wx.showLoading({ title: '正在打卡...' });
-          request.post('/api/check-in/pt/' + id, { action: 'start' }, function(r) {
+        var tempPath = res.tempFilePaths[0];
+        wx.showLoading({ title: '正在验证人脸...' });
+        // 2. 读取图片为 base64
+        var fs = wx.getFileSystemManager();
+        var base64 = fs.readFileSync(tempPath, 'base64');
+        if (base64.indexOf(',') >= 0) base64 = base64.split(',')[1];
+        // 3. 调用人脸验证接口
+        request.post('/api/face/verify', { userId: String(memberId), image: base64 }, function(r) {
+          if (r && r.success) {
+            wx.showLoading({ title: '验证通过，正在打卡...' });
+            // 4. 人脸验证通过，自动打卡
+            request.post('/api/check-in/pt/coach/' + id + '?memberId=' + memberId + '&action=start', null, function(r2) {
+              wx.hideLoading();
+              if (r2 && r2.success) {
+                wx.showToast({ title: '打卡成功', icon: 'success' });
+                _this.loadAppointments();
+              } else {
+                wx.showToast({ title: (r2 && r2.message) || '打卡失败', icon: 'none' });
+              }
+            });
+          } else {
             wx.hideLoading();
-            if (r && r.success) {
-              wx.showToast({ title: '打卡成功', icon: 'success' });
-              _this.loadAppointments();
-            } else {
-              wx.showToast({ title: r.message || '打卡失败', icon: 'none' });
-            }
-          });
-        }
+            wx.showToast({ title: '人脸验证失败，请确认是会员本人', icon: 'none' });
+          }
+        });
+      },
+      fail: function() {
+        wx.showToast({ title: '拍照取消或失败', icon: 'none' });
       }
     });
   },

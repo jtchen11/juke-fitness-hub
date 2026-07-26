@@ -1,5 +1,7 @@
 package com.gym.controller;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -24,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/class-bookings")
 @CrossOrigin(originPatterns = "*", allowCredentials = "true")
@@ -194,6 +197,17 @@ public class ClassBookingController {
             memberMapper.updateById(member);
         }
 
+        // 9.6 免费/体验课直接增加已预约人数（无需支付）
+        if ("free".equals(gc.getType()) || price.compareTo(BigDecimal.ZERO) == 0 || (gc.getAllowVisitor() != null && gc.getAllowVisitor())) {
+            gc.setEnrolled(gc.getEnrolled() + 1);
+            groupClassMapper.updateById(gc);
+            log.info("预约成功 courseId={} enrolled={}", gc.getId(), gc.getEnrolled());
+            result.put("success", true);
+            result.put("message", "预约成功");
+            result.put("amount", BigDecimal.ZERO);
+            return result;
+        }
+
         // 10. 返回支付信息
         result.put("success", true);
         result.put("message", "预约已创建，请完成支付");
@@ -274,6 +288,7 @@ public class ClassBookingController {
         // 增加课程已预约人数
         gc.setEnrolled(gc.getEnrolled() + 1);
         groupClassMapper.updateById(gc);
+        log.info("支付成功 courseId={} enrolled={}", gc.getId(), gc.getEnrolled());
 
         result.put("success", true);
         result.put("message", "支付成功，预约完成！");

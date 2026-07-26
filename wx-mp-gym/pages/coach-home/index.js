@@ -21,5 +21,21 @@ Page({
   goDetail(e) {
     var id = e.currentTarget.dataset.id;
     wx.navigateTo({ url: '/pages/coach-appointments/index?highlight=' + id });
+  },
+  generateCode(e) {
+    var id = e.currentTarget.dataset.id;
+    var _this = this;
+    var request = require('../../utils/request.js');
+    wx.showLoading({ title: '正在生成...' });
+    request.post('/api/check-in/class/' + id + '/generate-code', {}, function(r) {
+      wx.hideLoading();
+      if (r && r.success) {
+        var st = r.startTime ? r.startTime.substring(11,16) : '开课时间';
+        var et = r.endTime ? r.endTime.substring(11,16) : '结束';
+        wx.showModal({ title: '签到码', content: '签到码：' + r.code + '\n有效期：' + st + ' - ' + et + '\n请告知会员输入此码签到', showCancel: false });
+      } else {
+        wx.showToast({ title: (r && r.message) || '生成失败', icon: 'none' });
+      }
+    });
   }
 });

@@ -64,7 +64,7 @@
   </view>
 
   <!-- 5. 课程推荐（横向滚动） -->
-  <view class="section">
+  <view class="section" wx:if="{{recommendedCourses.length>0}}">
     <view class="section-header"><text class="section-title">课程推荐</text><text class="section-more" bindtap="goCourses">更多 ></text></view>
     <scroll-view class="recommend-scroll" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="recommend-card" wx:for="{{recommendedCourses}}" wx:key="id" data-id="{{item.id}}" bindtap="goBooking">

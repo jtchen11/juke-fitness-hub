@@ -1,4 +1,4 @@
-.page-home{min-height:100vh;background:#F5F6FA}
+.page-home{min-height:100vh;background:#F5F6FA;padding-top:0}
 /* 1. Banner */
 .banner-swiper{height:300rpx;width:100vw;margin:0;border-radius:0;overflow:hidden}
 .banner-img{width:100%;height:300rpx}
@@ -18,13 +18,13 @@
 .asset-num{font-size:44rpx;font-weight:700;color:#4A6CF7;display:block}
 .asset-label{font-size:20rpx;color:#8A8AA0;margin-top:4rpx;display:block}
 /* 3. 快捷入口 */
-.quick-actions{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:16rpx;padding:24rpx 32rpx 8rpx}
+.quick-actions{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12rpx;padding:16rpx 32rpx 4rpx}
 .five-cards .action-card{padding:24rpx 8rpx}
 .action-card{background:#FFF;border-radius:12px;padding:24rpx 16rpx;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
 .action-icon{font-size:40rpx;display:block;margin-bottom:8rpx}
 .action-text{font-size:22rpx;color:#1A1A2E}
 /* 4. 今日课程 */
-.section{padding:0 32rpx;margin-top:24rpx}
+.section{padding:0 32rpx;margin-top:16rpx}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16rpx}
 .section-title{font-size:30rpx;font-weight:600;color:#1A1A2E}
 .section-more{font-size:24rpx;color:#8A8AA0}

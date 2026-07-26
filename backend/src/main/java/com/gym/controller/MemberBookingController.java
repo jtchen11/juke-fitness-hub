@@ -65,6 +65,9 @@ public class MemberBookingController {
                 GroupClass gc = groupClassMapper.selectById(cb.getClassId());
                 if (gc != null) {
                     name = gc.getName();
+                    item.put("classStartTime", gc.getStartTime());
+                    item.put("classEndTime", gc.getEndTime());
+            item.put("classId", cb.getClassId());
                     if (gc.getTrainerId() != null) {
                         Trainer t = trainerMapper.selectById(gc.getTrainerId());
                         if (t != null) trainerName = t.getName();
@@ -103,6 +106,7 @@ public class MemberBookingController {
             item.put("trainerName", tn);
             item.put("typeLabel", "\u79c1\u6559");
             item.put("isFree", pt.getIsFree());
+            item.put("trainerId", pt.getTrainerId());
             result.add(item);
         }
 

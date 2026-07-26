@@ -1,6 +1,7 @@
 package com.gym.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.gym.entity.ClassBooking;
 import com.gym.entity.GroupClass;
 import com.gym.mapper.ClassBookingMapper;
@@ -59,8 +60,10 @@ public class PointsScheduledTask {
             }
 
             // 标记团课为已完成
-            gc.setStatus("completed");
-            groupClassMapper.updateById(gc);
+            // 仅更新status字段，避免覆盖并发写入的enrolled值
+            groupClassMapper.update(null, new LambdaUpdateWrapper<GroupClass>()
+                    .eq(GroupClass::getId, gc.getId())
+                    .set(GroupClass::getStatus, "completed"));
             log.info("Processed paid class {}: {} bookings, {} points awarded", gc.getId(), bookings.size(), bookings.size() * 10);
         }
     }
@@ -95,8 +98,10 @@ public class PointsScheduledTask {
                 }
             }
 
-            gc.setStatus("completed");
-            groupClassMapper.updateById(gc);
+            // 仅更新status字段，避免覆盖并发写入的enrolled值
+            groupClassMapper.update(null, new LambdaUpdateWrapper<GroupClass>()
+                    .eq(GroupClass::getId, gc.getId())
+                    .set(GroupClass::getStatus, "completed"));
             log.info("Processed free class {}: {} bookings, {} points awarded", gc.getId(), bookings.size(), bookings.size());
         }
     }

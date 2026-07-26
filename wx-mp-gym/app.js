@@ -7,25 +7,33 @@ App({
   globalData: {
     token: "",
     userInfo: null,
-    apiBaseUrl: "http://localhost:8080",
+    apiBaseUrl: "http://192.168.10.6:8080",
     appMode: "member" // "member" | "coach"
   },
 
   onLaunch() {
     const token = wx.getStorageSync("token");
     const userInfo = wx.getStorageSync("userInfo");
-    const savedMode = wx.getStorageSync("appMode");
     if (token) {
       this.globalData.token = token;
       this.globalData.userInfo = userInfo;
     }
-    // 恢复模式：教练角色默认教练模式，否则会员模式
+    // 恢复模式：根据角色和上次保存的模式决定
     if (userInfo && (userInfo.role === "trainer" || userInfo.role === "both")) {
-      this.globalData.appMode = savedMode || "coach";
+      const savedMode = wx.getStorageSync("appMode");
+      this.globalData.appMode = savedMode === "coach" || savedMode === "member" ? savedMode : "coach";
     } else {
       this.globalData.appMode = "member";
     }
     wx.setStorageSync("appMode", this.globalData.appMode);
+    // 重定向到对应端首页
+    if (this.globalData.appMode === "coach") {
+      const pages = getCurrentPages();
+      const current = pages.length > 0 ? pages[pages.length - 1].route : "";
+      if (current !== "pages/coach-home/index" && !current.startsWith("pages/coach-")) {
+        wx.reLaunch({ url: "/pages/coach-home/index" });
+      }
+    }
   },
 
   // 切换到会员模式

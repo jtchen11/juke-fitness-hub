@@ -18,5 +18,6 @@ Page({
   goDetail(e) {
     var id = e.currentTarget.dataset.id;
     wx.navigateTo({ url: '/pages/competition-detail/index?id=' + id });
-  }
+  },
+  goBack() { wx.navigateBack(); }
 });

@@ -61,6 +61,15 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
             return "该时段已被其他会员预约";
         }
 
+        // 4.5 检查会员该时段是否已有私教预约
+        LambdaQueryWrapper<PersonalTraining> memberConflictWrapper = new LambdaQueryWrapper<>();
+        memberConflictWrapper.eq(PersonalTraining::getMemberId, memberId)
+                .eq(PersonalTraining::getAppointmentTime, appointmentTime)
+                .eq(PersonalTraining::getStatus, "scheduled");
+        if (ptMapper.selectCount(memberConflictWrapper) > 0) {
+            return "您在该时段已有私教预约，请选择其他时间";
+        }
+
         // 5. 创建预约记录
         PersonalTraining pt = new PersonalTraining();
         pt.setMemberId(memberId);

@@ -22,7 +22,7 @@ Page({
     }
     var date = params.date || '';
     var display = date ? date.replace(/-/g, '/') : '';
-    _this.setData({ ptDate: date, ptDateDisplay: '预约日期：' + display });
+    _this.setData({ ptDate: date, ptDateDisplay: display });
     _this.loadCoach(params.id);
   },
 

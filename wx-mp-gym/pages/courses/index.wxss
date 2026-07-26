@@ -1,4 +1,4 @@
-.page-courses{min-height:100vh;background:#F5F6FA}
+.page-courses{min-height:100vh;background:#F5F6FA;padding-top:calc(20rpx + env(safe-area-inset-top))}
 .tab-bar{position:relative;display:flex;padding:20rpx 0;margin:0 32rpx;background:#FFF;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
 .tab-item{flex:1;text-align:center;font-size:28rpx;color:#8A8AA0;padding:16rpx 0;z-index:1}
 .tab-item.active{color:#4A6CF7;font-weight:600}
@@ -41,8 +41,8 @@
 .coach-status.active{background:rgba(0,200,83,0.08);color:#00C853}
 .coach-status.vacation{background:rgba(255,179,0,0.08);color:#FFB300}
 .empty-state{text-align:center;padding:80rpx 0;font-size:28rpx;color:#8A8AA0}
-.tab-bar.three-tabs{justify-content:space-between}
-.tab-indicator.my{transform:translateX(200%)}
+.tab-bar.two-tabs{justify-content:space-between}
+
 .booking-card{display:flex;align-items:center;justify-content:space-between;background:#FFF;border-radius:12px;padding:12px 16px;margin-bottom:10px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
 .booking-card .card-left{flex:1}
 .booking-card .card-right{flex-shrink:0;margin-left:12px}

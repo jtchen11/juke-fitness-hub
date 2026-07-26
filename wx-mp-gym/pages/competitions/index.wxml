@@ -1,7 +1,8 @@
 <view class="page-competitions">
-  <view class="banner">
-    <text class="banner-title">健身比赛</text>
-    <text class="banner-desc">参加比赛，挑战自己</text>
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
+    <text class="nav-title">健身比赛</text>
+    <view class="nav-placeholder"></view>
   </view>
 
   <view class="section">

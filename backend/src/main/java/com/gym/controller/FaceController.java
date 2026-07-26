@@ -10,6 +10,9 @@ import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestController
 @RequestMapping("/api/face")
 @CrossOrigin(originPatterns = "*", allowCredentials = "true")
@@ -27,6 +30,7 @@ public class FaceController {
     public Map<String, Object> register(@RequestBody FaceRequest request) {
         Map<String, Object> result = new HashMap<>();
         String url = faceConfig.getFaceServiceUrl() + "/api/face/register";
+        log.info("收到注册请求 userId={}, image长度={}, image开头50字={}", request.getUserId(), request.getImage() != null ? request.getImage().length() : 0, request.getImage() != null ? request.getImage().substring(0, Math.min(50, request.getImage().length())) : "null");
         try {
             // 转发请求并获取响应
             Map<String, Object> response = restTemplate.postForObject(url, request, Map.class);

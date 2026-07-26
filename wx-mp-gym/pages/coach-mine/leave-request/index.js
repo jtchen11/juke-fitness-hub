@@ -7,7 +7,7 @@ Page({
     this.setData({ leaveDate: today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0') });
   },
   onDateChange(e) { this.setData({ leaveDate: e.detail.value }); },
-  onPeriodSelect(e) { this.setData({ periodIdx: parseInt(e.currentTarget.dataset.idx) }); },
+  onPeriodSelect(e) { this.setData({ selectedPeriod: e.currentTarget.dataset.period }); },
   onReasonInput(e) { this.setData({ reason: e.detail.value }); },
   goBack() { wx.navigateBack(); },
   onSubmit() {

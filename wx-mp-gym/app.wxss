@@ -1,4 +1,4 @@
-page{background:#F5F6FA;color:#1A1A2E;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding-top:calc(env(safe-area-inset-top) + 20px);box-sizing:border-box}
+page{background:#F5F6FA;color:#1A1A2E;font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-sizing:border-box}
 
 /* 页面容器 - 统一下边距 */
 .page-container{padding-bottom:70px}

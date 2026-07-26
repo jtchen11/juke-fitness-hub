@@ -403,7 +403,8 @@ public class TrainerController {
             item.put("id", pt.getId());
             item.put("name", "私教课");
             item.put("time", pt.getAppointmentTime() != null ? pt.getAppointmentTime().toLocalTime().toString().substring(0, 5) : "");
-            item.put("memberName", pt.getMemberName() != null ? pt.getMemberName() : "会员#" + pt.getMemberId());
+            Member ptMember = memberMapper.selectById(pt.getMemberId());
+            item.put("memberName", ptMember != null ? ptMember.getName() : "会员#" + pt.getMemberId());
             item.put("status", pt.getStatus());
             item.put("statusText", getScheduleStatusText(pt.getStatus()));
             item.put("type", "pt");
@@ -445,10 +446,12 @@ public class TrainerController {
         for (PersonalTraining pt : pts) {
             Map<String, Object> item = new HashMap<>();
             item.put("id", pt.getId());
-            item.put("memberName", pt.getMemberName() != null ? pt.getMemberName() : "会员#" + pt.getMemberId());
+            Member ptMember = memberMapper.selectById(pt.getMemberId());
+            item.put("memberName", ptMember != null ? ptMember.getName() : "会员#" + pt.getMemberId());
             item.put("courseName", pt.getPackageName() != null ? pt.getPackageName() : "私教课");
             item.put("time", pt.getAppointmentTime() != null ? pt.getAppointmentTime().toString().replace("T", " ") : "");
             item.put("status", pt.getStatus());
+            item.put("memberId", pt.getMemberId());
             item.put("type", "pt");
             result.add(item);
         }

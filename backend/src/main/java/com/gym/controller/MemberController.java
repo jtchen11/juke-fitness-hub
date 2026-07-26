@@ -3,11 +3,10 @@ package com.gym.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.gym.entity.Member;
+import com.gym.entity.*;
 import com.gym.enums.MemberLevel;
 import com.gym.mapper.MemberMapper;
 import com.gym.mapper.UserMessageMapper;
-import com.gym.entity.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,12 +25,7 @@ import com.gym.mapper.ClassBookingMapper;
 import com.gym.mapper.PersonalTrainingMapper;
 import com.gym.mapper.CompetitionRegistrationMapper;
 import com.gym.mapper.TrainerMapper;
-import com.gym.entity.FitnessTest;
-import com.gym.entity.GroupClass;
-import com.gym.entity.ClassBooking;
-import com.gym.entity.PersonalTraining;
-import com.gym.entity.CompetitionRegistration;
-import com.gym.entity.Trainer;
+import com.gym.mapper.MemberPrivatePackageMapper;
 import com.gym.auth.LoginContext;
 import com.gym.service.PointsService;
 import java.time.LocalTime;
@@ -39,7 +33,8 @@ import java.time.LocalTime;
 @RestController
 @RequestMapping("/api/members")
 public class MemberController {
-
+    @Autowired
+    private MemberPrivatePackageMapper memberPrivatePackageMapper;
     @Autowired
     private UserMessageMapper userMessageMapper;
 
@@ -400,6 +395,13 @@ public class MemberController {
         return obj == null ? "" : obj.toString();
     }
 
+
+    @GetMapping("/{id}/packages")
+    public List<MemberPrivatePackage> getMemberPackages(@PathVariable Long id) {
+        LambdaQueryWrapper<MemberPrivatePackage> w = new LambdaQueryWrapper<>();
+        w.eq(MemberPrivatePackage::getMemberId, id).orderByDesc(MemberPrivatePackage::getCreatedAt);
+        return memberPrivatePackageMapper.selectList(w);
+    }
 
     @GetMapping("/{id}/benefits")
     public Map<String, Object> getBenefits(@PathVariable Long id) {

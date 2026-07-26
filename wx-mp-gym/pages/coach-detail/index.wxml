@@ -15,18 +15,16 @@
   <!-- 3 Stat Cards -->
   <view class="stat-row">
     <view class="stat-card">
-      <text class="stat-num">{{totalClasses || 0}}</text>
+      <text class="stat-num">{{totalClasses || 0}}节</text>
       <text class="stat-label">累计上课</text>
-      <text class="stat-unit">节</text>
     </view>
     <view class="stat-card">
       <text class="stat-num stat-spec">{{coach.specialty || '未设置'}}</text>
       <text class="stat-label">专长</text>
     </view>
     <view class="stat-card">
-      <text class="stat-num stat-price">¥{{coach.pricePerHour || 0}}</text>
+      <text class="stat-num stat-price">¥{{coach.pricePerHour || 0}}<text class="unit-inline">/小时</text></text>
       <text class="stat-label">价格</text>
-      <text class="stat-unit">/小时</text>
     </view>
   </view>
 
@@ -45,10 +43,10 @@
   <!-- Date & Time Slots -->
   <view class="section-card">
     <text class="section-title">预约日期</text>
-    <text class="date-display">{{ptDateDisplay}}</text>
+    <text class="date-display">{{ptDate}}</text>
     <text class="section-title slot-title">选择时段</text>
     <view class="slot-grid" wx:if="{{slots.length > 0}}">
-      <view class="slot-item {{slotIdx === idx ? 'active' : ''}}" wx:for="{{slots}}" wx:key="*this" data-idx="{{idx}}" bindtap="selectSlot">{{item}}</view>
+      <view class="slot-item {{slotIdx === index ? 'active' : ''}}" wx:for="{{slots}}" wx:key="index" data-idx="{{index}}" bindtap="selectSlot">{{item}}</view>
     </view>
     <text wx:if="{{slots.length === 0}}" class="empty-slots">该日暂无可用时段</text>
   </view>

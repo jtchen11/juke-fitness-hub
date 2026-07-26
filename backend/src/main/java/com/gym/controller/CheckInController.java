@@ -361,7 +361,7 @@ public class CheckInController {
                                                @RequestParam(required = false, defaultValue = "start") String action) {
         // 1. 校验调用者角色必须为 trainer
         String role = LoginContext.getRole();
-        if (role == null || !"trainer".equals(role)) {
+        if (role == null || (!"trainer".equals(role) && !"both".equals(role))) {
             return errorResponse("仅教练可执行此操作");
         }
         // 2. 检查预约是否存在
@@ -375,7 +375,20 @@ public class CheckInController {
         if (!"scheduled".equals(pt.getStatus())) {
             return errorResponse("该预约已取消或已完成");
         }
-        // 3. 检查是否已记录过该动作
+        // 3. 时间校验：开课前1小时内才能打卡
+        LocalDateTime now3 = LocalDateTime.now();
+        LocalDateTime ptStart = pt.getAppointmentTime();
+        if (ptStart == null) {
+            return errorResponse("预约时间缺失");
+        }
+        LocalDateTime ptEnd = ptStart.plusMinutes(pt.getDurationMinutes() != null ? pt.getDurationMinutes() : 60);
+        if (now3.isBefore(ptStart.minusHours(1))) {
+            return errorResponse("距开课超过1小时，暂不可打卡");
+        }
+        if (now3.isAfter(ptEnd)) {
+            return errorResponse("课程已结束，不可打卡");
+        }
+        // 4. 检查是否已记录过该动作
         LambdaQueryWrapper<CheckIn> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CheckIn::getPtId, ptId)
                 .eq(CheckIn::getMemberId, memberId)
@@ -393,8 +406,11 @@ public class CheckInController {
         checkIn.setCheckInType("pt");
         checkIn.setRemark(action);
         checkInMapper.insert(checkIn);
-        // 5. end动作标记完成
-        if ("end".equals(action)) {
+        // 5. 根据action更新预约状态
+        if ("start".equals(action)) {
+            pt.setStatus("ongoing");
+            personalTrainingMapper.updateById(pt);
+        } else if ("end".equals(action)) {
             pt.setStatus("completed");
             personalTrainingMapper.updateById(pt);
         }
@@ -436,6 +452,16 @@ public class CheckInController {
     public Map<String, Object> generateCode(@PathVariable Long classId) {
         GroupClass gc = groupClassMapper.selectById(classId);
         if (gc == null) return errorResponse("课程不存在");
+        // 如果已有签到码，直接返回不再重新生成
+        if (gc.getCheckinCode() != null && !gc.getCheckinCode().isEmpty()) {
+            Map<String, Object> r = new HashMap<>();
+            r.put("success", true);
+            r.put("code", gc.getCheckinCode());
+            r.put("message", "签到码已存在，无需重新生成");
+            r.put("startTime", gc.getStartTime() != null ? gc.getStartTime().toString() : "");
+            r.put("endTime", gc.getEndTime() != null ? gc.getEndTime().toString() : "");
+            return r;
+        }
         // 生成6位随机数字码
         String code = String.format("%06d", (int)(Math.random() * 1000000));
         gc.setCheckinCode(code);
@@ -445,6 +471,8 @@ public class CheckInController {
         r.put("success", true);
         r.put("code", code);
         r.put("message", "签到码已生成");
+        r.put("startTime", gc.getStartTime() != null ? gc.getStartTime().toString() : "");
+        r.put("endTime", gc.getEndTime() != null ? gc.getEndTime().toString() : "");
         return r;
     }
 
@@ -461,10 +489,10 @@ public class CheckInController {
         if (gc.getCheckinCode() == null || !gc.getCheckinCode().equals(code))
             return errorResponse("签到码错误");
         if (gc.getCodeGeneratedAt() == null) return errorResponse("签到码已失效");
-        // 校验有效期：生成时间~课程结束
+        // 校验有效期：开课前15分钟~课程结束
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expireTime = gc.getCodeGeneratedAt().plusMinutes(15);
-        if (now.isAfter(expireTime)) return errorResponse("签到码已过期");
+        if (gc.getStartTime() != null && now.isBefore(gc.getStartTime().minusMinutes(15)))
+            return errorResponse("距开课超过15分钟，签到码暂未生效");
         if (gc.getEndTime() != null && now.isAfter(gc.getEndTime()))
             return errorResponse("课程已结束，签到码已失效");
         // 检查是否已签到

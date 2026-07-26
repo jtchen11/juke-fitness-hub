@@ -1,0 +1,60 @@
+<view class="page-packages">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
+    <text class="nav-title">课程包</text>
+    <view class="nav-placeholder"></view>
+  </view>
+
+  <view class="section">
+    <text class="section-title">可购买课程包</text>
+    <view wx:if="{{shopList.length===0}}" class="empty-state"><text>暂无可购买课程包</text></view>
+    <view class="shop-card" wx:for="{{shopList}}" wx:key="id" data-id="{{item.id}}" bindtap="buyPackage">
+      <view class="shop-left">
+        <text class="shop-name">{{item.name}}</text>
+        <text class="shop-desc">{{item.description}}</text>
+        <view class="shop-meta">
+          <text class="shop-sessions">{{item.sessions}}节课</text>
+          <text class="shop-valid">有效期{{item.validDays}}天</text>
+        </view>
+      </view>
+      <view class="shop-right">
+        <text class="shop-price">¥{{item.price}}</text>
+        <text class="shop-buy">购买</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <text class="section-title">我的课程包</text>
+    <view wx:if="{{list.length===0}}" class="empty-state"><text>暂无课程包</text></view>
+    <view class="pkg-card" wx:for="{{list}}" wx:key="id">
+      <view class="pkg-top">
+        <text class="pkg-name">{{item.packageName}}</text>
+        <text class="pkg-status {{item.status}}">{{item.status==='active' ? '使用中' : item.status==='expired' ? '已过期' : '已退款'}}</text>
+      </view>
+      <view class="pkg-progress">
+        <view class="progress-bar"><view class="progress-fill" style="width:{{item.usedSessions/item.totalSessions*100}}%"></view></view>
+        <text class="progress-text">{{item.usedSessions}}/{{item.totalSessions}}节</text>
+      </view>
+      <view class="pkg-info">
+        <text wx:if="{{item.endDate}}" class="pkg-expiry">有效期至：{{item.endDate}}</text>
+        <text class="pkg-remaining">剩余 {{item.remainingSessions}} 节</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showPayModal}}" class="pay-overlay" catchtap="closePayModal">
+    <view class="pay-modal" catchtap="">
+      <text class="pay-title">确认购买</text>
+      <view class="pay-detail">
+        <text>{{payPkg.name}}</text>
+        <text>{{payPkg.sessions}}节课 · 有效期{{payPkg.validDays}}天</text>
+      </view>
+      <view class="pay-amount"><text>¥{{payPkg.price}}</text></view>
+      <view class="pay-btns">
+        <view class="pay-cancel" bindtap="closePayModal">取消</view>
+        <view class="pay-confirm" bindtap="confirmBuy">确认支付</view>
+      </view>
+    </view>
+  </view>
+</view>

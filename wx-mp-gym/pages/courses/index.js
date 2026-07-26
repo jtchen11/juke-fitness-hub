@@ -1,7 +1,7 @@
 const app = getApp();
 const request = require('../../utils/request.js');
 Page({
-  data: { tab: 'group', dateIdx: 0, ptDateIdx: 0, dates: [], ptDates: [], typeFilter: '', specFilter: '', courses: [], coaches: [], myBookings: [], showLoginModal: false, isLoggedIn: false },
+  data: { tab: 'group', dateIdx: 0, ptDateIdx: 0, dates: [], ptDates: [], typeFilter: '', specFilter: '', courses: [], coaches: [], showLoginModal: false, isLoggedIn: false },
 
   onLoad() {
     this.generateDates();
@@ -9,7 +9,7 @@ Page({
     this.loadCourses();
     this.loadCoaches();
   },
-  onShow() { this.checkLogin(); this.loadMyBookings(); },
+  onShow() { this.checkLogin(); },
 
   checkLogin() { this.setData({ isLoggedIn: app.isLoggedIn() }); },
 
@@ -93,22 +93,9 @@ Page({
     });
   },
 
-  loadMyBookings() {
-    if (!app.isLoggedIn()) return;
-    request.get('/api/member/bookings', { status: 'all' }, (res) => { this.setData({ myBookings: Array.isArray(res) ? res : (res && res.list ? res.list : []) }); });
-  },
-
   goBooking(e) { if (!app.isLoggedIn()) { this.setData({ showLoginModal: true }); return; } wx.navigateTo({ url: '/pages/booking/index?id=' + e.currentTarget.dataset.id }); },
   goPTBooking(e) { if (!app.isLoggedIn()) { this.setData({ showLoginModal: true }); return; } var date = this.data.ptDates[this.data.ptDateIdx].full; wx.navigateTo({ url: '/pages/coach-detail/index?id=' + e.currentTarget.dataset.id + '&date=' + date }); },
-  onTabChange(e) {
-    var tab = e.currentTarget.dataset.tab;
-    if (tab === 'my') {
-      if (!app.isLoggedIn()) { this.setData({ showLoginModal: true }); return; }
-      wx.navigateTo({ url: '/pages/my-bookings/index' });
-      return;
-    }
-    this.setData({ tab: tab });
-  },
+  onTabChange(e) { var tab = e.currentTarget.dataset.tab; this.setData({ tab: tab }); },
   onLoginClose() { this.setData({ showLoginModal: false }); },
   onLoginSuccess() { this.setData({ showLoginModal: false }); },
   showCodeInput(e) {

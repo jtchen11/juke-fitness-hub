@@ -22,7 +22,7 @@
     "pages/coach-students/detail/index",
     "pages/coach-mine/leave-request/index",
     "pages/coach-appointments/detail/index",
-    "pages/coach-detail/index"
+    "pages/coach-detail/index","pages/packages/index"
   ],
   "window": {
     "navigationStyle": "custom",

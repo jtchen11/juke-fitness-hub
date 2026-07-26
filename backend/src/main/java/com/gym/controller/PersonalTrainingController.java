@@ -266,6 +266,29 @@ public class PersonalTrainingController {
         return error;
     }
 
+    @PostMapping("/{id}/cancel")
+    @Transactional
+    public Map<String, Object> cancelByTrainer(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        PersonalTraining pt = ptMapper.selectById(id);
+        if (pt == null) {
+            result.put("success", false);
+            result.put("message", "预约记录不存在");
+            return result;
+        }
+        if ("cancelled".equals(pt.getStatus())) {
+            result.put("success", false);
+            result.put("message", "该预约已取消");
+            return result;
+        }
+        pt.setStatus("cancelled_by_trainer");
+        pt.setCancelReason("教练端取消");
+        ptMapper.updateById(pt);
+        result.put("success", true);
+        result.put("message", "取消成功");
+        return result;
+    }
+
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable Long id) {
         ptMapper.deleteById(id);

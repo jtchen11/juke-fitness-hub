@@ -1,5 +1,5 @@
 <view class="page-my-bookings">
-  <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+  <view class="nav-bar"><view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view></view><scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
     <view class="filter-list">
       <view class="filter-item {{filter==='all' ? 'active' : ''}}" data-filter="all" bindtap="onFilter">全部</view>
       <view class="filter-item {{filter==='booked' ? 'active' : ''}}" data-filter="booked" bindtap="onFilter">已预约</view>
@@ -16,14 +16,14 @@
         <view class="card-left">
           <text class="card-type">{{item.typeLabel}}</text>
           <text class="card-name">{{item.name}}</text>
-          <text class="card-trainer">{{item.trainerName}}</text>
-          <text class="card-time">{{item.bookingTime}}</text>
+          <text class="card-trainer">{{item.trainerName}} · {{item.classTime}}</text>
+          <text class="card-order-time">下单时间：{{item.bookingTime}}</text>
         </view>
         <view class="status-tag {{item.status}}">{{statusText(item.status)}}</view>
       </view>
       <view class="card-actions" wx:if="{{item.status==='booked'}}">
         <button class="btn-cancel" data-id="{{item.id}}" data-type="{{item.type}}" catchtap="onCancel">取消预约</button>
-        <button class="btn-checkin" data-id="{{item.id}}" data-type="{{item.type}}" catchtap="onCheckin">签到</button>
+        <button class="btn-checkin" wx:if="{{item.type!='pt'}}" data-id="{{item.id}}" data-type="{{item.type}}" catchtap="onCheckin">签到</button>
       </view>
     </view>
   </view>

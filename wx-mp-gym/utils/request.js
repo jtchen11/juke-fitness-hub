@@ -9,9 +9,9 @@ function getToken() {
 function getBaseUrl() {
   try {
     var app = getApp();
-    if (app && app.globalData) return app.globalData.apiBaseUrl || "http://localhost:8080";
+    if (app && app.globalData) return app.globalData.apiBaseUrl || "http://192.168.10.6:8080";
   } catch (e) {}
-  return "http://localhost:8080";
+  return "http://192.168.10.6:8080";
 }
 
 function doLogout() {

@@ -1,4 +1,4 @@
-.page-my-bookings{min-height:100vh;background:#F5F6FA}
+.nav-bar{display:flex;align-items:center;padding:calc(20rpx + env(safe-area-inset-top)) 20rpx 12rpx;background:#FFF}.nav-back{display:flex;align-items:center}.back-icon{font-size:48rpx;color:#4A6CF7;line-height:1}.back-text{font-size:28rpx;color:#4A6CF7;margin-left:4rpx}.page-my-bookings{min-height:100vh;background:#F5F6FA}
 .filter-scroll{white-space:nowrap;padding:20rpx 32rpx;background:#FFF}
 .filter-list{display:inline-flex;gap:8rpx}
 .filter-item{padding:12rpx 28rpx;font-size:26rpx;color:#8A8AA0;background:#F5F6FA;border-radius:8px;display:inline-block}
@@ -10,7 +10,7 @@
 .card-type{font-size:22rpx;color:#4A6CF7;font-weight:500;display:block;margin-bottom:4rpx}
 .card-name{font-size:30rpx;font-weight:600;color:#1A1A2E;display:block;margin-bottom:6rpx}
 .card-trainer{font-size:24rpx;color:#8A8AA0;display:block;margin-bottom:4rpx}
-.card-time{font-size:22rpx;color:#8A8AA0;display:block}
+.card-time{font-size:22rpx;color:#8A8AA0;display:block}.card-order-time{font-size:20rpx;color:#BDBDBD;display:block;margin-top:4rpx}
 .status-tag{font-size:22rpx;padding:6rpx 16rpx;border-radius:4px;height:fit-content;flex-shrink:0}
 .status-tag.booked{background:#FFF3E0;color:#FFB300}
 .status-tag.checked_in{background:#E8F5E9;color:#00C853}

@@ -1,6 +1,6 @@
 <view class="page-leave">
   <view class="nav-bar">
-    <view class="nav-back" bindtap="goBack"><text>&lt;</text><text>请假申请</text></view>
+    <view class="nav-back" bindtap="goBack"><text>←</text><text>请假申请</text></view>
   </view>
   <view class="form">
     <view class="form-item">
@@ -12,7 +12,7 @@
     <view class="form-item">
       <text class="form-label">请假时段</text>
       <view class="period-list">
-        <view class="period-item {{periodIdx===idx ? 'active' : ''}}" wx:for="{{periods}}" wx:key="idx" data-idx="{{idx}}" bindtap="onPeriodSelect">{{item}}</view>
+        <view class="period-item {{selectedPeriod===item ? 'active' : ''}}" wx:for="{{periods}}" wx:key="*this" data-period="{{item}}" bindtap="onPeriodSelect">{{item}}</view>
       </view>
     </view>
     <view class="form-item">

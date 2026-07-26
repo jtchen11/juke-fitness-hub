@@ -1,20 +1,40 @@
-<view class="page-face-checkin">
+<view class="page-face">
+  <view class="nav-back" bindtap="goBack"><text class="back-arrow">‹</text></view>
   <view class="camera-area">
-    <camera class="camera" device-position="front" flash="off" binderror="onCameraError"></camera>
-    <view class="camera-mask">
-      <view class="face-frame"></view>
+    <view class="camera-placeholder">
+      <text class="placeholder-icon">📷</text>
+      <text class="placeholder-text">点击下方按钮拍照</text>
+    </view>
+    <view class="face-frame {{pageMode==='success' ? 'frame-success' : ''}}">
+      <view class="frame-corner tl"></view>
+      <view class="frame-corner tr"></view>
+      <view class="frame-corner bl"></view>
+      <view class="frame-corner br"></view>
     </view>
   </view>
-
-  <view class="status-bar">
-    <text class="status-text">{{statusText}}</text>
+  <view class="status-row">
+    <text class="status-text {{statusColor}}">{{statusText}}</text>
   </view>
-
-  <view class="action-area">
-    <button class="btn-capture" bindtap="onCapture">
-      <image class="btn-icon" src="/images/icon_camera.png" wx:if="{{false}}"/>
-      <text>开始打卡</text>
-    </button>
-    <text class="action-hint" wx:if="{{!isRegistered}}">首次使用需先注册脸部信息</text>
+  <view wx:if="{{pageMode!=='success' && !isVisitor}}" class="toggle-row">
+    <view class="toggle-card {{actionType==='start' ? 'active' : ''}}" data-action="start" bindtap="switchAction">
+      <text class="toggle-card-title">上课打卡</text>
+      <text class="toggle-card-desc">开始训练记录</text>
+    </view>
+    <view class="toggle-card {{actionType==='end' ? 'active' : ''}}" data-action="end" bindtap="switchAction">
+      <text class="toggle-card-title">下课打卡</text>
+      <text class="toggle-card-desc">结束训练记录</text>
+    </view>
+  </view>
+  <view class="action-area" wx:if="{{pageMode==='unregistered' && !isVisitor}}">
+    <button class="btn-capture" bindtap="onRegister">注册人脸</button>
+    <text class="action-hint">首次使用需先注册脸部信息</text>
+  </view>
+  <view class="action-area" wx:elif="{{pageMode==='ready' && !isVisitor}}">
+    <button class="btn-capture" bindtap="onCapture">拍照打卡</button>
+  </view>
+  <view class="action-area success-area" wx:elif="{{pageMode==='success'}}">
+    <view class="success-icon">✓</view>
+    <text class="success-text">{{checkinMsg}}</text>
+    <text class="success-sub">{{countdown}}秒后自动返回...</text>
   </view>
 </view>
