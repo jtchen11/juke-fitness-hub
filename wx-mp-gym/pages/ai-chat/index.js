@@ -171,6 +171,51 @@ Page({
           if (evt.type === "token") {
             _this.updateLastAiMessage(evt.full || evt.content);
           } else if (evt.type === "complete") {
+            var fullText = evt.full || "";
+                        if (fullText.indexOf("**PAYMENT**") >= 0) {
+              console.log("[payment] fullText contains **PAYMENT**");
+              var parts = fullText.split("**PAYMENT**");
+              var displayText = parts[0].trim();
+              var optionsText = parts[1] || "";
+              var payOptions = [];
+              var lines = optionsText.split("\n");
+              for (var li = 0; li < lines.length; li++) {
+                var line = lines[li].trim();
+                if (!line) continue;
+                var dotPos = line.indexOf(".");
+                if (dotPos > 0 && dotPos < 3) {
+                  var val = line.substring(0, dotPos).trim();
+                  var rest = line.substring(dotPos + 1).trim();
+                  var label = rest;
+                  var sub = "";
+                  var p1 = rest.indexOf("(");
+                  var p2 = rest.indexOf("（");
+                  var p = (p1 >= 0 && (p2 < 0 || p1 < p2)) ? p1 : p2;
+                  if (p >= 0) {
+                    label = rest.substring(0, p).trim();
+                    var subEnd = rest.lastIndexOf(")") >= 0 ? rest.lastIndexOf(")") : rest.lastIndexOf("）");
+                    if (subEnd > p) {
+                      sub = rest.substring(p + 1, subEnd).trim();
+                    }
+                  }
+                  payOptions.push({ label: label, sub: sub, payValue: val });
+                }
+              }
+              console.log("[payment] parsed", payOptions.length, "options");
+              if (payOptions.length > 0) {
+                var msgs = _this.data.messages;
+                for (var mi = msgs.length - 1; mi >= 0; mi--) {
+                  if (msgs[mi].role === "ai") {
+                    msgs[mi].content = displayText;
+                    msgs[mi].paymentOptions = payOptions;
+                    msgs[mi].isStreaming = false;
+                    break;
+                  }
+                }
+                _this.setData({ messages: msgs, isStreaming: false, scrollTarget: "bottom" });
+                return;
+              }
+            }
             _this.updateLastAiMessage(evt.full);
             _this.finishStreaming();
           } else if (evt.type === "error") {
@@ -246,6 +291,13 @@ Page({
     }, function(err) {
       console.warn("[ai-chat] loadHistory failed:", err);
     });
+  },
+
+  onPaymentSelect: function(e) {
+    var pay = e.currentTarget.dataset.pay;
+    if (!pay) return;
+    this.setData({ inputText: pay });
+    this.onSend();
   },
 
   onCancelStream: function() {

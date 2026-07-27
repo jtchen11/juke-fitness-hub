@@ -22,3 +22,24 @@
 .btn-send::after{border:none}
 .btn-cancel{width:56px;height:36px;background:#FF6B6B;color:#FFF;border:none;border-radius:18px;font-size:13px;display:flex;align-items:center;justify-content:center;margin-left:8px;flex-shrink:0}
 .btn-cancel::after{border:none}
+/* 支付按钮 */
+.payment-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+.payment-btn {
+  background: #f0f5ff;
+  border: 1rpx solid #b3d4ff;
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+}
+.payment-btn:active {
+  background: #d6e6ff;
+}
+.payment-sub {
+  color: #666;
+  font-size: 24rpx;
+  margin-left: 8rpx;
+}

@@ -13,11 +13,17 @@
   <scroll-view class="chat-messages" scroll-into-view="{{scrollTarget}}" scroll-y>
     <!-- 历史分组标题 -->
     <view class="date-divider" wx:if="{{showDateDivider}}"><text>{{dateDividerText}}</text></view>
-    <view class="msg msg-{{item.role}}" wx:for="{{messages}}" wx:key="*this">
+    <view class="msg msg-{{item.role}}" wx:for="{{messages}}" wx:for-index="msgIdx" wx:key="msgIdx">
       <view class="msg-avatar">{{item.role==="ai" ? "AI" : "我"}}</view>
       <view class="msg-bubble">
         <text wx:if="{{item.isStreaming && !item.content}}">正在输入<text class="streaming-dots">...</text></text>
         <text wx:else>{{item.content}}</text>
+        <view wx:if="{{item.paymentOptions}}" class="payment-buttons">
+          <view class="payment-btn" wx:for="{{item.paymentOptions}}" wx:for-index="optIdx" wx:key="optIdx" data-pay="{{item.payValue}}" bindtap="onPaymentSelect">
+            <text>{{item.label}}</text>
+            <text wx:if="{{item.sub}}" class="payment-sub">{{item.sub}}</text>
+          </view>
+        </view>
       </view>
     </view>
     <!-- 底部撑开空间，确保最后一条消息不被输入框遮挡 -->

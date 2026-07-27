@@ -452,7 +452,7 @@ public class AIController {
         // ---- 5. 预约团课 ----
         if ((lowerMsg.contains("约") || lowerMsg.contains("预约") || lowerMsg.contains("报名"))
                 && !lowerMsg.contains("私教") && !lowerMsg.contains("教练")
-                && !lowerMsg.contains("体测") && !lowerMsg.contains("比赛") && !lowerMsg.contains("约课") && !lowerMsg.contains("约一下") && !lowerMsg.contains("想约") && !lowerMsg.contains("要约")) {
+                && !lowerMsg.contains("体测") && !lowerMsg.contains("比赛")) {
             log.info("✅ 命中【预约团课】分支");
             String result = handleBookGroupClass(userMessage, memberId);
             if (!result.equals("请告诉我您想预约哪门团课，例如「帮我预约动感单车」")) {
@@ -697,73 +697,6 @@ public class AIController {
                 } else {
                     return result2;
                 }
-            } else if (pending.hasDate && pending.hasTime) {
-                // 已收集日期和时间，等待选择支付方式
-                String payResult = processPaymentChoice(userMessage, pending, pendingKey);
-                if (payResult != null) {
-                    return payResult;
-                }
-                // 支付方式已选择，执行预约
-                pendingBookings.remove(pendingKey);
-                String effectiveDate = pending.dateStr;
-                if (effectiveDate == null) {
-                    effectiveDate = LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-                }
-                LocalDateTime apptTime;
-                try {
-                    apptTime = LocalDateTime.parse(effectiveDate + " " + pending.timeStr, DATE_FORMATTER);
-                } catch (DateTimeParseException e) {
-                    try {
-                        apptTime = LocalDateTime.parse(effectiveDate + " " + pending.timeStr + ":00", DATE_FORMATTER2);
-                    } catch (DateTimeParseException ex) {
-                        pendingBookings.put(pendingKey, pending);
-                        return "日期时间格式有误，请重新发起预约。";
-                    }
-                }
-                // 校验时间范围
-                int hour = apptTime.getHour();
-                int min = apptTime.getMinute();
-                if (hour < 9 || hour > 21 || (hour == 21 && min > 0)) {
-                    pendingBookings.remove(pendingKey);
-                    return "预约时间必须在上午9点到晚上9点之间，请重新选择。";
-                }
-                // 校验冲突
-                String conflictMsg = checkBookingConflict(pending.memberId, apptTime);
-                if (conflictMsg != null) {
-                    pending.retryCount = 0;
-                    pending.hasTime = false;
-                    pending.timeStr = null;
-                    pendingBookings.put(pendingKey, pending);
-                    log.info("[预约上下文] 冲突后保留上下文，等待新时间");
-                    return conflictMsg + "\n\n请选择其他时间，例如【下午2点】或【14:00】";
-                }
-                // 执行预约
-                boolean useFree = "free".equals(pending.paymentMethod);
-                Long pkgId = null;
-                if ("package".equals(pending.paymentMethod)) {
-                    LambdaQueryWrapper<MemberPrivatePackage> pw = new LambdaQueryWrapper<>();
-                    pw.eq(MemberPrivatePackage::getMemberId, pending.memberId)
-                       .eq(MemberPrivatePackage::getStatus, "active")
-                       .gt(MemberPrivatePackage::getRemainingSessions, 0)
-                       .last("LIMIT 1");
-                    try {
-                        MemberPrivatePackage pkg = memberPrivatePackageMapper.selectOne(pw);
-                        if (pkg != null) pkgId = pkg.getId();
-                    } catch (Exception e) {
-                        log.warn("查询课程包失败", e);
-                    }
-                }
-                String result = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId, useFree);
-                pendingBookings.remove(pendingKey);
-                if (result.startsWith("私教预约成功")) {
-                    String label = "单次付费";
-                    if (useFree) label = "免费私教课";
-                    else if (pkgId != null) label = "课程包扣费";
-                    return "预约成功！已为您预约 " + pending.trainerName + " 的课程，时间：" +
-                            apptTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n支付方式：" + label;
-                } else {
-                    return result;
-                }
             } else {
                 // 无法解析任何有效信息
                 pending.retryCount++;
@@ -804,18 +737,7 @@ public class AIController {
             return gymTools.queryAvailableCompetitions();
         }
 
-        // ---- 13.5 查询教练可预约时段 ----
-        if (lowerMsg.contains("什么时候有空") || lowerMsg.contains("可预约时段") || lowerMsg.contains("有没有空") ||
-                lowerMsg.contains("何时有空") || (lowerMsg.contains("时间") && lowerMsg.contains("上课"))) {
-            log.info("✅ 命中【查询教练可预约时段】分支");
-            String coachName = extractTrainerName(userMessage);
-            String dateStr = parseDate(userMessage);
-            if (dateStr == null) {
-                dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-            }
-            return "该教练" + (coachName != null ? coachName : "") + "的可预约时段，请您拨打前台电话或到店咨询。";
-        }
-        // ---- 13.7 模糊预约意图引导 ----        if ((lowerMsg.contains("约课") || lowerMsg.contains("约一下") || lowerMsg.contains("想约") ||                lowerMsg.contains("要约") || lowerMsg.equals("约") || lowerMsg.equals("预约"))                && !lowerMsg.contains("团课") && !lowerMsg.contains("私教") && !lowerMsg.contains("教练")) {            log.info("✅ 命中【模糊预约意图】分支");            return "请问您想预约团课还是私教课？团课请回复课程名称（如动感单车），私教课请提供教练姓名。";        }        // ---- 14. 图片生成 ----
+        // ---- 14. 图片生成 ----
         if (lowerMsg.contains("画") || lowerMsg.contains("图片") || lowerMsg.contains("图示") ||
                 lowerMsg.contains("姿势") || lowerMsg.contains("图解")) {
             log.info("✅ 命中【图片生成】分支");
@@ -971,7 +893,7 @@ public class AIController {
         // 没有识别到支付方式，查询可用选项
         try {
             StringBuilder sb = new StringBuilder();
-            sb.append("请选择支付方式：\n\n---\n**PAYMENT**\n");
+            sb.append("请选择支付方式：\n\n**PAYMENT**\n");
             if (pending.memberId != null && pending.memberId > 0) {
                 Member member = memberMapper.selectById(pending.memberId);
                 if (member != null) {
@@ -1095,55 +1017,18 @@ public class AIController {
             log.info("[预约上下文] 冲突提示后保留上下文，等待新时间");
             return conflictMsg + "\n\n请选择其他时间，例如【下午2点】或【14:00】";
         }
-        // 保存预约上下文，进入支付选择
-        String pendingKey = "booking_" + (memberId != null ? memberId : "guest");
-        PendingBooking pending = new PendingBooking(memberId, trainerId, trainerName, true, true, dateStr);
-        pending.timeStr = timeStr;
-        pendingBookings.put(pendingKey, pending);
-        log.info("[预约流程] 预约信息完整，进入支付选择: 教练={}, 日期={}, 时间={}", trainerName, dateStr, timeStr);
-
-        // 检查支付方式
-        String payResult = processPaymentChoice(userMessage, pending, pendingKey);
-        if (payResult != null) {
-            log.info("[预约流程] 需要用户选择支付方式");
-            return payResult;
-        }
-
-        // 用户已选择支付方式，执行预约
-        log.info("[预约流程] 支付方式已选择: {}, 执行预约", pending.paymentMethod);
-        pendingBookings.remove(pendingKey);
-
-        boolean useFree = "free".equals(pending.paymentMethod);
-        Long pkgId = null;
-        if ("package".equals(pending.paymentMethod)) {
-            LambdaQueryWrapper<MemberPrivatePackage> pw = new LambdaQueryWrapper<>();
-            pw.eq(MemberPrivatePackage::getMemberId, pending.memberId)
-               .eq(MemberPrivatePackage::getStatus, "active")
-               .gt(MemberPrivatePackage::getRemainingSessions, 0)
-               .last("LIMIT 1");
-            try {
-                MemberPrivatePackage pkg = memberPrivatePackageMapper.selectOne(pw);
-                if (pkg != null) pkgId = pkg.getId();
-            } catch (Exception e) {
-                log.warn("查询课程包失败", e);
-            }
-        }
-
-        String result = ptService.bookPersonalTraining(memberId, trainerId, appointmentTime, 60, pkgId, useFree);
+        String result = ptService.bookPersonalTraining(memberId, trainerId, appointmentTime, 60);
         long t4 = System.currentTimeMillis();
         log.info("[预约耗时] 执行预约(DB): {}ms", t4 - t3);
         log.info("[预约耗时] 总耗时: {}ms", t4 - t0);
 
         if (result.startsWith("私教预约成功")) {
-            String label = "单次付费";
-            if (useFree) label = "免费私教课";
-            else if (pkgId != null) label = "课程包扣费";
-            return "预约成功！已为您预约 " + trainerName + " 的课程，时间：" +
-                    appointmentTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n支付方式：" + label;
+            return "✅ " + result + "。已为您预约 " + trainerName + " 的课程，时间：" +
+                    appointmentTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
         } else {
             return "❌ " + result;
         }
-        }
+    }
 
     private String parseDate(String userMessage) {
         if (userMessage.contains("明天")) {
@@ -1154,14 +1039,6 @@ public class AIController {
         }
         if (userMessage.contains("今天")) {
             return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        }
-        // 支持"X年X月X日"格式（如"2026年7月12日"）
-        java.util.regex.Matcher yearMatcher = java.util.regex.Pattern.compile("(\\d{4})年(\\d{1,2})月(\\d{1,2})(日|号)").matcher(userMessage);
-        if (yearMatcher.find()) {
-            int year = Integer.parseInt(yearMatcher.group(1));
-            int month = Integer.parseInt(yearMatcher.group(2));
-            int day = Integer.parseInt(yearMatcher.group(3));
-            return String.format("%d-%02d-%02d", year, month, day);
         }
         // 先尝试完整的"X月X号/日"格式
         Matcher dateMatcher = DATE_PATTERN_CN.matcher(userMessage);
@@ -1371,7 +1248,7 @@ public class AIController {
             end = start.plusDays(7).withHour(22).withMinute(0).withSecond(0);
         }
 
-        String startStr = start.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));  // 按日期严格过滤
+        String startStr = start.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String endStr = end.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
         String result = gymTools.queryAvailableClasses(startStr, endStr);

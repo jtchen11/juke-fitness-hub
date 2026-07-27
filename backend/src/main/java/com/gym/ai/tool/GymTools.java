@@ -70,7 +70,6 @@ public class GymTools {
             for (int i = 0; i < classes.size(); i++) {
                 GroupClass gc = classes.get(i);
                 sb.append(i + 1).append(". 课程：").append(gc.getName())
-                        .append("，时间：").append(gc.getStartTime().format(FORMATTER))
                         .append("，剩余名额：").append(gc.getMaxCapacity() - gc.getEnrolled()).append(" 人\n");
             }
             sb.append("\n请根据以上信息为用户推荐合适的团课。无需继续调用工具。");
@@ -275,10 +274,12 @@ public class GymTools {
             double muscleMass = latest.getMuscleMassKg() != null ? latest.getMuscleMassKg().doubleValue() : 0.0;
             double weight = latest.getWeightKg() != null ? latest.getWeightKg().doubleValue() : 0.0;
 
-            // 体脂判断
-            boolean highFat = bodyFat > 25.0;
-            // 肌肉量判断（男性一般30kg+为正常）
-            boolean lowMuscle = muscleMass > 0.0 && muscleMass < 30.0;
+            // 获取会员性别，用于体脂/肌肉量判断
+            String genderSK = member.getGender() != null ? member.getGender() : "男";
+            double fatHighSK = "女".equals(genderSK) ? 32.0 : 25.0;
+            double muscleLowSK = "女".equals(genderSK) ? 25.0 : 30.0;
+            boolean highFat = bodyFat > fatHighSK;
+            boolean lowMuscle = muscleMass > 0.0 && muscleMass < muscleLowSK;
 
             if (highFat && !lowMuscle) {
                 // 体脂高但肌肉量正常 → 减脂为主，多增加有氧
@@ -501,7 +502,7 @@ public String generateMealPlanSkeleton(Long memberId) {
                     .append(pt.getAppointmentTime().format(DateTimeFormatter.ofPattern("MM-dd HH:mm"))).append(" ")
                     .append(trainerName).append(" 教练")
                     .append("（").append(statusText).append("）")
-                    .append(" ID: ").append(pt.getId())
+                    
                     .append("\n");
         }
         return sb.toString();
@@ -532,9 +533,9 @@ public String generateMealPlanSkeleton(Long memberId) {
             else if ("cancelled".equals(cb.getStatus())) statusText = "❌ 已取消";
 
             sb.append(i + 1).append(". ")
-                    .append(className)
+                    .append(className)                    
                     .append("（").append(statusText).append("）")
-                    .append(" ID: ").append(cb.getId())
+                    
                     .append("\n");
         }
         return sb.toString();
@@ -573,7 +574,6 @@ public String generateMealPlanSkeleton(Long memberId) {
             sb.append("- ").append(pkg.getPackageName())
                     .append("：剩余 ").append(pkg.getRemainingSessions()).append(" 节")
                     .append("（有效期至 ").append(endDateStr).append("）")
-                    .append(" ID: ").append(pkg.getId())
                     .append("\n");
         }
         sb.append("\n📊 总计剩余课时：").append(totalRemaining).append(" 节");
