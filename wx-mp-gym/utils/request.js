@@ -7,6 +7,7 @@
 }
 
 function getBaseUrl() {
+  console.log("[request.js] getBaseUrl called");
   try {
     var app = getApp();
     if (app && app.globalData) {
@@ -27,6 +28,7 @@ function doLogout() {
 }
 
 function request(method, url, data, success, fail) {
+  console.log("[request.js] request: " + method + " " + getBaseUrl() + url);
   var token = getToken();
   var baseUrl = getBaseUrl();
   wx.request({
@@ -55,9 +57,12 @@ function request(method, url, data, success, fail) {
 }
 
 module.exports = {
+  getBaseUrl: getBaseUrl,
   patch: function(url, data, success, fail) { request("PATCH", url, data, success, fail); },
   get: function(url, data, success, fail) { request("GET", url, data, success, fail); },
   post: function(url, data, success, fail) { request("POST", url, data, success, fail); },
   put: function(url, data, success, fail) { request("PUT", url, data, success, fail); },
   del: function(url, data, success, fail) { request("DELETE", url, data, success, fail); }
 };
+
+

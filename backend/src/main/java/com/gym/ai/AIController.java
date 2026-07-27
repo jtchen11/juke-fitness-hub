@@ -12,6 +12,7 @@ import com.gym.enums.MemberLevel;
 import com.gym.mapper.*;
 import com.gym.service.PersonalTrainingService;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
@@ -92,12 +93,29 @@ public class AIController {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
+    // ====== 多轮预约上下文 ======
+    private final ConcurrentHashMap<String, PendingBooking> pendingBookings = new ConcurrentHashMap<>();
+    // ====== ????????????"?/?"??? ======
+    private final ConcurrentHashMap<String, String> lastMentionedCoaches = new ConcurrentHashMap<>();
+
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter DATE_FORMATTER2 = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final Pattern DATE_PATTERN_CN = Pattern.compile("(\\d{1,2})月(\\d{1,2})日");
+
+    private static final String SYSTEM_PROMPT = 
+            "桔刻健身智能助手规范：\n" +
+            "1. 角色：你是桔刻健身的智能助手，专门解答健身相关问题。\n" +
+            "2. 风格：专业、简洁、友好，使用中文回复。\n" +
+            "3. 回复格式：纯文本，不使用 Markdown（如 # ** - 等符号）、代码块或 JSON。\n" +
+            "4. 分点清晰，用数字或中文序号（如 一、二、三 或 1. 2. 3.）。\n" +
+            "5. 约束：禁止编造信息，不知道就说不知道，引导用户联系前台。\n" +
+            "6. 用户的身份信息（会员ID、姓名、等级、剩余课时等）已在每次对话的上下文中提供，请直接使用，不得反问用户「你的会员ID是什么」「你叫什么名字」等身份问题。\n" +
+            "7. 工具调用结果已包含完整信息，直接以自然语言回复用户，无需重复呈现原始数据格式。\n" +
+            "8. 用户可以在「我的预约」页面自行取消预约。取消规则：团课需在开课前2小时取消，私教课需提前2小时联系教练或前台。2小时内不可取消。如果用户询问「取消预约」，请引导用户去「我的预约」页面操作，并告知取消时间限制。";
+    private static final Pattern DATE_PATTERN_CN = Pattern.compile("(\\d{1,2})月(\\d{1,2})(日|号)");
+    private static final Pattern DAY_ONLY_PATTERN = Pattern.compile("(\\d{1,2})号");
     private static final Pattern TIME_PATTERN_CN = Pattern.compile("(上午|下午|晚上)?(\\d{1,2})点(\\d{0,2})分?");
     private static final Pattern STD_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
-    private static final Pattern STD_TIME = Pattern.compile("(\\d{1,2}):(\\d{2})(?::(\\d{2}))?");
+    private static final Pattern STD_TIME = Pattern.compile("(\\d{1,2})[:：](\\d{2})(?:[:：](\\d{2}))?");
 
     private volatile Pattern trainerNamePattern;
     private volatile long trainerCacheTime = 0;
@@ -277,18 +295,7 @@ public class AIController {
                 String imageUrl = extractImageUrl(answer);
                 saveToMemory(memoryId, message, answer, imageUrl);
 
-                for (int i = 0; i < answer.length(); i++) {
-                    String token = answer.substring(i, i + 1);
-                    Map<String, Object> event = new HashMap<>();
-                    event.put("type", "token");
-                    event.put("content", token);
-                    event.put("full", answer.substring(0, i + 1));
-                    emitter.send(SseEmitter.event()
-                            .data(objectMapper.writeValueAsString(event))
-                            .name("message"));
-                    Thread.sleep(20);
-                }
-
+                // 直接发送完整回答，避免分块截断
                 Map<String, Object> completeEvent = new HashMap<>();
                 completeEvent.put("type", "complete");
                 completeEvent.put("full", answer);
@@ -325,23 +332,72 @@ public class AIController {
     // ========== 核心意图处理 ==========
     private String handleIntent(String userMessage, Long memberId, String sessionId, String memoryId) {
         String lowerMsg = userMessage.toLowerCase();
-        log.info("🔍 [意图识别] 原始消息: '{}'", userMessage);
+         if (lowerMsg == null || lowerMsg.trim().isEmpty()) {
+            log.warn("意图识别: 收到空消息");
+            return "请输入有效的问题，例如【今天有什么团课】【我的预约】【推荐教练】等。";
+        }
+       log.info("🔍 [意图识别] 原始消息: '{}'", userMessage);
 
         log.info("🔍 [意图识别] memberId={}, sessionId={}, lowerMsg={}", memberId, sessionId, lowerMsg);
         // ---- 1. 查询我的私教课 ----
+        // ---- 1. 查询我的私教课 / 剩余课时 ----
         if (lowerMsg.contains("我的私教") || lowerMsg.contains("我的预约") ||
-                (lowerMsg.contains("私教") && (lowerMsg.contains("查询") || lowerMsg.contains("看看")))) {
+                (lowerMsg.contains("私教") && (lowerMsg.contains("查询") || lowerMsg.contains("看看") || lowerMsg.contains("还剩") || lowerMsg.contains("剩余") || lowerMsg.contains("几次") || lowerMsg.contains("几节")))) {
+            if (lowerMsg.contains("还剩") || lowerMsg.contains("剩余") || lowerMsg.contains("几次") || lowerMsg.contains("几节")) {
+                log.info("✅ 命中【查询私教剩余课时】分支");
+                return gymTools.getMyPackageInfo(memberId);
+            }
             log.info("✅ 命中【查询我的私教课】分支");
             return gymTools.queryMyPTBookings(memberId);
         }
+        // ---- 1.5 推荐团课（优先于查询我的团课） ----
+        if (lowerMsg.contains("推荐") && lowerMsg.contains("团课")) {
+            log.info("命中【推荐团课】分支");
+            return handleQueryClasses(userMessage);
+        }
 
-        // ---- 2. 查询我的团课 ----
-        if (lowerMsg.contains("团课") && (lowerMsg.contains("我") || lowerMsg.contains("报名") ||
-                lowerMsg.contains("约") || lowerMsg.contains("查询") || lowerMsg.contains("看看"))) {
-            log.info("✅ 命中【查询我的团课】分支");
+        // ---- 2. 查询我的团课记录（精确匹配） ----
+        if ((lowerMsg.contains("我的团课") || lowerMsg.contains("我报名的团课") || lowerMsg.contains("我预约的团课")) ||
+                (lowerMsg.contains("团课") && (lowerMsg.contains("我的") || lowerMsg.contains("我看") || lowerMsg.contains("我报") || lowerMsg.contains("我约的")))) {
+            log.info("命中【查询我的团课记录】分支");
             return gymTools.queryMyClassBookings(memberId);
         }
 
+        // ---- 2.5 查询报名/预约记录（通用匹配：我报了/我报了什么课） ----
+        if (lowerMsg.contains("我报") && (lowerMsg.contains("课") || lowerMsg.contains("课程") || lowerMsg.contains("什么"))) {
+            log.info("✅ 命中【查询报名记录】分支");
+            return gymTools.queryMyClassBookings(memberId);
+        }
+
+        // ---- 2.7 查询我的课程安排（我+今天/明天/我的+课，排除预约意图） ----
+        if ((lowerMsg.contains("我的") && lowerMsg.contains("课") && !lowerMsg.contains("约")) ||
+                (lowerMsg.contains("我") && (lowerMsg.contains("今天") || lowerMsg.contains("明天") || lowerMsg.contains("后天")) && lowerMsg.contains("课") && !lowerMsg.contains("预约") && !lowerMsg.contains("约"))) {
+            log.info("命中【查询我的课程安排】分支");
+            return gymTools.queryMyClassBookings(memberId);
+        }
+
+        // ---- 2.8 查询我的所有预约（团课+私教） ----
+        if ((lowerMsg.contains("我") && (lowerMsg.contains("约了什么课") || lowerMsg.contains("约了哪些课") || lowerMsg.contains("的预约"))) ||
+                (lowerMsg.contains("我的") && (lowerMsg.contains("所有预约") || lowerMsg.contains("全部预约")))) {
+            log.info("命中【查询所有预约】分支（团课+私教）");
+            String classBookings = gymTools.queryMyClassBookings(memberId);
+            String ptBookings = gymTools.queryMyPTBookings(memberId);
+            StringBuilder sb = new StringBuilder();
+            sb.append("\u3010\u60a8\u7684\u5168\u90e8\u9884\u7ea6\u3011\\n\\n");
+            sb.append("--- \u56e2\u8bfe\u9884\u7ea6 ---\\n");
+            if (classBookings != null && !classBookings.contains("\u6682\u65e0") && !classBookings.contains("\u8bf7\u5148\u767b\u5f55")) {
+                sb.append(classBookings);
+            } else {
+                sb.append("\u6682\u65e0\u56e2\u8bfe\u9884\u7ea6\\n");
+            }
+            sb.append("\\n--- \u79c1\u6559\u8bfe\u9884\u7ea6 ---\\n");
+            if (ptBookings != null && !ptBookings.contains("\u6682\u65e0") && !ptBookings.contains("\u8bf7\u5148\u767b\u5f55")) {
+                sb.append(ptBookings);
+            } else {
+                sb.append("\u6682\u65e0\u79c1\u6559\u8bfe\u9884\u7ea6\\n");
+            }
+            return sb.toString();
+        }
         // ---- 3. 查询体测历史 ----
         if (lowerMsg.contains("体测") && (lowerMsg.contains("历史") || lowerMsg.contains("记录") ||
                 lowerMsg.contains("以前") || lowerMsg.contains("之前"))) {
@@ -357,7 +413,30 @@ public class AIController {
             if (trainerName == null) {
                 return "请告诉我是哪位教练，例如「王教练怎么样」";
             }
+            lastMentionedCoaches.put(sessionId, trainerName);
+            log.info("[教练详情] 记录上次提及教练: {}", trainerName);
             return gymTools.queryTrainerByName(trainerName);
+        }
+
+        // ---- 4.5 取消预约 ----
+        if (lowerMsg.contains("取消") && (lowerMsg.contains("预约") || lowerMsg.contains("约"))) {
+            log.info("✅ 命中【取消预约】分支");
+            return "关于取消预约：\n一、团课预约：可在「我的预约」页面自行取消，需在开课前2小时操作。\n二、私教课预约：需提前2小时联系教练或前台取消。\n三、开课前2小时内不可取消。\n请前往「我的预约」页面查看并操作，如仍有疑问请联系前台。";
+        }
+
+        // ---- 4.6 预约他/她（代词处理，优先生效）----
+        if ((lowerMsg.contains("约") || lowerMsg.contains("预约")) &&
+            (lowerMsg.contains("他") || lowerMsg.contains("她") || lowerMsg.contains("ta") || lowerMsg.contains("TA"))) {
+            log.info("✅ 命中【预约代词】分支");
+            String lastCoach = lastMentionedCoaches.get(sessionId);
+            if (lastCoach != null) {
+                log.info("[预约代词] 找到上次提及教练: {}", lastCoach);
+                java.util.regex.Pattern pronounP = java.util.regex.Pattern.compile("[他她]");
+                java.util.regex.Matcher pronounM = pronounP.matcher(userMessage);
+                String modifiedMsg = pronounM.replaceAll(lastCoach);
+                return handleBooking(modifiedMsg, memberId);
+            }
+            return "请问您想预约哪位教练？请提供教练姓名，例如「我要预约李教练」。";
         }
 
         // ---- 5. 预约团课 ----
@@ -399,11 +478,18 @@ public class AIController {
         }
 
         // ---- 9. 团课查询（查询所有可预约团课） ----
-        if (lowerMsg.contains("团课") || lowerMsg.contains("课表") ||
+        if (lowerMsg.contains("团课") || lowerMsg.contains("课表") || lowerMsg.contains("什么课") ||
                 lowerMsg.contains("能报名") || lowerMsg.contains("可预约") ||
                 (lowerMsg.contains("团") && lowerMsg.contains("课"))) {
             log.info("✅ 命中【团课查询】分支");
             return handleQueryClasses(userMessage);
+        }
+
+        // ---- 9.5 查询会员信息 / 过期时间 ----
+        if (lowerMsg.contains("会员信息") || lowerMsg.contains("我的信息") || lowerMsg.contains("会员资料") ||
+                (lowerMsg.contains("过期") && (lowerMsg.contains("我") || lowerMsg.contains("到期")))) {
+            log.info("✅ 命中【查询会员信息】分支");
+            return gymTools.getMyProfile(memberId);
         }
 
         // ---- 10. 推荐教练 ----
@@ -413,28 +499,187 @@ public class AIController {
                 return "请先登录，以便根据您的会员等级推荐合适的教练。";
             }
             try {
-                return gymTools.recommendTrainerByLevel(memberId);
+                String recResult = gymTools.recommendTrainerByLevel(memberId);
+                log.info("[推荐教练] 推荐结果: {}", recResult);
+                return recResult;
             } catch (Exception e) {
                 log.error("推荐教练异常 memberId={}", memberId, e);
                 return "推荐教练时出现异常，请稍后再试。";
             }
         }
 
-        // ---- 11. 教练列表（宽匹配） ----
-        if (lowerMsg.contains("教练") && !lowerMsg.contains("预约") && !lowerMsg.contains("推荐")) {
-            log.info("✅ 命中【教练列表】分支（宽匹配）");
-            return gymTools.listAllTrainers();
-        }
-        // ---- 12. 预约私教 ----
+        // ---- 11. 预约私教（置于教练列表之前，防止"约李教练"被误判） ----
         if ((lowerMsg.contains("约") || lowerMsg.contains("预约") || lowerMsg.contains("订"))
                 && (lowerMsg.contains("教练") || lowerMsg.contains("私教"))) {
             log.info("✅ 命中【预约私教】分支");
+            String extractedTr = extractTrainerName(userMessage);
+            if (extractedTr != null) {
+                lastMentionedCoaches.put(sessionId, extractedTr);
+                log.info("[预约私教] 记录上次提及教练: {}", extractedTr);
+            }
             String bookingResult = handleBooking(userMessage, memberId);
             if (bookingResult != null && !bookingResult.isEmpty()) {
                 return bookingResult;
             }
         }
 
+
+// ---- 14.5 检查是否有待完成的预约上下文 ----
+        String pendingKey = "booking_" + (memberId != null ? memberId : "guest");
+        PendingBooking pending = pendingBookings.get(pendingKey);
+        if (pending != null) {
+            log.info("命中【待完成预约上下文】pendingKey={}, hasDate={}, dateStr={}, hasTime={}", 
+                     pendingKey, pending.hasDate, pending.dateStr, pending.hasTime);
+            String dateStr = parseDate(userMessage);
+            String timeStr = parseTime(userMessage);
+            if (!pending.hasDate && dateStr != null && !pending.hasTime && timeStr != null) {
+                // 日期和时间同时解析成功，直接执行预约
+                LocalDateTime apptTime;
+                try {
+                    apptTime = LocalDateTime.parse(dateStr + " " + timeStr, DATE_FORMATTER);
+                } catch (DateTimeParseException e) {
+                    try {
+                        apptTime = LocalDateTime.parse(dateStr + " " + timeStr + ":00", DATE_FORMATTER2);
+                    } catch (DateTimeParseException ex) {
+                        return "日期时间格式有误，请使用类似【明天下午2点】的格式。";
+                    }
+                }
+                pendingBookings.remove(pendingKey);
+                log.info("[预约上下文] 已获取日期和时间，执行预约");
+                // 校验时间范围
+                int hour = apptTime.getHour();
+                int min = apptTime.getMinute();
+                if (hour < 9 || hour > 21 || (hour == 21 && min > 0)) {
+                    pendingBookings.remove(pendingKey);
+                    return "预约时间必须在上午9点到晚上9点之间，请重新选择。";
+                }
+                String result = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60);
+                if (result.startsWith("私教预约成功")) {
+                    return "预约成功！已为您预约 " + pending.trainerName + " 的课程，时间：" +
+                            apptTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                } else {
+                    return result;
+                }
+            } else if (!pending.hasDate && dateStr != null) {
+                // 校验日期是否过期
+                String pastMsg = validateDateNotPast(dateStr);
+                if (pastMsg != null) {
+                    return pastMsg;
+                }
+                // 只解析出日期，更新上下文继续等待时间
+                pending.hasDate = true;
+                pending.dateStr = dateStr;
+                pending.retryCount = 0;
+                pendingBookings.put(pendingKey, pending);
+                log.info("[预约上下文] 已获取日期={}, 继续等待时间", dateStr);
+                return "好的，" + dateStr + "。请问您想约什么时间？（例如：下午2点、14:00）";
+            } else if (pending.hasDate && !pending.hasTime) {
+                if (timeStr == null) {
+                    // 检查是否提供了新的日期（用于"换个日期"场景）
+                    String newDate = parseDate(userMessage);
+                    if (newDate != null && !newDate.equals(pending.dateStr)) {
+                        pending.dateStr = newDate;
+                        pending.retryCount = 0;
+                        pendingBookings.put(pendingKey, pending);
+                        log.info("[预约上下文] 已更新日期={}, 继续等待时间", newDate);
+                        return "好的，已更新日期为 " + newDate + "。请问您想约什么时间？（例如：下午2点、14:00）";
+                    }
+                    // 检测是否输入了非整点时间
+                    boolean hasTimePattern = userMessage.matches(".*[0-9一两三四五六七八九十].*[:\uff1a点].*") ||
+                        userMessage.matches(".*(上午|下午|晚上).*[0-9一两三四五六七八九十].*");
+                    if (hasTimePattern) {
+                        pending.retryCount++;
+                        pendingBookings.put(pendingKey, pending);
+                        return "预约时间只支持整点（如 14:00、15:00），请重新输入。";
+                    }
+                    pending.retryCount++;
+                    if (pending.retryCount >= 2) {
+                        pendingBookings.remove(pendingKey);
+                        return "未能识别您的时间，请重新发起预约。例如：「帮我约李教练明天下午2点」";
+                    }
+                    pendingBookings.put(pendingKey, pending);
+                    return "未能识别您的时间，请用【下午2点】或【14:00】格式重新输入。";
+                }
+                // 已有日期，本次解析出时间，用上下文中的日期+本次的时间执行预约
+                String effectiveDate = pending.dateStr;
+                if (effectiveDate == null) {
+                    effectiveDate = LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                }
+                LocalDateTime apptTime;
+                try {
+                    apptTime = LocalDateTime.parse(effectiveDate + " " + timeStr, DATE_FORMATTER);
+                } catch (DateTimeParseException e) {
+                    try {
+                        apptTime = LocalDateTime.parse(effectiveDate + " " + timeStr + ":00", DATE_FORMATTER2);
+                    } catch (DateTimeParseException ex) {
+                        pending.retryCount++;
+                        if (pending.retryCount >= 2) {
+                            pendingBookings.remove(pendingKey);
+                            log.info("[预约上下文] 连续{}次解析失败，清除上下文", pending.retryCount);
+                            return "未能识别您的时间，请重新发起预约。";
+                        }
+                        pendingBookings.put(pendingKey, pending);
+                        return "未能识别您的时间，请用【下午2点】或【14:00】格式重新输入。";
+                    }
+                }
+                pendingBookings.remove(pendingKey);
+                log.info("[预约上下文] 已获取时间，执行预约");
+                // 校验冲突
+                String conflictMsg = checkBookingConflict(pending.memberId, apptTime);
+                if (conflictMsg != null) {
+                    // 保留上下文，允许用户重新选择时间
+                    pending.retryCount = 0;
+                    pendingBookings.put(pendingKey, pending);
+                    log.info("[预约上下文] 冲突后保留上下文，等待新时间");
+                    return conflictMsg + "\n\n请选择其他时间，例如【下午2点】或【14:00】";
+                }
+                // 校验时间范围
+                int hour = apptTime.getHour();
+                int min = apptTime.getMinute();
+                if (hour < 9 || hour > 21 || (hour == 21 && min > 0)) {
+                    pendingBookings.remove(pendingKey);
+                    return "预约时间必须在上午9点到晚上9点之间，请重新选择。";
+                }
+                String result = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60);
+                if (result.startsWith("私教预约成功")) {
+                    return "预约成功！已为您预约 " + pending.trainerName + " 的课程，时间：" +
+                            apptTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                } else {
+                    return result;
+                }
+            } else {
+                // 无法解析任何有效信息
+                pending.retryCount++;
+                if (pending.retryCount >= 2) {
+                    pendingBookings.remove(pendingKey);
+                    log.info("[预约上下文] 连续{}次解析失败，清除上下文", pending.retryCount);
+                    return "未能识别您的预约信息，请重新发起预约。例如：【帮我约李教练明天下午2点】";
+                }
+                pendingBookings.put(pendingKey, pending);
+                log.info("[预约上下文] 第{}次解析失败，继续等待", pending.retryCount);
+                String hint = "";
+                if (!pending.hasDate) {
+                    hint = "请提供日期，例如【明天】或【6月30日】";
+                } else if (!pending.hasTime) {
+                    hint = "请提供时间，例如【下午2点】或【14:00】";
+                }
+                return "未能识别您的输入，请重新输入。" + hint;
+            }
+        }
+
+                // ---- 11.5 具体教练名检测（解决"李教练的"进入预约）----
+        String detectedTrainer = extractTrainerName(userMessage);
+        if (detectedTrainer != null && !lowerMsg.contains("查询") && !lowerMsg.contains("看看") && !lowerMsg.contains("介绍") && !lowerMsg.contains("怎么样") && !lowerMsg.contains("评价")) {
+            log.info("✔️ 命中【具体教练名预约】分支: detected={}", detectedTrainer);
+            lastMentionedCoaches.put(sessionId, detectedTrainer);
+            return handleBooking(userMessage, memberId);
+        }
+
+        // ---- 12. 教练列表（宽匹配，排除已处理预约的） ----
+        if (lowerMsg.contains("教练") && !lowerMsg.contains("预约") && !lowerMsg.contains("推荐")) {
+            log.info("✅ 命中【教练列表】分支（宽匹配）");
+            return gymTools.listAllTrainers();
+        }
         // ---- 13. 查询可报名比赛 ----
         if (lowerMsg.contains("比赛") && (lowerMsg.contains("查询") || lowerMsg.contains("报名") ||
                 lowerMsg.contains("参加") || lowerMsg.contains("有什么"))) {
@@ -478,6 +723,8 @@ public class AIController {
             }
             promptBuilder.append("\n\n用户提问：").append(userMessage);
             String finalPrompt = promptBuilder.toString();
+            log.debug("normalChat finalPrompt={}", finalPrompt);
+            log.info("normalChat: memberId={}, promptLen={}", memberId, finalPrompt.length());
             String answer = CompletableFuture.supplyAsync(() ->
                     assistant.chat(finalPrompt),
                     CompletableFuture.delayedExecutor(0, TimeUnit.SECONDS)
@@ -523,6 +770,7 @@ public class AIController {
                     .chatLanguageModel(model)
                     .tools(gymTools)
                     .chatMemory(chatMemory)
+                    .systemMessageProvider(m -> SYSTEM_PROMPT)
                     .build();
         });
     }
@@ -585,6 +833,7 @@ public class AIController {
     }
 
     private String handleBooking(String userMessage, Long memberId) {
+        long t0 = System.currentTimeMillis();
         if (memberId == null || memberId <= 0) {
             return "预约失败：请先登录。";
         }
@@ -596,21 +845,59 @@ public class AIController {
         } else {
             return "预约失败：未识别到教练姓名，请明确指定教练（如：王教练、李教练等）。";
         }
+        long t1 = System.currentTimeMillis();
+        log.info("[预约耗时] 解析教练姓名: {}ms", t1 - t0);
+
         Trainer trainer = trainerMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Trainer>()
                         .eq("name", trainerName)
         );
+        long t2 = System.currentTimeMillis();
+        log.info("[预约耗时] 查询教练信息: {}ms", t2 - t1);
         if (trainer == null) {
             return "预约失败：未找到名为 " + trainerName + " 的教练，请确认教练姓名是否正确。";
         }
         Long trainerId = trainer.getId();
         String dateStr = parseDate(userMessage);
+        if (dateStr != null) {
+            String pastMsg = validateDateNotPast(dateStr);
+            if (pastMsg != null) {
+                // 过期日期，但保存上下文（教练已知）以便用户重新选择
+                String pendingKey = "booking_" + (memberId != null ? memberId : "guest");
+                pendingBookings.put(pendingKey, new PendingBooking(memberId, trainerId, trainerName, false, false, null));
+                log.info("[预约上下文] 日期过期，已保存教练上下文");
+                return pastMsg;
+            }
+        }
         if (dateStr == null) {
-            return "预约失败：未识别到日期，请提供具体日期（如：6月30日 或 明天）。";
+            // 保存预约上下文，等待用户补充日期
+            String pendingKey = "booking_" + (memberId != null ? memberId : "guest");
+            pendingBookings.put(pendingKey, new PendingBooking(memberId, trainerId, trainerName, false, false, null));
+            log.info("[预约上下文] 已保存待完成预约: 教练={}, 等待提供日期", trainerName);
+            return "好的，已为您选择 " + trainerName + "。请问您想约哪一天？（例如：明天、6月30日）";
         }
         String timeStr = parseTime(userMessage);
         if (timeStr == null) {
-            return "预约失败：未识别到时间，请提供具体时间（如：下午2点 或 14:00）。";
+            // 检查是否包含时间格式但解析失败（如非整点）
+            boolean hasTimePattern = userMessage.matches(".*[0-9一两三四五六七八九十].*[:：点].*") ||
+                    userMessage.matches(".*(上午|下午|晚上).*[0-9一两三四五六七八九十].*");
+            if (hasTimePattern) {
+                log.info("[预约耗时] 识别到时间格式但解析失败（可能是非整点），保存上下文");
+                String pendingKey = "booking_" + (memberId != null ? memberId : "guest");
+                pendingBookings.put(pendingKey, new PendingBooking(memberId, trainerId, trainerName, true, false, dateStr));
+                return "预约时间只支持整点（如 13:00、14:00），请重新输入。";
+            }
+            // 保存预约上下文，等待用户补充时间
+            String pendingKey = "booking_" + (memberId != null ? memberId : "guest");
+            pendingBookings.put(pendingKey, new PendingBooking(memberId, trainerId, trainerName, true, false, dateStr));
+            log.info("[预约上下文] 已保存待完成预约: 教练={}, 日期={}, 等待提供时间", trainerName, dateStr);
+            return "好的，已为您选择 " + trainerName + "，请问您想约什么时间？（例如：下午2点、14:00）";
+        }
+        // 校验时间范围 09:00-21:00
+        int hour = Integer.parseInt(timeStr.split(":")[0]);
+        int min = Integer.parseInt(timeStr.split(":")[1]);
+        if (hour < 9 || hour > 21 || (hour == 21 && min > 0)) {
+            return "预约时间必须在上午9点到晚上9点之间，请重新选择。";
         }
         LocalDateTime appointmentTime;
         try {
@@ -619,10 +906,25 @@ public class AIController {
             try {
                 appointmentTime = LocalDateTime.parse(dateStr + " " + timeStr + ":00", DATE_FORMATTER2);
             } catch (DateTimeParseException ex) {
-                return "预约失败：日期或时间格式不正确，请使用类似“6月30日下午2点”或“2026-06-30 14:00”的格式。";
+                return "预约失败：日期或时间格式不正确，请使用类似【6月30日下午2点】或【2026-06-30 14:00】的格式。";
             }
         }
+        long t3 = System.currentTimeMillis();
+        log.info("[预约耗时] 解析日期时间: {}ms", t3 - t2);
+
+        String conflictMsg = checkBookingConflict(memberId, appointmentTime);
+        if (conflictMsg != null) {
+            // 保留上下文，允许用户重新选择时间
+            String pendingKey = "booking_" + (memberId != null ? memberId : "guest");
+            pendingBookings.put(pendingKey, new PendingBooking(memberId, trainerId, trainerName, true, false, dateStr));
+            log.info("[预约上下文] 冲突提示后保留上下文，等待新时间");
+            return conflictMsg + "\n\n请选择其他时间，例如【下午2点】或【14:00】";
+        }
         String result = ptService.bookPersonalTraining(memberId, trainerId, appointmentTime, 60);
+        long t4 = System.currentTimeMillis();
+        log.info("[预约耗时] 执行预约(DB): {}ms", t4 - t3);
+        log.info("[预约耗时] 总耗时: {}ms", t4 - t0);
+
         if (result.startsWith("私教预约成功")) {
             return "✅ " + result + "。已为您预约 " + trainerName + " 的课程，时间：" +
                     appointmentTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
@@ -641,6 +943,7 @@ public class AIController {
         if (userMessage.contains("今天")) {
             return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         }
+        // 先尝试完整的"X月X号/日"格式
         Matcher dateMatcher = DATE_PATTERN_CN.matcher(userMessage);
         if (dateMatcher.find()) {
             int month = Integer.parseInt(dateMatcher.group(1));
@@ -653,6 +956,20 @@ public class AIController {
             }
             return String.format("%d-%02d-%02d", year, month, day);
         }
+        // 支持"号"格式（如"28号"，默认当前年月）
+        java.util.regex.Matcher dayOnlyMatcher = DAY_ONLY_PATTERN.matcher(userMessage);
+        if (dayOnlyMatcher.find()) {
+            int day = Integer.parseInt(dayOnlyMatcher.group(1));
+            java.time.LocalDate now = java.time.LocalDate.now();
+            int year = now.getYear();
+            int month = now.getMonthValue();
+            // 如果传入的日期小于今天，推至下月
+            if (day < now.getDayOfMonth()) {
+                month++;
+                if (month > 12) { month = 1; year++; }
+            }
+            return String.format("%d-%02d-%02d", year, month, day);
+        }
         Matcher stdMatcher = STD_DATE.matcher(userMessage);
         if (stdMatcher.find()) {
             return stdMatcher.group(0);
@@ -661,7 +978,29 @@ public class AIController {
     }
 
     private String parseTime(String userMessage) {
-        Matcher timeMatcher = TIME_PATTERN_CN.matcher(userMessage);
+        // 先移除日期信息，避免干扰时间解析
+        String timeInput = userMessage.replaceAll("明天|后天|今天", "").trim();
+        timeInput = timeInput.replaceAll("\\d{1,2}月\\d{1,2}(日|号)", "").trim();
+        timeInput = timeInput.replaceAll("\\d{4}年\\d{1,2}月\\d{1,2}日", "").trim();
+        timeInput = timeInput.replaceAll("\\d{4}-\\d{2}-\\d{2}", "").trim();
+        
+        // 尝试标准格式: "14:00", "14:00:00" （优先于中文格式，避免数字冲突）
+        Matcher stdMatcher = STD_TIME.matcher(timeInput);
+        if (stdMatcher.find()) {
+            int hour = Integer.parseInt(stdMatcher.group(1));
+            int minute = Integer.parseInt(stdMatcher.group(2));
+            if (minute != 0) {
+                log.info("[parseTime] 拒绝非整点时间: hour={}, minute={}", hour, minute);
+                return null;
+            }
+            // 校验小时范围
+            if (hour >= 0 && hour <= 23) {
+                return String.format("%02d:%02d", hour, minute);
+            }
+        }
+        
+        // 尝试阿拉伯数字格式: "2点", "下午2点", "2点30分"
+        Matcher timeMatcher = TIME_PATTERN_CN.matcher(timeInput);
         if (timeMatcher.find()) {
             String period = timeMatcher.group(1);
             int hour = Integer.parseInt(timeMatcher.group(2));
@@ -674,13 +1013,103 @@ public class AIController {
             }
             return String.format("%02d:%02d", hour, minute);
         }
-        Matcher stdMatcher = STD_TIME.matcher(userMessage);
-        if (stdMatcher.find()) {
-            int hour = Integer.parseInt(stdMatcher.group(1));
-            int minute = Integer.parseInt(stdMatcher.group(2));
+        // 尝试中文数字格式: "三点", "三点半", "下午三点", "下午三点半"
+        // 匹配: (上午|下午|晚上)?(一|二|两|三|四|五|六|七|八|九|十|十一|十二)点(半|(一|二|三|四|五|六|七|八|九|十)(分)?)?
+        String chineseOrdinal = "(一|二|两|三|四|五|六|七|八|九|十|十一|十二)";
+        String chineseMinute = "(半|(一|二|三|四|五|六|七|八|九|十|十一|十二|十三|十四|十五|十六|十七|十八|十九|二十|二十一|二十二|二十三|二十四|二十五|二十六|二十七|二十八|二十九|三十|三十一|三十二|三十三|三十四|三十五|三十六|三十七|三十八|三十九|四十|四十一|四十二|四十三|四十四|四十五|四十六|四十七|四十八|四十九|五十|五十一|五十二|五十三|五十四|五十五|五十六|五十七|五十八|五十九))";
+        Pattern chineseTimePattern = Pattern.compile("(上午|下午|晚上)?" + chineseOrdinal + "点(" + chineseMinute + "分?)?");
+        Matcher chineseMatcher = chineseTimePattern.matcher(userMessage);
+        if (chineseMatcher.find()) {
+            String period = chineseMatcher.group(1);
+            String hourCn = chineseMatcher.group(2);
+            String minuteCn = chineseMatcher.group(3); // could be "半" or a number
+            int hour = chineseToDigit(hourCn);
+            int minute = 0;
+            if (minuteCn != null && !minuteCn.isEmpty()) {
+                if ("半".equals(minuteCn)) {
+                    minute = 30;
+                } else {
+                    minute = chineseToDigit(minuteCn);
+                }
+            }
+            // 拒绝非整点时间（如三点半、15:30）
+            if (minute != 0) {
+                log.info("[parseTime] 拒绝非整点时间: hour={}, minute={}", hour, minute);
+                return null;
+            }
+            if (("下午".equals(period) || "晚上".equals(period)) && hour < 12) {
+                hour += 12;
+            }
             return String.format("%02d:%02d", hour, minute);
         }
         return null;
+    }
+
+    // ====== 中文数字 → 阿拉伯数字 ======
+    private int chineseToDigit(String cn) {
+        switch (cn) {
+            case "一": return 1;
+            case "二":
+            case "两": return 2;
+            case "三": return 3;
+            case "四": return 4;
+            case "五": return 5;
+            case "六": return 6;
+            case "七": return 7;
+            case "八": return 8;
+            case "九": return 9;
+            case "十": return 10;
+            case "十一": return 11;
+            case "十二": return 12;
+            case "十三": return 13;
+            case "十四": return 14;
+            case "十五": return 15;
+            case "十六": return 16;
+            case "十七": return 17;
+            case "十八": return 18;
+            case "十九": return 19;
+            case "二十": return 20;
+            case "二十一": return 21;
+            case "二十二": return 22;
+            case "二十三": return 23;
+            case "二十四": return 24;
+            case "二十五": return 25;
+            case "二十六": return 26;
+            case "二十七": return 27;
+            case "二十八": return 28;
+            case "二十九": return 29;
+            case "三十": return 30;
+            case "三十一": return 31;
+            case "三十二": return 32;
+            case "三十三": return 33;
+            case "三十四": return 34;
+            case "三十五": return 35;
+            case "三十六": return 36;
+            case "三十七": return 37;
+            case "三十八": return 38;
+            case "三十九": return 39;
+            case "四十": return 40;
+            case "四十一": return 41;
+            case "四十二": return 42;
+            case "四十三": return 43;
+            case "四十四": return 44;
+            case "四十五": return 45;
+            case "四十六": return 46;
+            case "四十七": return 47;
+            case "四十八": return 48;
+            case "四十九": return 49;
+            case "五十": return 50;
+            case "五十一": return 51;
+            case "五十二": return 52;
+            case "五十三": return 53;
+            case "五十四": return 54;
+            case "五十五": return 55;
+            case "五十六": return 56;
+            case "五十七": return 57;
+            case "五十八": return 58;
+            case "五十九": return 59;
+            default: return 0;
+        }
     }
 
     private Pattern getTrainerNamePattern() {
@@ -947,4 +1376,59 @@ private String nullToEmpty(Object obj) {
 
         return gymTools.bookGroupClass(memberId, gc.getId());
     }
+
+    // ====== 校验日期是否过期 ======
+    private String validateDateNotPast(String dateStr) {
+        try {
+            java.time.LocalDate date = java.time.LocalDate.parse(dateStr);
+            java.time.LocalDate today = java.time.LocalDate.now();
+            if (date.isBefore(today)) {
+                return "该日期已过期（" + dateStr + "），请选择未来的日期。";
+            }
+        } catch (Exception e) {
+            log.warn("校验日期失败: {}", dateStr);
+        }
+        return null;
+    }
+
+    // ====== 检查私教预约冲突 ======
+    private String checkBookingConflict(Long memberId, LocalDateTime appointmentTime) {
+        try {
+            LocalDateTime endTime = appointmentTime.plusMinutes(60);
+            Long count = personalTrainingMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.gym.entity.PersonalTraining>()
+                    .eq(com.gym.entity.PersonalTraining::getMemberId, memberId)
+                    .eq(com.gym.entity.PersonalTraining::getStatus, "scheduled")
+                    .between(com.gym.entity.PersonalTraining::getAppointmentTime, appointmentTime, endTime)
+            );
+            if (count != null && count > 0) {
+                return "您在该时段（" + appointmentTime.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")) + "）已有私教预约，请选择其他时间。";
+            }
+        } catch (Exception e) {
+            log.warn("检查预约冲突异常", e);
+        }
+        return null;
+    }
+
+    // ====== 待完成预约上下文（用于多轮对话） ======
+    private static class PendingBooking {
+        Long memberId;
+        Long trainerId;
+        String trainerName;
+        boolean hasDate;
+        boolean hasTime;
+        String dateStr;
+        int retryCount;
+
+        PendingBooking(Long memberId, Long trainerId, String trainerName, boolean hasDate, boolean hasTime, String dateStr) {
+            this.memberId = memberId;
+            this.trainerId = trainerId;
+            this.trainerName = trainerName;
+            this.hasDate = hasDate;
+            this.hasTime = hasTime;
+            this.dateStr = dateStr;
+            this.retryCount = 0;
+        }
+    }
+
 }
