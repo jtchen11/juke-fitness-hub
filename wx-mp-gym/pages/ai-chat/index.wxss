@@ -13,7 +13,11 @@
 .msg-user .msg-avatar{background:#8B5CF6;order:1;margin-right:0;margin-left:8px}
 .msg-bubble{max-width:80%;word-break:break-all;background:#FFF;border-radius:12px;padding:10px 14px;font-size:14px;color:#1A1A2E;line-height:1.6;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow-wrap:break-word;word-wrap:break-word}
 .msg-user .msg-bubble{background:#4A6CF7;color:#FFF}
+.streaming-dots{animation:blink 1.2s infinite;display:inline}
+@keyframes blink{0%,100%{opacity:0}50%{opacity:1}}
 .chat-input-bar{position:fixed;bottom:50px;left:0;right:0;display:flex;padding:8px 12px;background:#FFF;border-top:1px solid #E8E8E8;align-items:center;padding-bottom:calc(8px + env(safe-area-inset-bottom));z-index:100;box-sizing:border-box}
 .chat-input{flex:1;min-width:0;height:36px;background:#F5F6FA;border-radius:18px;padding:0 14px;font-size:14px;color:#1A1A2E}
 .btn-send{width:56px;height:36px;background:#4A6CF7;color:#FFF;border:none;border-radius:18px;font-size:14px;display:flex;align-items:center;justify-content:center;margin-left:8px;flex-shrink:0}
 .btn-send::after{border:none}
+.btn-cancel{width:56px;height:36px;background:#FF6B6B;color:#FFF;border:none;border-radius:18px;font-size:13px;display:flex;align-items:center;justify-content:center;margin-left:8px;flex-shrink:0}
+.btn-cancel::after{border:none}

@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.web.bind.annotation.*;
+import javax.servlet.http.HttpServletResponse;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.servlet.http.HttpSession;
@@ -36,6 +37,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -195,11 +198,18 @@ public class AIController {
 
     // ========== 普通聊天 ==========
     @PostMapping
-    public Map<String, Object> chat(@RequestBody ChatRequest request) {
+    public Map<String, Object> chat(@RequestBody ChatRequest request, HttpServletResponse response) {
         Map<String, Object> result = new HashMap<>();
         String sessionId = request.getSessionId();
         String userMessage = request.getMessage();
-        Long memberId = getCurrentMemberId();
+        Long memberId = null;
+        try {
+            memberId = getCurrentMemberId();
+        } catch (Exception e) {
+            response.setStatus(401);
+            result.put("answer", "请先登录");
+            return result;
+        }
         String memoryId = getMemoryId(sessionId);
 
         try {
@@ -231,14 +241,38 @@ public class AIController {
     public SseEmitter streamChat(
             @RequestParam String sessionId,
             @RequestParam String message,
-            @RequestParam(required = false) Long memberId) {
+            @RequestParam(required = false) Long memberId,
+            HttpServletResponse response) {
         SseEmitter emitter = new SseEmitter(120000L);
-        Long currentMemberId = getCurrentMemberId();
+        emitter.onTimeout(() -> {
+            log.warn("流式请求超时: sessionId={}", sessionId);
+            try {
+                Map<String, Object> errorEvent = new HashMap<>();
+                errorEvent.put("type", "error");
+                errorEvent.put("content", "请求超时，请稍后重试");
+                emitter.send(SseEmitter.event()
+                        .data(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorEvent))
+                        .name("error"));
+            } catch (Exception ex) { }
+            emitter.completeWithError(new RuntimeException("请求超时"));
+        });
+        Long currentMemberId = null;
+        try {
+            currentMemberId = getCurrentMemberId();
+        } catch (Exception e) {
+            try { emitter.send(SseEmitter.event().data("{\"type\":\"error\",\"content\":\"请先登录\"}")); } catch (Exception ex) {}
+            emitter.complete();
+            return emitter;
+        }
+        final Long finalMemberId = currentMemberId;
         String memoryId = getMemoryId(sessionId);
+
+        long streamStartTime = System.currentTimeMillis();
+        log.info("流式请求开始: sessionId={}, message={}", sessionId, message);
 
         executor.execute(() -> {
             try {
-                String answer = handleIntent(message, currentMemberId, sessionId, memoryId);
+                String answer = handleIntent(message, finalMemberId, sessionId, memoryId);
                 // 提取图片 URL
                 String imageUrl = extractImageUrl(answer);
                 saveToMemory(memoryId, message, answer, imageUrl);
@@ -262,6 +296,8 @@ public class AIController {
                         .data(objectMapper.writeValueAsString(completeEvent))
                         .name("complete"));
                 emitter.complete();
+                log.info("流式请求结束: sessionId={}, 耗时={}ms",
+                        sessionId, System.currentTimeMillis() - streamStartTime);
 
             } catch (Exception e) {
                 if (e instanceof org.apache.catalina.connector.ClientAbortException ||
@@ -427,12 +463,32 @@ public class AIController {
         try {
             Assistant assistant = getOrCreateAssistant(sessionId, memoryId);
             String userContext = buildUserContext(memberId);
-            String fullPrompt = userContext + "\n\n" + "用户提问：" + userMessage;
-            String answer = assistant.chat(fullPrompt);
+            // 注入 RAG 知识库上下文
+            String ragContext = knowledgeBase.searchRelevant(userMessage);
+
+            // 注入动态数据（教练信息、课程介绍）
+            String dynContext = buildDynamicContext(userMessage);
+
+            StringBuilder promptBuilder = new StringBuilder(userContext);
+            if (ragContext != null && ragContext.startsWith("【健身知识库检索结果】")) {
+                promptBuilder.append("\n\n参考知识库信息：\n").append(ragContext);
+            }
+            if (!dynContext.isEmpty()) {
+                promptBuilder.append("\n\n").append(dynContext);
+            }
+            promptBuilder.append("\n\n用户提问：").append(userMessage);
+            String finalPrompt = promptBuilder.toString();
+            String answer = CompletableFuture.supplyAsync(() ->
+                    assistant.chat(finalPrompt),
+                    CompletableFuture.delayedExecutor(0, TimeUnit.SECONDS)
+            ).get(60, TimeUnit.SECONDS);
             if (answer == null || answer.trim().isEmpty()) {
                 return getFallbackResponse(userMessage);
             }
             return answer;
+        } catch (java.util.concurrent.TimeoutException e) {
+            log.error("AI 模型调用超时(60s)", e);
+            return "抱歉，AI 响应超时，请简化问题后重试。";
         } catch (Exception e) {
             log.error("AI 模型调用失败", e);
             return getFallbackResponse(userMessage);
@@ -777,7 +833,63 @@ public class AIController {
         );
     }
 
-    private String nullToEmpty(Object obj) {
+    
+    // ========== 构建动态上下文（教练信息、课程介绍等） ==========
+    private String buildDynamicContext(String userMessage) {
+        String lower = userMessage.toLowerCase();
+        StringBuilder sb = new StringBuilder();
+        String lowerMsg = userMessage.toLowerCase();
+
+        // 用户问到教练信息时，注入教练列表
+        if (lowerMsg.contains("教练")) {
+            try {
+                com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Trainer> tw = 
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+                tw.eq(Trainer::getStatus, "active");
+                tw.last("LIMIT 10");
+                java.util.List<Trainer> trainers = trainerMapper.selectList(tw);
+                if (trainers != null && !trainers.isEmpty()) {
+                    sb.append("【当前在职教练】\n");
+                    for (Trainer t : trainers) {
+                        sb.append("- ").append(nullToEmpty(t.getName()))
+                          .append("，专长：").append(nullToEmpty(t.getSpecialty()))
+                          .append("，价格：").append(t.getPricePerHour() != null ? t.getPricePerHour() : "待定").append(" 元/小时\n");
+                    }
+                    sb.append("\n");
+                }
+            } catch (Exception e) {
+                log.warn("查询教练动态数据失败", e);
+            }
+        }
+
+        // 用户问到课程时，注入团课信息
+        if (lowerMsg.contains("课程") || lowerMsg.contains("团课") || lowerMsg.contains("课表")) {
+            try {
+                com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<GroupClass> gw = 
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+                gw.eq(GroupClass::getStatus, "scheduled")
+                   .gt(GroupClass::getStartTime, java.time.LocalDateTime.now())
+                   .orderByAsc(GroupClass::getStartTime)
+                   .last("LIMIT 5");
+                java.util.List<GroupClass> classes = groupClassMapper.selectList(gw);
+                if (classes != null && !classes.isEmpty()) {
+                    sb.append("【近期可预约团课】\n");
+                    for (GroupClass gc : classes) {
+                        sb.append("- ").append(nullToEmpty(gc.getName()))
+                          .append(" | ").append(gc.getStartTime() != null ? gc.getStartTime().format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")) : "")
+                          .append(" | 余位 ").append(gc.getMaxCapacity() - gc.getEnrolled()).append(" 人\n");
+                    }
+                    sb.append("\n");
+                }
+            } catch (Exception e) {
+                log.warn("查询团课动态数据失败", e);
+            }
+        }
+
+        return sb.toString();
+    }
+
+private String nullToEmpty(Object obj) {
         return obj == null ? "" : obj.toString();
     }
 

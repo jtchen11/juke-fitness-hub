@@ -1,4 +1,4 @@
-function getToken() {
+﻿function getToken() {
   try {
     var app = getApp();
     if (app && app.globalData) return app.globalData.token || wx.getStorageSync("token") || "";
@@ -9,9 +9,11 @@ function getToken() {
 function getBaseUrl() {
   try {
     var app = getApp();
-    if (app && app.globalData) return app.globalData.apiBaseUrl || "http://192.168.10.6:8080";
+    if (app && app.globalData) {
+      return app.globalData.apiBaseUrl || "http://localhost:8080";
+    }
   } catch (e) {}
-  return "http://192.168.10.6:8080";
+  return "http://localhost:8080";
 }
 
 function doLogout() {
@@ -32,6 +34,7 @@ function request(method, url, data, success, fail) {
     method: method,
     data: data,
     header: { "Content-Type": "application/json", "Authorization": token ? "Bearer " + token : "" },
+    timeout: 120000,
     success: function(res) {
       if (res.statusCode === 401) {
         doLogout();

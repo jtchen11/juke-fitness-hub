@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Duration;
+
 @Configuration
 public class AiModelConfig {
 
@@ -28,6 +30,8 @@ public class AiModelConfig {
                 .apiKey(apiKey)
                 .modelName(modelName)
                 .temperature(temperature)
+                .timeout(Duration.ofSeconds(60))
+                .maxRetries(2)
                 .build();
     }
 }

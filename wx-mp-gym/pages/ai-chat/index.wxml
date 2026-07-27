@@ -1,27 +1,31 @@
 <view class="page-ai-chat">
   <view class="chat-header" style="padding-top:{{headerPadding}}px">
     <text class="chat-title">AI智能助手</text>
-    <text class="chat-subtitle">桔刻健身 • 7x24小时在线</text>
+    <text class="chat-subtitle">桔刻健身 · 7x24小时在线</text>
   </view>
   <!-- 快捷提问 -->
   <scroll-view class="quick-ask" scroll-x enhanced show-scrollbar="{{false}}">
-    <view class="quick-chip" data-msg="帮我制定一份减脂训练计划" bindtap="onQuickAsk">🏋️ 训练计划</view>
-    <view class="quick-chip" data-msg="最近体测数据怎么样？给我分析一下" bindtap="onQuickAsk">📊 体测建议</view>
-    <view class="quick-chip" data-msg="给我推荐健康的饮食计划" bindtap="onQuickAsk">🥗 饮食计划</view>
-    <view class="quick-chip" data-msg="我想预约一节私教课" bindtap="onQuickAsk">📅 预约课程</view>
+    <view class="quick-chip" data-msg="帮我制定一份减脂训练计划" bindtap="onQuickAsk">💪 训练计划</view>
+    <view class="quick-chip" data-msg="最近体测数据怎么样？给我分析一下" bindtap="onQuickAsk">📳 体测建议</view>
+    <view class="quick-chip" data-msg="给我推荐健康的饮食计划" bindtap="onQuickAsk">🥜 饮食计划</view>
+    <view class="quick-chip" data-msg="我想预约一节私教课" bindtap="onQuickAsk">📮 预约课程</view>
   </scroll-view>
   <scroll-view class="chat-messages" scroll-into-view="{{scrollTarget}}" scroll-y>
     <!-- 历史分组标题 -->
     <view class="date-divider" wx:if="{{showDateDivider}}"><text>{{dateDividerText}}</text></view>
     <view class="msg msg-{{item.role}}" wx:for="{{messages}}" wx:key="*this">
       <view class="msg-avatar">{{item.role==='ai' ? 'AI' : '我'}}</view>
-      <view class="msg-bubble"><text>{{item.content}}</text></view>
+      <view class="msg-bubble">
+        <text wx:if="{{item.isStreaming && !item.content}}">正在输入<text class="streaming-dots">...</text></text>
+        <text wx:else>{{item.content}}</text>
+      </view>
     </view>
     <view id="bottom"></view>
   </scroll-view>
   <view class="chat-input-bar">
-    <input class="chat-input" placeholder="输入你的问题..." bindinput="onInput" value="{{inputText}}"/>
-    <button class="btn-send" bindtap="onSend">发送</button>
+    <input class="chat-input" placeholder="输入你的问题..." bindinput="onInput" value="{{inputText}}" disabled="{{isStreaming}}"/>
+    <button class="btn-send" bindtap="onSend" wx:if="{{!isStreaming}}">发送</button>
+    <button class="btn-cancel" bindtap="onCancelStream" wx:if="{{isStreaming}}">取消</button>
   </view>
   <tab-bar/>
 </view>

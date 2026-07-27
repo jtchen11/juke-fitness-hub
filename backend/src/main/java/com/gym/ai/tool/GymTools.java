@@ -251,7 +251,7 @@ public class GymTools {
     }
 
     // ====== 新增：生成一周训练计划骨架（JSON格式） ======
-    @Tool("根据会员体测数据生成一周减脂训练计划骨架（JSON格式），用于AI进一步润色")
+        @Tool("根据会员体测数据动态生成一周训练计划骨架（JSON格式），体脂高增加有氧、肌肉量低增加力量")
     public String generateWorkoutPlanSkeleton(Long memberId) {
         if (memberId == null || memberId <= 0) {
             return "{\"error\": \"会员ID无效\"}";
@@ -264,11 +264,112 @@ public class GymTools {
         FitnessTest latest = getLatestFitnessTest(memberId);
         String name = member.getName() != null ? member.getName() : "会员";
 
+        // ====== 根据体测数据动态计算训练比例 ======
+        int strengthDays = 3;  // 默认力量训练天数
+        int cardioDays = 3;    // 默认有氧训练天数
+        String focus = "均衡训练";
+        String intensity = "中级";
+
+        if (latest != null) {
+            double bodyFat = latest.getBodyFatPercent() != null ? latest.getBodyFatPercent().doubleValue() : 0.0;
+            double muscleMass = latest.getMuscleMassKg() != null ? latest.getMuscleMassKg().doubleValue() : 0.0;
+            double weight = latest.getWeightKg() != null ? latest.getWeightKg().doubleValue() : 0.0;
+
+            // 体脂判断
+            boolean highFat = bodyFat > 25.0;
+            // 肌肉量判断（男性一般30kg+为正常）
+            boolean lowMuscle = muscleMass > 0.0 && muscleMass < 30.0;
+
+            if (highFat && !lowMuscle) {
+                // 体脂高但肌肉量正常 → 减脂为主，多增加有氧
+                strengthDays = 2;
+                cardioDays = 4;
+                focus = "减脂为主";
+            } else if (lowMuscle && !highFat) {
+                // 肌肉量低但体脂正常 → 增肌为主，多增加力量
+                strengthDays = 4;
+                cardioDays = 2;
+                focus = "增肌为主";
+            } else if (highFat && lowMuscle) {
+                // 体脂高且肌肉量低 → 减脂增肌并重，适当增加训练量
+                strengthDays = 3;
+                cardioDays = 3;
+                focus = "减脂增肌并重";
+            } else {
+                // 体脂和肌肉量正常 → 维持均衡训练
+                strengthDays = 3;
+                cardioDays = 3;
+                focus = "维持均衡";
+            }
+
+            // 根据会员等级确定训练强度
+            String level = member.getLevel() != null ? member.getLevel() : "普通会员";
+            if (level.contains("铂金") || level.contains("黄金")) {
+                intensity = "高级";
+            } else {
+                intensity = "中级";
+            }
+        } else {
+            // 无体测数据，使用默认通用计划
+        }
+
+        // ====== 构建动态一周训练安排 ======
+        String[][] strengthWorkouts = {
+            {"胸部训练（杠铃卧推 + 哑铃飞鸟 + 俯卧撑）"},
+            {"背部训练（高位下拉 + 俯身划船 + 坐姿划船）"},
+            {"腿部训练（深蹲 + 腿举 + 罗马尼亚硬拉）"},
+            {"肩部训练（哑铃推举 + 侧平举 + 前平举）"}
+        };
+        String[][] cardioWorkouts = {
+            {"30分钟慢跑"},
+            {"30分钟椭圆机"},
+            {"30分钟动感单车"},
+            {"30分钟划船机"},
+            {"30分钟快走"}
+        };
+
+        List<Map<String, String>> weeklyPlan = new ArrayList<>();
+        String[] days = {"周一", "周二", "周三", "周四", "周五", "周六", "周日"};
+        // 交替安排力量和训练日
+        int sIdx = 0, cIdx = 0;
+        for (int d = 0; d < 7; d++) {
+            Map<String, String> day = new LinkedHashMap<>();
+            day.put("day", days[d]);
+            if (d == 6) {
+                // 周日休息
+                day.put("strengthTraining", "完全休息");
+                day.put("cardio", "无");
+                day.put("duration", "0分钟");
+            } else if (d % 2 == 0 && sIdx < strengthDays) {
+                // 力量训练日
+                day.put("strengthTraining", strengthWorkouts[sIdx % strengthWorkouts.length][0]);
+                day.put("cardio", "20分钟快走（热身）");
+                day.put("duration", "60分钟");
+                sIdx++;
+            } else if (cIdx < cardioDays) {
+                // 有氧训练日
+                day.put("strengthTraining", "核心训练（平板支撑 + 卷腹 + 俄罗斯转体）");
+                day.put("cardio", cardioWorkouts[cIdx % cardioWorkouts.length][0]);
+                day.put("duration", "60分钟");
+                cIdx++;
+            } else {
+                // 日常活动
+                day.put("strengthTraining", "低强度活动");
+                day.put("cardio", "30分钟快走");
+                day.put("duration", "30分钟");
+            }
+            weeklyPlan.add(day);
+        }
+
+        // ====== 构建 JSON ======
         Map<String, Object> plan = new LinkedHashMap<>();
         plan.put("memberName", name);
         plan.put("memberLevel", member.getLevel() != null ? member.getLevel() : "普通会员");
-        plan.put("fitnessGoal", "减脂塑形");
+        plan.put("fitnessGoal", focus);
         plan.put("planType", "training");
+        plan.put("trainingIntensity", intensity);
+        plan.put("strengthDays", strengthDays);
+        plan.put("cardioDays", cardioDays);
 
         if (latest != null) {
             Map<String, Object> data = new LinkedHashMap<>();
@@ -281,32 +382,15 @@ public class GymTools {
             plan.put("latestTestData", "暂无体测数据，以下为通用减脂计划，建议先进行体测评估");
         }
 
-        // 一周训练安排
-        List<Map<String, String>> weeklyPlan = new ArrayList<>();
-        String[][] workouts = {
-                {"周一", "胸部训练 + 三头肌", "30分钟慢跑", "60分钟"},
-                {"周二", "背部训练 + 二头肌", "30分钟椭圆机", "60分钟"},
-                {"周三", "腿部训练 + 肩部训练", "30分钟动感单车", "60分钟"},
-                {"周四", "胸部训练 + 三头肌", "30分钟慢跑", "60分钟"},
-                {"周五", "全身循环训练", "30分钟游泳", "60分钟"},
-                {"周六", "低强度有氧（快走或瑜伽）", "低强度", "45分钟"},
-                {"周日", "完全休息", "无", "0分钟"}
-        };
-        for (String[] w : workouts) {
-            Map<String, String> day = new LinkedHashMap<>();
-            day.put("day", w[0]);
-            day.put("strengthTraining", w[1]);
-            day.put("cardio", w[2]);
-            day.put("duration", w[3]);
-            weeklyPlan.add(day);
-        }
         plan.put("weeklyPlan", weeklyPlan);
 
         List<String> principles = Arrays.asList(
-                "每次训练前热身10分钟，训练后拉伸10分钟",
-                "力量训练重量选择：每组8-12次，做到力竭",
-                "有氧心率控制在最大心率的60%-70%",
-                "训练强度根据自身感受调整，循序渐进"
+            "每次训练前热身10分钟，训练后拉伸10分钟",
+            "力量训练重量选择：每组8-12次，做到力竭",
+            "有氧心率控制在最大心率的60%-70%",
+            "训练强度根据自身感受调整，循序渐进",
+            "保证充足睡眠（7-8小时），促进恢复",
+            "如感到不适，立即停止训练"
         );
         plan.put("trainingPrinciples", principles);
 
@@ -317,9 +401,7 @@ public class GymTools {
         }
     }
 
-    // ====== 新增：生成一周饮食计划骨架（JSON格式） ======
-    @Tool("根据会员体测数据生成一周减脂饮食计划骨架（JSON格式），用于AI进一步润色")
-    public String generateMealPlanSkeleton(Long memberId) {
+public String generateMealPlanSkeleton(Long memberId) {
         if (memberId == null || memberId <= 0) {
             return "{\"error\": \"会员ID无效\"}";
         }
