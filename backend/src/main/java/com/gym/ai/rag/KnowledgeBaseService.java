@@ -86,7 +86,7 @@ public class KnowledgeBaseService {
                     .build();
             var searchResult = embeddingStore.search(searchRequest);
             var relevant = searchResult.matches();
-            log.info("RAG 检索: query=\"{}\", 结果数={}", query, relevant.size());
+            log.debug("RAG 检索: query=\"{}\", 结果数={}", query, relevant.size());
             if (relevant.isEmpty()) {
                 return "未找到相关知识。";
             }

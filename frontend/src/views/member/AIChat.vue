@@ -155,41 +155,41 @@ const sendMessageStream = (text) => {
     isStreaming: true
   })
   isStreaming.value = true
-  scrollToBottom()
+
+
 
   // 创建 EventSource 连接
   eventSource = new EventSource(url)
 
-  // 监听消息事件（逐字输出）
-  eventSource.addEventListener('message', (event) => {
+  // 监听 delta 事件（逐字推送）
+  eventSource.addEventListener('delta', (event) => {
     try {
       const data = JSON.parse(event.data)
-      if (data.type === 'token') {
-        // 更新消息内容
-        messages[placeholderIdx].content = data.full || data.content
-        scrollToBottom()
+      if (data.type === 'tool_result') {
+        // 工具调用结果：作为系统提示追加
+        messages[placeholderIdx].content += '\n📌 ' + (data.content || '')
+      } else if (data.content) {
+        // 普通 token：追加到当前消息
+        messages[placeholderIdx].content += data.content
       }
-    } catch (e) {
-      console.error('解析 SSE 消息失败:', e)
-    }
-  })
-
-  // 监听完成事件
-  eventSource.addEventListener('complete', (event) => {
-    try {
-      const data = JSON.parse(event.data)
-      messages[placeholderIdx].content = data.full || messages[placeholderIdx].content
-      messages[placeholderIdx].isStreaming = false
-      isStreaming.value = false
-      eventSource.close()
-      eventSource = null
       scrollToBottom()
     } catch (e) {
-      console.error('解析 SSE 完成事件失败:', e)
+      console.error('解析 SSE delta 事件失败:', e)
     }
   })
 
-  // 监听错误事件
+  // 监听 end 事件（流式结束）
+  eventSource.addEventListener('end', (event) => {
+    messages[placeholderIdx].isStreaming = false
+    isStreaming.value = false
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
+    scrollToBottom()
+  })
+
+  // 监听 error 事件（后端推送的异常）
   eventSource.addEventListener('error', (event) => {
     try {
       const data = JSON.parse(event.data)
@@ -199,10 +199,13 @@ const sendMessageStream = (text) => {
     }
     messages[placeholderIdx].isStreaming = false
     isStreaming.value = false
-    eventSource.close()
-    eventSource = null
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
     scrollToBottom()
   })
+
 
   // 通用错误处理（连接断开等）
   eventSource.onerror = (error) => {

@@ -556,6 +556,15 @@ public String generateMealPlanSkeleton(Long memberId) {
         List<MemberPrivatePackage> packages = memberPrivatePackageMapper.selectList(wrapper);
 
         if (packages.isEmpty()) {
+            // 诊断：打印所有课程包原始数据
+            LambdaQueryWrapper<MemberPrivatePackage> diagAll = new LambdaQueryWrapper<>();
+            diagAll.eq(MemberPrivatePackage::getMemberId, memberId);
+            List<MemberPrivatePackage> allPkgsForDiag = memberPrivatePackageMapper.selectList(diagAll);
+            if (allPkgsForDiag != null && !allPkgsForDiag.isEmpty()) {
+                for (MemberPrivatePackage p : allPkgsForDiag) {
+                    System.out.println("[课程包诊断] 会员" + memberId + ": id=" + p.getId() + ", name=" + p.getPackageName() + ", total=" + p.getTotalSessions() + ", used=" + p.getUsedSessions() + ", remaining=" + p.getRemainingSessions() + ", status=" + p.getStatus() + ", endDate=" + p.getEndDate());
+                }
+            }
             // 检查是否有已用完或过期的
             LambdaQueryWrapper<MemberPrivatePackage> allWrapper = new LambdaQueryWrapper<>();
             allWrapper.eq(MemberPrivatePackage::getMemberId, memberId);

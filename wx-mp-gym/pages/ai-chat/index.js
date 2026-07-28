@@ -3,8 +3,14 @@ var request = require('../../utils/request.js');
 
 var streamingReq = null;
 
+// 跨块 UTF-8 解码器（stream:true 保持多字节字符连续性）
+var chunkDecoder = new TextDecoder("utf-8");
+// SSE 跨块缓冲（累积不完整的分割事件）
+var sseBuffer = "";
+var hasReceivedChunk = false;
+
 function arrayBufferToString(buffer) {
-  return new TextDecoder("utf-8").decode(buffer);
+  return chunkDecoder.decode(buffer, { stream: true });
 }
 
 Page({
@@ -22,10 +28,8 @@ Page({
 
   onLoad() {
     var _this = this;
-    // 会话 ID 持久化：先尝试从 Storage 读取
     var sid = wx.getStorageSync("chat_session_id") || "";
     console.log("[ai-chat] onLoad: existing sid=" + sid);
-    // 如果已登录，用 memberId 构建固定 sessionId
     var memberId = "";
     try {
       var storedInfo = wx.getStorageSync("userInfo") || {};
@@ -53,13 +57,11 @@ Page({
       messages: [welcomeMsg]
     });
     this.checkLogin();
-    // 异步加载历史记录
     _this.loadHistory(sid, welcomeMsg);
   },
 
   onShow() {
     this.checkLogin();
-    // 每次显示页面时重新检查 memberId，确保登录后 sessionId 更新
     var currentSid = this.data.sessionId;
     var memberId = "";
     try {
@@ -91,7 +93,7 @@ Page({
   onInput(e) { this.setData({ inputText: e.detail.value }); },
 
   onQuickAsk(e) {
-    if (!this.data.isLoggedIn) { wx.showToast({ title: "请先登录再使用AI助手", icon: "none" }); setTimeout(function() { wx.navigateTo({ url: "/pages/login/login" }); }, 1000); return; }
+    if (!this.data.isLoggedIn) { wx.showToast({ title: "请先登录再使用AI助手", icon: "none" }); setTimeout(function() { wx.navigateTo({ url: "/pages/login/login" }); }, 10000); return; }
     var msg = e.currentTarget.dataset.msg;
     this.setData({ inputText: msg });
     this.onSend();
@@ -127,117 +129,175 @@ Page({
     var token = "";
     try { token = wx.getStorageSync("token") || ""; } catch (e) {}
 
-    streamingReq = wx.request({
+    var reqId = Date.now() + "_" + Math.random();
+    var req = wx.request({
       url: baseUrl + "/api/ai/chat/stream",
       data: { sessionId: _this.data.sessionId, message: text },
       header: { "Authorization": token ? "Bearer " + token : "" },
       enableChunked: true,
       timeout: 120000,
       success: function(res) {
-        if (_this.data.isStreaming) {
+        if (streamingReq === req && _this.data.isStreaming) {
           _this.finishStreaming();
         }
       },
       fail: function(err) {
         if (err.errMsg && err.errMsg.indexOf("abort") >= 0) return;
+        if (streamingReq !== req) return;
+        hasReceivedChunk = false;
         _this.replaceLastAiMessage("网络连接失败，请检查服务器是否启动。");
         _this.finishStreaming();
       }
     });
+    streamingReq = req;
 
-    streamingReq.onChunkReceived(function(res) {
-      var raw = arrayBufferToString(res.data);
-      var parts = raw.split("\n\n");
-      for (var p = 0; p < parts.length; p++) {
-        var part = parts[p].trim();
-        if (!part) continue;
-        var jsonStr = part;
-        if (jsonStr.indexOf("data: ") === 0) {
-          jsonStr = jsonStr.substring(6);
-        }
-        var dataLine = "";
-        var lines = jsonStr.split("\n");
-        for (var li = 0; li < lines.length; li++) {
-          if (lines[li].indexOf("data:") === 0) {
-            var afterData = lines[li].substring(5).trim();
-            dataLine = afterData;
-          } else if (lines[li].indexOf("{") === 0) {
-            dataLine = lines[li];
+    req.onChunkReceived(function(res) {
+      hasReceivedChunk = true;
+      try {
+        // 流式解码，保持多字节字符跨块连续性
+        var decoded = chunkDecoder.decode(res.data, { stream: true });
+        sseBuffer += decoded;
+        // 按 SSE 双换行符切割完整事件
+        var parts = sseBuffer.split("\n\n");
+        // 最后一个片段可能不完整，留在缓冲区
+        sseBuffer = parts.pop();
+        for (var p = 0; p < parts.length; p++) {
+          var part = parts[p].trim();
+          if (!part) continue;
+          var jsonStr = part;
+          if (jsonStr.indexOf("data: ") === 0) {
+            jsonStr = jsonStr.substring(6);
           }
-        }
-        if (!dataLine) continue;
-        try {
-          var evt = JSON.parse(dataLine);
-          if (evt.type === "token") {
-            _this.updateLastAiMessage(evt.full || evt.content);
-          } else if (evt.type === "complete") {
-            var fullText = evt.full || "";
-                        if (fullText.indexOf("**PAYMENT**") >= 0) {
-              console.log("[payment] fullText contains **PAYMENT**");
-              var parts = fullText.split("**PAYMENT**");
-              var displayText = parts[0].trim();
-              var optionsText = parts[1] || "";
-              var payOptions = [];
-              var lines = optionsText.split("\n");
-              for (var li = 0; li < lines.length; li++) {
-                var line = lines[li].trim();
-                if (!line) continue;
-                var dotPos = line.indexOf(".");
-                if (dotPos > 0 && dotPos < 3) {
-                  var val = line.substring(0, dotPos).trim();
-                  var rest = line.substring(dotPos + 1).trim();
-                  var label = rest;
-                  var sub = "";
-                  var p1 = rest.indexOf("(");
-                  var p2 = rest.indexOf("（");
-                  var p = (p1 >= 0 && (p2 < 0 || p1 < p2)) ? p1 : p2;
-                  if (p >= 0) {
-                    label = rest.substring(0, p).trim();
-                    var subEnd = rest.lastIndexOf(")") >= 0 ? rest.lastIndexOf(")") : rest.lastIndexOf("）");
-                    if (subEnd > p) {
-                      sub = rest.substring(p + 1, subEnd).trim();
+          var dataLine = "";
+          var slines = jsonStr.split("\n");
+          for (var li = 0; li < slines.length; li++) {
+            if (slines[li].indexOf("data:") === 0) {
+              dataLine = slines[li].substring(5).trim();
+            } else if (slines[li].indexOf("{") === 0) {
+              dataLine = slines[li];
+            }
+          }
+          if (!dataLine) continue;
+          try {
+            var evt = JSON.parse(dataLine);
+            if (evt.type === "delta" || evt.type === "token") {
+              _this.updateLastAiMessage(evt.content || evt.full || "");
+            } else if (evt.type === "tool_result") {
+              var toolText = evt.content || "";
+              // 检测 **PAYMENT** 标记，解析为支付按钮
+              if (toolText.indexOf("**PAYMENT**") >= 0) {
+                var pparts = toolText.split("**PAYMENT**");
+                var displayText = pparts[0].trim();
+                var optionsText = pparts[1] || "";
+                var payOptions = [];
+                var optLines = optionsText.split("\n");
+                for (var oi = 0; oi < optLines.length; oi++) {
+                  var optLine = optLines[oi].trim();
+                  if (!optLine) continue;
+                  var dotPos = optLine.indexOf(".");
+                  if (dotPos > 0 && dotPos < 3) {
+                    var val = optLine.substring(0, dotPos).trim();
+                    var rest = optLine.substring(dotPos + 1).trim();
+                    var label = rest;
+                    var sub = "";
+                    var pp1 = rest.indexOf("(");
+                    var pp2 = rest.indexOf("\uff08");
+                    var ppos = (pp1 >= 0 && (pp2 < 0 || pp1 < pp2)) ? pp1 : pp2;
+                    if (ppos >= 0) {
+                      label = rest.substring(0, ppos).trim();
+                      var subEnd = rest.lastIndexOf(")") >= 0 ? rest.lastIndexOf(")") : rest.lastIndexOf("\uff09");
+                      if (subEnd > ppos) { sub = rest.substring(ppos + 1, subEnd).trim(); }
+                    }
+                    payOptions.push({ label: label, sub: sub, payValue: val });
+                  }
+                }
+                console.log("[payment] tool_result parsed", payOptions.length, "options");
+                if (payOptions.length > 0) {
+                  var msgs2 = _this.data.messages;
+                  for (var mi2 = msgs2.length - 1; mi2 >= 0; mi2--) {
+                    if (msgs2[mi2].role === "ai") {
+                      msgs2[mi2].content = displayText;
+                      msgs2[mi2].paymentOptions = payOptions;
+                      msgs2[mi2].isStreaming = false;
+                      break;
                     }
                   }
-                  payOptions.push({ label: label, sub: sub, payValue: val });
+                  _this.setData({ messages: msgs2, isStreaming: false, scrollTarget: "bottom" });
+                  continue;
                 }
               }
-              console.log("[payment] parsed", payOptions.length, "options");
-              if (payOptions.length > 0) {
-                var msgs = _this.data.messages;
-                for (var mi = msgs.length - 1; mi >= 0; mi--) {
-                  if (msgs[mi].role === "ai") {
-                    msgs[mi].content = displayText;
-                    msgs[mi].paymentOptions = payOptions;
-                    msgs[mi].isStreaming = false;
-                    break;
+              var msgs = _this.data.messages;
+              // 填充最后一条 AI 占位消息，不新增 system 消息
+              var found = false;
+              for (var mi = msgs.length - 1; mi >= 0; mi--) {
+                if (msgs[mi].role === "ai") {
+                  msgs[mi].content = toolText;
+                  msgs[mi].isStreaming = false;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                msgs.push({ role: "ai", content: toolText, time: Date.now(), isStreaming: false });
+              }
+              _this.setData({ messages: msgs, isStreaming: false, scrollTarget: "bottom" });
+            } else if (evt.type === "end") {
+              _this.finishStreaming();
+            } else if (evt.type === "complete") {
+              var fullText = evt.full || "";
+              if (fullText.indexOf("**PAYMENT**") >= 0) {
+                console.log("[payment] fullText contains **PAYMENT**");
+                var pparts = fullText.split("**PAYMENT**");
+                var displayText = pparts[0].trim();
+                var optionsText = pparts[1] || "";
+                var payOptions = [];
+                var optLines = optionsText.split("\n");
+                for (var oi = 0; oi < optLines.length; oi++) {
+                  var optLine = optLines[oi].trim();
+                  if (!optLine) continue;
+                  var dotPos = optLine.indexOf(".");
+                  if (dotPos > 0 && dotPos < 3) {
+                    var val = optLine.substring(0, dotPos).trim();
+                    var rest = optLine.substring(dotPos + 1).trim();
+                    var label = rest;
+                    var sub = "";
+                    var pp1 = rest.indexOf("(");
+                    var pp2 = rest.indexOf("\uff08");
+                    var ppos = (pp1 >= 0 && (pp2 < 0 || pp1 < pp2)) ? pp1 : pp2;
+                    if (ppos >= 0) {
+                      label = rest.substring(0, ppos).trim();
+                      var subEnd = rest.lastIndexOf(")") >= 0 ? rest.lastIndexOf(")") : rest.lastIndexOf("\uff09");
+                      if (subEnd > ppos) { sub = rest.substring(ppos + 1, subEnd).trim(); }
+                    }
+                    payOptions.push({ label: label, sub: sub, payValue: val });
                   }
                 }
-                _this.setData({ messages: msgs, isStreaming: false, scrollTarget: "bottom" });
-                return;
+                console.log("[payment] parsed", payOptions.length, "options");
+                if (payOptions.length > 0) {
+                  var msgs = _this.data.messages;
+                  for (var mi = msgs.length - 1; mi >= 0; mi--) {
+                    if (msgs[mi].role === "ai") {
+                      msgs[mi].content = displayText;
+                      msgs[mi].paymentOptions = payOptions;
+                      msgs[mi].isStreaming = false;
+                      break;
+                    }
+                  }
+                  _this.setData({ messages: msgs, isStreaming: false, scrollTarget: "bottom" });
+                  continue;
+                }
               }
+              _this.updateLastAiMessage(evt.full);
+              _this.finishStreaming();
+            } else if (evt.type === "error") {
+              _this.replaceLastAiMessage(evt.content || "服务异常，请稍后重试。");
+              _this.finishStreaming();
             }
-            _this.updateLastAiMessage(evt.full);
-            _this.finishStreaming();
-          } else if (evt.type === "error") {
-            _this.replaceLastAiMessage(evt.content || "服务异常，请稍后重试。");
-            _this.finishStreaming();
-          }
-        } catch (e) {}
-      }
+          } catch (e) { console.warn("[ai-chat] parse event error:", e, "dataLine:", dataLine); }
+        }
+      } catch (e) { console.warn("[ai-chat] decode chunk error:", e); }
     });
-  },
-
-  updateLastAiMessage: function(text) {
-    var msgs = this.data.messages;
-    for (var i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].role === "ai") {
-        msgs[i].content = text;
-        msgs[i].isStreaming = true;
-        break;
-      }
-    }
-    this.setData({ messages: msgs, scrollTarget: "bottom" });
-  },
+    },
 
   replaceLastAiMessage: function(text) {
     var msgs = this.data.messages;
@@ -251,18 +311,38 @@ Page({
     this.setData({ messages: msgs, scrollTarget: "bottom" });
   },
 
+  updateLastAiMessage: function(text) {
+    var msgs = this.data.messages;
+    for (var i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === "ai") {
+        // 如果当前内容为空，直接替换；否则追加
+        if (!msgs[i].content) {
+          msgs[i].content = text;
+        } else {
+          msgs[i].content += text;
+        }
+        msgs[i].isStreaming = true;
+        break;
+      }
+    }
+    this.setData({ messages: msgs, scrollTarget: "bottom" });
+  },
+
   finishStreaming: function() {
     streamingReq = null;
     var msgs = this.data.messages;
     for (var i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === "ai") {
         msgs[i].isStreaming = false;
-        if (!msgs[i].content) {
+        // 只有完全没有收到任何数据时才显示"抱歉"
+        if (!msgs[i].content && !hasReceivedChunk) {
           msgs[i].content = "抱歉，暂时无法回答，请稍后再试。";
         }
         break;
       }
     }
+    sseBuffer = "";
+    hasReceivedChunk = false;
     this.setData({ messages: msgs, isStreaming: false, scrollTarget: "bottom" });
   },
 
@@ -281,7 +361,6 @@ Page({
             time: Date.now()
           });
         }
-        // 历史记录追加到欢迎语后面
         var allMsgs = [welcomeMsg].concat(historyMsgs);
         _this.setData({ messages: allMsgs, scrollTarget: "bottom" });
         console.log("[ai-chat] loadHistory: loaded " + res.history.length + " records");
@@ -306,5 +385,5 @@ Page({
       streamingReq = null;
     }
     this.finishStreaming();
-  },
+  }
 });

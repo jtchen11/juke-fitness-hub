@@ -17,12 +17,15 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.StreamingResponseHandler;
 import dev.langchain4j.service.AiServices;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.Response;
+// import okhttp3.Response; (unused - removed to avoid ambiguity with dev.langchain4j.model.output.Response)
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -65,6 +68,8 @@ public class AIController {
 
     @Autowired
     private ChatLanguageModel chatLanguageModel;
+    @Autowired
+    private StreamingChatLanguageModel streamingChatLanguageModel;
 
     @Autowired
     private MongoChatMemoryStore memoryStore;
@@ -107,10 +112,11 @@ public class AIController {
             "2. 风格：专业、简洁、友好，使用中文回复。\n" +
             "3. 回复格式：纯文本，不使用 Markdown（如 # ** - 等符号）、代码块或 JSON。\n" +
             "4. 分点清晰，用数字或中文序号（如 一、二、三 或 1. 2. 3.）。\n" +
-            "5. 约束：禁止编造信息，不知道就说不知道，引导用户联系前台。\n" +
+            "5. 如果用户问的问题超出桔刻健身的知识范围（如通用健身常识、运动营养、训练动作等），你可以用自己的常识进行友好解答，但需注明「以下内容来自通用知识，非本馆内部数据」。如果完全不确定，则引导用户联系前台。\n" +
             "6. 用户的身份信息（会员ID、姓名、等级、剩余课时等）已在每次对话的上下文中提供，请直接使用，不得反问用户「你的会员ID是什么」「你叫什么名字」等身份问题。\n" +
             "7. 工具调用结果已包含完整信息，直接以自然语言回复用户，无需重复呈现原始数据格式。\n" +
-            "8. 用户可以在「我的预约」页面自行取消预约。取消规则：团课需在开课前2小时取消，私教课需提前2小时联系教练或前台。2小时内不可取消。如果用户询问「取消预约」，请引导用户去「我的预约」页面操作，并告知取消时间限制。";
+            "8. 用户可以在「我的预约」页面自行取消预约。取消规则：团课需在开课前2小时取消，私教课需提前2小时联系教练或前台。2小时内不可取消。如果用户询问「取消预约」，请引导用户去「我的预约」页面操作，并告知取消时间限制。\n" +
+            "9. 对于「你好」「嗨」「在吗」「hello」等日常寒暄，请自然友好地回应，并主动介绍自己能提供的帮助（如查询课程、体测建议、预约私教等）。";
     private static final Pattern DATE_PATTERN_CN = Pattern.compile("(\\d{1,2})月(\\d{1,2})(日|号)");
     private static final Pattern DAY_ONLY_PATTERN = Pattern.compile("(\\d{1,2})号");
     private static final Pattern TIME_PATTERN_CN = Pattern.compile("(上午|下午|晚上)?(\\d{1,2})点(\\d{0,2})分?");
@@ -286,26 +292,42 @@ public class AIController {
         String memoryId = getMemoryId(sessionId);
 
         long streamStartTime = System.currentTimeMillis();
-        log.info("流式请求开始: sessionId={}, message={}", sessionId, message);
-
         executor.execute(() -> {
             try {
-                String answer = handleIntent(message, finalMemberId, sessionId, memoryId);
-                // 提取图片 URL
-                String imageUrl = extractImageUrl(answer);
-                saveToMemory(memoryId, message, answer, imageUrl);
+                String answer = handleIntent(message, finalMemberId, sessionId, memoryId, emitter);
+                // answer != null 表示是工具调用结果（非 LLM 流式输出）
+                if (answer != null) {
+                    String imageUrl = extractImageUrl(answer);
+                    saveToMemory(memoryId, message, answer, imageUrl);
 
-                // 直接发送完整回答，避免分块截断
-                Map<String, Object> completeEvent = new HashMap<>();
-                completeEvent.put("type", "complete");
-                completeEvent.put("full", answer);
-                emitter.send(SseEmitter.event()
-                        .data(objectMapper.writeValueAsString(completeEvent))
-                        .name("complete"));
-                emitter.complete();
-                log.info("流式请求结束: sessionId={}, 耗时={}ms",
-                        sessionId, System.currentTimeMillis() - streamStartTime);
+                    // 如果包含 **PAYMENT** 标记，以 complete 事件发送（前端会解析为带按钮的消息）
+                    // 否则仍以 tool_result 事件发送
+                    if (answer.contains("**PAYMENT**") || answer.contains("__EXIT__")) {
+                        Map<String, Object> completeEvent = new HashMap<>();
+                        completeEvent.put("type", "complete");
+                        completeEvent.put("full", answer);
+                        emitter.send(SseEmitter.event()
+                                .name("delta")
+                                .data(objectMapper.writeValueAsString(completeEvent)));
+                        emitter.complete();
+                    } else {
+                        Map<String, Object> toolEvent = new HashMap<>();
+                        toolEvent.put("type", "tool_result");
+                        toolEvent.put("content", answer);
+                        emitter.send(SseEmitter.event()
+                                .name("delta")
+                                .data(objectMapper.writeValueAsString(toolEvent)));
 
+                        Map<String, Object> endEvent = new HashMap<>();
+                        endEvent.put("type", "end");
+                        emitter.send(SseEmitter.event()
+                                .name("end")
+                                .data(objectMapper.writeValueAsString(endEvent)));
+                        emitter.complete();
+                    }
+                    log.info("流式请求结束(工具结果): sessionId={}, 耗时={}ms",
+                            sessionId, System.currentTimeMillis() - streamStartTime);
+                }
             } catch (Exception e) {
                 if (e instanceof org.apache.catalina.connector.ClientAbortException ||
                         e instanceof IOException && e.getMessage() != null &&
@@ -328,17 +350,19 @@ public class AIController {
 
         return emitter;
     }
-
-    // ========== 核心意图处理 ==========
     private String handleIntent(String userMessage, Long memberId, String sessionId, String memoryId) {
+        return handleIntent(userMessage, memberId, sessionId, memoryId, null);
+    }
+    private String handleIntent(String userMessage, Long memberId, String sessionId, String memoryId, SseEmitter emitter) {
+        // ========== 核心意图处理 ==========
         String lowerMsg = userMessage.toLowerCase();
-         if (lowerMsg == null || lowerMsg.trim().isEmpty()) {
+        if (lowerMsg == null || lowerMsg.trim().isEmpty()) {
             log.warn("意图识别: 收到空消息");
             return "请输入有效的问题，例如【今天有什么团课】【我的预约】【推荐教练】等。";
         }
-       log.info("🔍 [意图识别] 原始消息: '{}'", userMessage);
+       log.debug("🔍 [意图识别] 原始消息: '{}'", userMessage);
 
-        log.info("🔍 [意图识别] memberId={}, sessionId={}, lowerMsg={}", memberId, sessionId, lowerMsg);
+        log.debug("🔍 [意图识别] memberId={}, sessionId={}, lowerMsg={}", memberId, sessionId, lowerMsg);
         // ---- 0. 检查待完成预约上下文（优先拦截，避免降级到normalChat）----
         String flowPendKey = "booking_" + (memberId != null ? memberId : "guest");
         String flowPendKey2 = flowPendKey;
@@ -360,6 +384,12 @@ public class AIController {
             log.info("✅ 命中【查询我的私教课】分支");
             return gymTools.queryMyPTBookings(memberId);
         }
+        // ---- 1.3 查询课程包剩余 ----        
+        if (lowerMsg.contains("课程包") && (lowerMsg.contains("还剩") || lowerMsg.contains("剩余") || lowerMsg.contains("几次") || lowerMsg.contains("几节") || lowerMsg.contains("还有"))) {
+            log.info("✅ 命中【查询课程包剩余】分支");
+            return gymTools.getMyPackageInfo(memberId);
+        }
+
         // ---- 1.5 推荐团课（优先于查询我的团课） ----
         if (lowerMsg.contains("推荐") && lowerMsg.contains("团课")) {
             log.info("命中【推荐团课】分支");
@@ -380,7 +410,7 @@ public class AIController {
         }
 
         // ---- 2.7 查询我的课程安排（我+今天/明天/我的+课，排除预约意图） ----
-        if ((lowerMsg.contains("我的") && lowerMsg.contains("课") && !lowerMsg.contains("约")) ||
+        if ((lowerMsg.contains("我的") && lowerMsg.contains("课") && !lowerMsg.contains("约") && !lowerMsg.contains("课程包")) ||
                 (lowerMsg.contains("我") && (lowerMsg.contains("今天") || lowerMsg.contains("明天") || lowerMsg.contains("后天")) && lowerMsg.contains("课") && !lowerMsg.contains("预约") && !lowerMsg.contains("约"))) {
             log.info("命中【查询我的课程安排】分支");
             return gymTools.queryMyClassBookings(memberId);
@@ -566,6 +596,10 @@ public class AIController {
                 // 检查支付方式
                 String payResult1 = processPaymentChoice(userMessage, pending, pendingKey);
                 if (payResult1 != null) {
+                    if (payResult1.equals("__EXIT__")) {
+                        pendingBookings.remove(pendingKey);
+                        return "好的，已取消预约。请问还有其他问题吗？";
+                    }
                     return payResult1;
                 }
                 // 有支付方式，执行预约
@@ -577,6 +611,9 @@ public class AIController {
                     pw1.eq(com.gym.entity.MemberPrivatePackage::getMemberId, pending.memberId)
                        .eq(com.gym.entity.MemberPrivatePackage::getStatus, "active")
                        .gt(com.gym.entity.MemberPrivatePackage::getRemainingSessions, 0)
+                       .and(w -> w.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
+                            .or()
+                            .ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
                        .last("LIMIT 1");
                     try { com.gym.entity.MemberPrivatePackage pkg1 = memberPrivatePackageMapper.selectOne(pw1); if (pkg1 != null) pkgId1 = pkg1.getId(); } catch (Exception e) { log.warn("查询课程包失败", e); }
                 }
@@ -673,6 +710,10 @@ public class AIController {
                 // 检查支付方式
                 String payResult2 = processPaymentChoice(userMessage, pending, pendingKey);
                 if (payResult2 != null) {
+                    if (payResult2.equals("__EXIT__")) {
+                        pendingBookings.remove(pendingKey);
+                        return "好的，已取消预约。请问还有其他问题吗？";
+                    }
                     return payResult2;
                 }
                 boolean useFree2 = "free".equals(pending.paymentMethod);
@@ -683,6 +724,9 @@ public class AIController {
                     pw2.eq(com.gym.entity.MemberPrivatePackage::getMemberId, pending.memberId)
                        .eq(com.gym.entity.MemberPrivatePackage::getStatus, "active")
                        .gt(com.gym.entity.MemberPrivatePackage::getRemainingSessions, 0)
+                       .and(w -> w.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
+                            .or()
+                            .ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
                        .last("LIMIT 1");
                     try { com.gym.entity.MemberPrivatePackage pkg2 = memberPrivatePackageMapper.selectOne(pw2); if (pkg2 != null) pkgId2 = pkg2.getId(); } catch (Exception e) { log.warn("查询课程包失败", e); }
                 }
@@ -701,6 +745,10 @@ public class AIController {
                 // 已收集日期和时间，等待选择支付方式
                 String payResult = processPaymentChoice(userMessage, pending, pendingKey);
                 if (payResult != null) {
+                    if (payResult.equals("__EXIT__")) {
+                        pendingBookings.remove(pendingKey);
+                        return "好的，已取消预约。请问还有其他问题吗？";
+                    }
                     return payResult;
                 }
                 // 支付方式已选择，执行预约
@@ -828,16 +876,24 @@ public class AIController {
 
         // ---- 15. 默认：普通AI对话 ----
         log.info("➡️ 未命中任何专用分支，进入【普通 AI 对话】");
+        if (emitter != null) { streamingNormalChat(sessionId, userMessage, memberId, memoryId, emitter); return null; }
         return normalChat(sessionId, userMessage, memberId, memoryId);
     }
+
 
     // ========== 普通对话（直接使用AI + 工具 + 记忆） ==========
     private String normalChat(String sessionId, String userMessage, Long memberId, String memoryId) {
         try {
             Assistant assistant = getOrCreateAssistant(sessionId, memoryId);
             String userContext = buildUserContext(memberId);
-            // 注入 RAG 知识库上下文
-            String ragContext = knowledgeBase.searchRelevant(userMessage);
+
+            // RAG 检索：仅当与健身相关时才检索
+            String ragContext = null;
+            if (isFitnessRelated(userMessage)) {
+                ragContext = knowledgeBase.searchRelevant(userMessage);
+            } else {
+                log.info("normalChat: 非健身问题，跳过 RAG 检索");
+            }
 
             // 注入动态数据（教练信息、课程介绍）
             String dynContext = buildDynamicContext(userMessage);
@@ -851,15 +907,19 @@ public class AIController {
             }
             promptBuilder.append("\n\n用户提问：").append(userMessage);
             String finalPrompt = promptBuilder.toString();
-            log.debug("normalChat finalPrompt={}", finalPrompt);
+            log.debug("normalChat finalPrompt(前500字): {}",
+                    finalPrompt.length() > 500 ? finalPrompt.substring(0, 500) + "..." : finalPrompt);
             log.info("normalChat: memberId={}, promptLen={}", memberId, finalPrompt.length());
             String answer = CompletableFuture.supplyAsync(() ->
                     assistant.chat(finalPrompt),
                     CompletableFuture.delayedExecutor(0, TimeUnit.SECONDS)
             ).get(60, TimeUnit.SECONDS);
             if (answer == null || answer.trim().isEmpty()) {
+                log.warn("normalChat: AI 返回内容为空, answer={}", answer);
                 return getFallbackResponse(userMessage);
             }
+            log.info("normalChat response(前300字): {}",
+                    answer.length() > 300 ? answer.substring(0, 300) + "..." : answer);
             return answer;
         } catch (java.util.concurrent.TimeoutException e) {
             log.error("AI 模型调用超时(60s)", e);
@@ -881,6 +941,115 @@ public class AIController {
                     "如有紧急需求，请直接联系前台。";
         }
         return "🤖 您好！我是智能健身助手，很高兴为您服务。您可以直接问我关于课程预约、体测建议、训练计划、团课查询等问题。如有紧急需求，也可以联系前台人工服务。";
+    }
+
+    // ========== 流式普通对话（逐 Token 推送） ==========
+    private void streamingNormalChat(String sessionId, String userMessage, Long memberId, String memoryId, SseEmitter emitter) {
+        try {
+            String userContext = buildUserContext(memberId);
+
+            // RAG 检索：仅当与健身相关时才检索
+            String ragContext = null;
+            if (isFitnessRelated(userMessage)) {
+                ragContext = knowledgeBase.searchRelevant(userMessage);
+            } else {
+                log.info("streamingNormalChat: 非健身问题，跳过 RAG 检索");
+            }
+
+            String dynContext = buildDynamicContext(userMessage);
+
+            StringBuilder promptBuilder = new StringBuilder(userContext);
+            if (ragContext != null && ragContext.startsWith("【健身知识库检索结果】")) {
+                promptBuilder.append("\n\n参考知识库信息：\n").append(ragContext);
+            }
+            if (!dynContext.isEmpty()) {
+                promptBuilder.append("\n\n").append(dynContext);
+            }
+            promptBuilder.append("\n\n用户提问：").append(userMessage);
+            String finalPrompt = promptBuilder.toString();
+
+            log.debug("streamingNormalChat finalPrompt(前500字): {}",
+                    finalPrompt.length() > 500 ? finalPrompt.substring(0, 500) + "..." : finalPrompt);
+            log.info("streamingNormalChat: memberId={}, promptLen={}", memberId, finalPrompt.length());
+
+            // 从记忆加载历史消息
+            List<ChatMessage> messages = new ArrayList<>();
+            messages.add(new SystemMessage(SYSTEM_PROMPT));
+            List<ChatMessage> history = memoryStore.getMessages(memoryId);
+            if (history != null) {
+                messages.addAll(history);
+            }
+            messages.add(new UserMessage(finalPrompt));
+
+            StringBuilder fullAnswer = new StringBuilder();
+
+            streamingChatLanguageModel.generate(messages, new StreamingResponseHandler<dev.langchain4j.data.message.AiMessage>() {
+                @Override
+                public void onNext(String token) {
+                    try {
+                        fullAnswer.append(token);
+                        emitter.send(SseEmitter.event()
+                                .name("delta")
+                                .data(Map.of("type", "delta", "content", token)));
+                    } catch (IOException e) {
+                        throw new RuntimeException("SSE send failed", e);
+                    }
+                }
+
+                @Override
+                public void onComplete(Response<dev.langchain4j.data.message.AiMessage> response) {
+                    try {
+                        String answer = fullAnswer.toString();
+
+                        // 空响应兜底：推一条降级消息
+                        if (answer == null || answer.trim().isEmpty()) {
+                            dev.langchain4j.data.message.AiMessage aiMsg = response != null ? response.content() : null;
+                            log.warn("streamingNormalChat onComplete: fullAnswer 为空, AiMessage={}",
+                                    aiMsg != null ? aiMsg.text() : "null");
+                            answer = "抱歉，暂时无法回答，请稍后重试或联系前台。";
+                            emitter.send(SseEmitter.event()
+                                    .name("delta")
+                                    .data(Map.of("type", "delta", "content", answer)));
+                        } else {
+                            log.debug("streamingNormalChat onComplete fullAnswer(前300字): {}",
+                                    answer.length() > 300 ? answer.substring(0, 300) + "..." : answer);
+                        }
+
+                        String imageUrl = extractImageUrl(answer);
+                        saveToMemory(memoryId, userMessage, answer, imageUrl);
+
+                        emitter.send(SseEmitter.event()
+                                .name("end")
+                                .data(Map.of("type", "end")));
+                        emitter.complete();
+                        log.info("streamingNormalChat 完成: sessionId={}", sessionId);
+                    } catch (IOException e) {
+                        log.error("streamingNormalChat onComplete send failed", e);
+                    }
+                }
+
+                @Override
+                public void onError(Throwable error) {
+                    try {
+                        log.error("streamingNormalChat 模型异常", error);
+                        emitter.send(SseEmitter.event()
+                                .name("error")
+                                .data(Map.of("type", "error", "content", "模型响应异常：" + error.getMessage())));
+                    } catch (IOException e) {
+                        log.error("streamingNormalChat onError send failed", e);
+                    }
+                    emitter.completeWithError(error);
+                }
+            });
+        } catch (Exception e) {
+            log.error("streamingNormalChat 初始化失败", e);
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(Map.of("type", "error", "content", "流式对话初始化失败：" + e.getMessage())));
+            } catch (IOException ex) { }
+            emitter.completeWithError(e);
+        }
     }
 
     // ========== 获取或创建 Assistant（注入工具和记忆） ==========
@@ -965,11 +1134,33 @@ public class AIController {
     private String processPaymentChoice(String userMessage, PendingBooking pending, String pendingKey) {
         if (pending.paymentMethod != null) return null;
         String lower = userMessage.toLowerCase().trim();
+
+        // 检测退出意图：用户明确表示不要了，清除支付上下文
+        if (lower.contains("不要了") || lower.contains("算了") || lower.contains("不约了") || lower.equals("不")) {
+            pendingBookings.remove(pendingKey);
+            log.info("[支付退出] 用户取消了支付选择，清除上下文: key={}", pendingKey);
+            return "__EXIT__";
+        }
+
         if (lower.equals("1") || lower.contains("免费")) { pending.paymentMethod = "free"; pendingBookings.put(pendingKey, pending); return null; }
         if (lower.equals("2") || lower.contains("课程包")) { pending.paymentMethod = "package"; pendingBookings.put(pendingKey, pending); return null; }
         if (lower.equals("3") || lower.contains("单次")) { pending.paymentMethod = "pay"; pendingBookings.put(pendingKey, pending); return null; }
         // 没有识别到支付方式，查询可用选项
         try {
+            // ====== 诊断：打印会员课程包原始数据 ======
+            if (pending.memberId != null && pending.memberId > 0) {
+                com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.gym.entity.MemberPrivatePackage> diagWrapper =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+                diagWrapper.eq(com.gym.entity.MemberPrivatePackage::getMemberId, pending.memberId);
+                java.util.List<com.gym.entity.MemberPrivatePackage> allPkgs = memberPrivatePackageMapper.selectList(diagWrapper);
+                log.info("[支付诊断] 会员{}的课程包原始数据（共{}条）:", pending.memberId, allPkgs != null ? allPkgs.size() : 0);
+                if (allPkgs != null) {
+                    for (com.gym.entity.MemberPrivatePackage p : allPkgs) {
+                        log.info("[支付诊断]   id={}, packageName={}, total={}, used={}, remaining={}, status={}, endDate={}",
+                            p.getId(), p.getPackageName(), p.getTotalSessions(), p.getUsedSessions(), p.getRemainingSessions(), p.getStatus(), p.getEndDate());
+                    }
+                }
+            }
             StringBuilder sb = new StringBuilder();
             sb.append("请选择支付方式：\n\n---\n**PAYMENT**\n");
             if (pending.memberId != null && pending.memberId > 0) {
@@ -988,6 +1179,9 @@ public class AIController {
                 pw.eq(com.gym.entity.MemberPrivatePackage::getMemberId, pending.memberId)
                    .eq(com.gym.entity.MemberPrivatePackage::getStatus, "active")
                    .gt(com.gym.entity.MemberPrivatePackage::getRemainingSessions, 0)
+                   .and(w -> w.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
+                        .or()
+                        .ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
                    .last("LIMIT 3");
                 java.util.List<com.gym.entity.MemberPrivatePackage> pkgs = memberPrivatePackageMapper.selectList(pw);
                 if (pkgs != null) {
@@ -1105,6 +1299,11 @@ public class AIController {
         // 检查支付方式
         String payResult = processPaymentChoice(userMessage, pending, pendingKey);
         if (payResult != null) {
+            if (payResult.equals("__EXIT__")) {
+                pendingBookings.remove(pendingKey);
+                log.info("[预约流程] 用户取消预约");
+                return "好的，已取消预约。请问还有其他问题吗？";
+            }
             log.info("[预约流程] 需要用户选择支付方式");
             return payResult;
         }
@@ -1120,6 +1319,9 @@ public class AIController {
             pw.eq(MemberPrivatePackage::getMemberId, pending.memberId)
                .eq(MemberPrivatePackage::getStatus, "active")
                .gt(MemberPrivatePackage::getRemainingSessions, 0)
+               .and(w -> w.isNull(MemberPrivatePackage::getEndDate)
+                    .or()
+                    .ge(MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
                .last("LIMIT 1");
             try {
                 MemberPrivatePackage pkg = memberPrivatePackageMapper.selectOne(pw);
@@ -1541,6 +1743,24 @@ public class AIController {
 private String nullToEmpty(Object obj) {
         return obj == null ? "" : obj.toString();
     }
+    // ====== 判断是否与健身相关，跳过 RAG ======
+    private boolean isFitnessRelated(String message) {
+        if (message == null || message.trim().isEmpty()) return true;
+        String lower = message.toLowerCase();
+        String[] keywords = {
+            "健身", "运动", "课程", "团课", "私教", "教练", "体测", "预约",
+            "深蹲", "卧推", "硬拉", "跑步", "有氧", "力量", "减脂", "增肌",
+            "瑜伽", "普拉提", "搏击", "动感单车", "杠铃", "饮食", "营养",
+            "蛋白", "卡路里", "热量", "训练", "拉伸", "热身", "肌肉",
+            "会员", "课时", "套餐", "积分", "签到", "打卡", "器械",
+            "你好", "嗨", "hello", "hi", "在吗", "help"
+        };
+        for (String kw : keywords) {
+            if (lower.contains(kw)) return true;
+        }
+        return false;
+    }
+
 
     private String extractTrainerName(String userMessage) {
         Pattern p = Pattern.compile("([\\u4e00-\\u9fa5]{2,})教练");
