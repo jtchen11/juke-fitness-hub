@@ -56,10 +56,14 @@ public class GymTools {
 
     @Tool("查询指定时间范围内的可预约团课课程列表，参数：开始时间(yyyy-MM-dd HH:mm:ss)，结束时间(yyyy-MM-dd HH:mm:ss)")
     public String queryAvailableClasses(String startTime, String endTime) {
+        return queryAvailableClasses(startTime, endTime, null);
+    }
+
+    public String queryAvailableClasses(String startTime, String endTime, String type) {
         try {
             LocalDateTime start = LocalDateTime.parse(startTime, FORMATTER);
             LocalDateTime end = LocalDateTime.parse(endTime, FORMATTER);
-            List<GroupClass> classes = groupClassService.getAvailableClasses(start, end);
+            List<GroupClass> classes = groupClassService.getAvailableClasses(start, end, type);
 
             if (classes.isEmpty()) {
                 return "【最终回答】在 " + startTime + " 到 " + endTime + " 范围内没有可预约的团课。建议扩大时间范围或选择其他日期。无需继续调用工具。";
