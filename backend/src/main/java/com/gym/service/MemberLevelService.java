@@ -23,19 +23,14 @@ public class MemberLevelService {
     }
 
     /**
-     * 检查会员是否可预约课程（铂金可超额预约）
-     * @param memberId 会员ID
-     * @param currentEnrolled 当前已预约人数
-     * @param maxCapacity 最大容量
-     * @return 是否可以预约
+     * 检查会员是否可预约课程（纯容量检查，铂金超额在 bookClass 内单独处理）
      */
     public boolean canBookClass(Long memberId, int currentEnrolled, int maxCapacity) {
         Member member = memberMapper.selectById(memberId);
         if (member == null) return false;
-        MemberLevel level = MemberLevel.fromDisplayName(member.getLevel());
-        // 铂金会员可额外多预约2个名额（即满员也可预约）
-        int effectiveMax = maxCapacity + (level.getPriority() >= 2 ? 2 : 0);
-        return currentEnrolled < effectiveMax;
+        // 纯容量检查：仅当 enrolled < maxCapacity 才返回 true
+        // 铂金会员超额预约资格在 GroupClassService.bookClass 中单独判断
+        return currentEnrolled < maxCapacity;
     }
 
     /**

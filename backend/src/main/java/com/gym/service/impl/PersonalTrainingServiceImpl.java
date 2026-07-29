@@ -37,6 +37,10 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
         // 1. 校验会员
         Member member = memberMapper.selectById(memberId);
         if (member == null) return "会员不存在";
+        // P0-1: 访客无法预约私教
+        if (member.isVisitor()) {
+            return "访客无法预约私教课，请注册会员后再预约";
+        }
 
         // 2. 校验教练
         Trainer trainer = trainerMapper.selectById(trainerId);
@@ -88,9 +92,25 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
             if (!pkg.getMemberId().equals(memberId)) return "无权使用该课程包";
             if (pkg.getRemainingSessions() <= 0) return "课程包已用完";
             if (pkg.getEndDate() != null && pkg.getEndDate().isBefore(LocalDate.now())) {
-                return "课程包已过期";
+                // Issue 3: 尝试自动查找另一个有效课程包
+                com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MemberPrivatePackage> fbw =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+                fbw.eq(MemberPrivatePackage::getMemberId, memberId)
+                   .eq(MemberPrivatePackage::getStatus, "active")
+                   .gt(MemberPrivatePackage::getRemainingSessions, 0)
+                   .and(w -> w.isNull(MemberPrivatePackage::getEndDate)
+                        .or()
+                        .ge(MemberPrivatePackage::getEndDate, LocalDate.now()))
+                   .last("LIMIT 1");
+                MemberPrivatePackage fbPkg = packageMapper.selectOne(fbw);
+                if (fbPkg != null) {
+                    pkg = fbPkg;
+                    packageId = pkg.getId();
+                    // log removed (no @Slf4j in this class)
+                } else {
+                    return "课程包已过期，且没有其他可用的课程包";
+                }
             }
-            // 扣减课程包
             pkg.setUsedSessions(pkg.getUsedSessions() + 1);
             pkg.setRemainingSessions(pkg.getRemainingSessions() - 1);
             packageMapper.updateById(pkg);
@@ -99,7 +119,6 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
             pt.setPackageName(pkg.getPackageName());
             pt.setIsFree(false);
         } else if (useFree) {
-            // 使用免费次数
             MemberLevel level = MemberLevel.fromDisplayName(member.getLevel());
             int maxFree = level.getFreePersonalTrainingsPerMonth();
             if (maxFree <= 0) return "当前等级无免费私教权益";
@@ -122,16 +141,34 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
             pt.setPackageId(null);
             pt.setPackageName(null);
         } else {
-            // ====== 单次付费（新增支持） ======
             pt.setIsFree(false);
             pt.setPackageId(null);
             pt.setPackageName(null);
             pt.setNotes("单次付费预约");
-            // 这里可以扩展为生成支付记录，演示版本直接通过
         }
 
         // 7. 保存预约记录
         ptMapper.insert(pt);
+        // P1-6: 单次付费返回折扣明细
+        if (packageId == null && !useFree) {
+            java.math.BigDecimal price = java.math.BigDecimal.valueOf(300);
+            if (trainer.getPricePerHour() != null) {
+                price = trainer.getPricePerHour();
+            }
+            String levelName = member.getLevel();
+            java.math.BigDecimal discounted = price;
+            String discountInfo = "";
+            if (levelName != null && !"访客".equals(levelName)) {
+                com.gym.enums.MemberLevel ml = com.gym.enums.MemberLevel.fromDisplayName(levelName);
+                int discountPct = ml.getDiscountPercent();
+                if (discountPct > 0) {
+                    discounted = price.multiply(java.math.BigDecimal.valueOf(100 - discountPct))
+                        .divide(java.math.BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                    discountInfo = "\n" + levelName + "折扣：-￥" + price.subtract(discounted) + "（" + discountPct + "%）";
+                }
+            }
+            return "私教预约成功！\n课程：私教课（" + trainer.getName() + "）\n原价：￥" + price + discountInfo + "\n实付金额：￥" + discounted;
+        }
         return "私教预约成功！";
     }
 }

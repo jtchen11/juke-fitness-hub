@@ -100,8 +100,12 @@ public class AIController {
 
     // ====== 多轮预约上下文 ======
     private final ConcurrentHashMap<String, PendingBooking> pendingBookings = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, PendingBooking> pendingGroupBookings = new ConcurrentHashMap<>();
     // ====== ????????????"?/?"??? ======
     private final ConcurrentHashMap<String, String> lastMentionedCoaches = new ConcurrentHashMap<>();
+    // ====== 团课查询列表缓存（用于代词解析）======
+    private final ConcurrentHashMap<String, java.util.List<com.gym.entity.GroupClass>> lastGroupClassListCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> lastGroupClassListTime = new ConcurrentHashMap<>();
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter DATE_FORMATTER2 = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -302,7 +306,7 @@ public class AIController {
 
                     // 如果包含 **PAYMENT** 标记，以 complete 事件发送（前端会解析为带按钮的消息）
                     // 否则仍以 tool_result 事件发送
-                    if (answer.contains("**PAYMENT**") || answer.contains("__EXIT__")) {
+                    if (answer.contains("**PAYMENT**") || answer.contains("**PAYMENT_GROUP**") || answer.contains("__EXIT__")) {
                         Map<String, Object> completeEvent = new HashMap<>();
                         completeEvent.put("type", "complete");
                         completeEvent.put("full", answer);
@@ -393,7 +397,7 @@ public class AIController {
         // ---- 1.5 推荐团课（优先于查询我的团课） ----
         if (lowerMsg.contains("推荐") && lowerMsg.contains("团课")) {
             log.info("命中【推荐团课】分支");
-            return handleQueryClasses(userMessage);
+            return handleQueryClasses(userMessage, memberId);
         }
 
         // ---- 2. 查询我的团课记录（精确匹配） ----
@@ -479,13 +483,14 @@ public class AIController {
             return "请问您想预约哪位教练？请提供教练姓名，例如「我要预约李教练」。";
         }
 
-        // ---- 5. 预约团课 ----
-        if ((lowerMsg.contains("约") || lowerMsg.contains("预约") || lowerMsg.contains("报名"))
+        // ---- 5. 预约团课（含多轮对话上下文）----
+        if ((lowerMsg.contains("约") || lowerMsg.contains("预约") || lowerMsg.contains("报名") || lowerMsg.contains("订"))
                 && !lowerMsg.contains("私教") && !lowerMsg.contains("教练")
-                && !lowerMsg.contains("体测") && !lowerMsg.contains("比赛") && !lowerMsg.contains("约课") && !lowerMsg.contains("约一下") && !lowerMsg.contains("想约") && !lowerMsg.contains("要约")) {
+                && !lowerMsg.contains("体测") && !lowerMsg.contains("比赛") && !(lowerMsg.contains("体验课") && (lowerMsg.contains("什么") || lowerMsg.contains("哪些") || lowerMsg.contains("有没有"))) && !lowerMsg.contains("约课") && !lowerMsg.contains("约一下") && !lowerMsg.contains("想约") && !lowerMsg.contains("要约")) {
             log.info("✅ 命中【预约团课】分支");
             String result = handleBookGroupClass(userMessage, memberId);
-            if (!result.equals("请告诉我您想预约哪门团课，例如「帮我预约动感单车」")) {
+            if (result != null && !result.isEmpty()
+                    && !result.equals("请告诉我您想预约哪门团课，例如「帮我预约动感单车」")) {
                 return result;
             }
             log.warn("预约团课解析失败，继续执行后续分支");
@@ -519,10 +524,11 @@ public class AIController {
 
         // ---- 9. 团课查询（查询所有可预约团课） ----
         if (lowerMsg.contains("团课") || lowerMsg.contains("课表") || lowerMsg.contains("什么课") ||
-                lowerMsg.contains("能报名") || lowerMsg.contains("可预约") ||
+                lowerMsg.contains("能报名") || lowerMsg.contains("可预约") || lowerMsg.contains("可以预约") ||
+                lowerMsg.contains("体验课") || lowerMsg.contains("公益课") ||
                 (lowerMsg.contains("团") && lowerMsg.contains("课"))) {
             log.info("✅ 命中【团课查询】分支");
-            return handleQueryClasses(userMessage);
+            return handleQueryClasses(userMessage, memberId);
         }
 
         // ---- 9.5 查询会员信息 / 过期时间 ----
@@ -567,6 +573,13 @@ public class AIController {
 // ---- 14.5 检查是否有待完成的预约上下文 ----
         String pendingKey = "booking_" + (memberId != null ? memberId : "guest");
         PendingBooking pending = pendingBookings.get(pendingKey);
+        // P0-4: 如果输入是纯数字且存在团课预约上下文，跳过私教预约上下文，让团课序号选择处理
+        String groupPendKey14 = "group_" + (memberId != null ? memberId : "guest");
+        PendingBooking groupPend14 = pendingGroupBookings.get(groupPendKey14);
+        if (pending != null && groupPend14 != null && userMessage.trim().matches("\\d+")) {
+            log.info("[私教上下文] 输入为纯数字，且存在团课上下文，跳过私教上下文处理");
+            pending = null;
+        }
         if (pending != null) {
             log.info("命中【待完成预约上下文】pendingKey={}, hasDate={}, dateStr={}, hasTime={}", 
                      pendingKey, pending.hasDate, pending.dateStr, pending.hasTime);
@@ -614,20 +627,25 @@ public class AIController {
                        .and(w -> w.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
                             .or()
                             .ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
-                       .last("LIMIT 1");
+                       .orderByDesc(com.gym.entity.MemberPrivatePackage::getEndDate).last("LIMIT 1");
                     try { com.gym.entity.MemberPrivatePackage pkg1 = memberPrivatePackageMapper.selectOne(pw1); if (pkg1 != null) pkgId1 = pkg1.getId(); } catch (Exception e) { log.warn("查询课程包失败", e); }
                 }
                 String result1 = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId1, useFree1);
                 pendingBookings.remove(pendingKey);
-                if (result1.startsWith("私教预约成功")) {
-                    String label1 = "单次付费";
-                    if (useFree1) label1 = "免费私教课";
-                    else if (pkgId1 != null) label1 = "课程包扣费";
+            if (result1.startsWith("私教预约成功")) {
+                String label1 = "单次付费";
+                if (useFree1) label1 = "免费私教课";
+                else if (pkgId1 != null) label1 = "课程包扣费";
+                // Issue 2: 使用实际返回结果
+                if (result1.contains("原价")) {
+                    return result1 + "\n支付方式：" + label1;
+                } else {
                     return "预约成功！已为您预约 " + pending.trainerName + " 的课程，时间：" +
                             apptTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n支付方式：" + label1;
-                } else {
-                    return result1;
                 }
+            } else {
+                return result1;
+            }
             } else if (!pending.hasDate && dateStr != null) {
                 // 校验日期是否过期
                 String pastMsg = validateDateNotPast(dateStr);
@@ -793,7 +811,7 @@ public class AIController {
                     pw.eq(MemberPrivatePackage::getMemberId, pending.memberId)
                        .eq(MemberPrivatePackage::getStatus, "active")
                        .gt(MemberPrivatePackage::getRemainingSessions, 0)
-                       .last("LIMIT 1");
+                       .orderByDesc(MemberPrivatePackage::getEndDate).last("LIMIT 1");
                     try {
                         MemberPrivatePackage pkg = memberPrivatePackageMapper.selectOne(pw);
                         if (pkg != null) pkgId = pkg.getId();
@@ -803,32 +821,20 @@ public class AIController {
                 }
                 String result = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId, useFree);
                 pendingBookings.remove(pendingKey);
-                if (result.startsWith("私教预约成功")) {
-                    String label = "单次付费";
-                    if (useFree) label = "免费私教课";
-                    else if (pkgId != null) label = "课程包扣费";
-                    return "预约成功！已为您预约 " + pending.trainerName + " 的课程，时间：" +
-                            apptTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n支付方式：" + label;
-                } else {
-                    return result;
-                }
+        if (result.startsWith("私教预约成功")) {
+            String label = "单次付费";
+            if (useFree) label = "免费私教课";
+            else if (pkgId != null) label = "课程包扣费";
+            // Issue 2: 使用实际返回结果（含折扣明细）
+            if (result.contains("原价")) {
+                return result + "\n支付方式：" + label;
             } else {
-                // 无法解析任何有效信息
-                pending.retryCount++;
-                if (pending.retryCount >= 2) {
-                    pendingBookings.remove(pendingKey);
-                    log.info("[预约上下文] 连续{}次解析失败，清除上下文", pending.retryCount);
-                    return "未能识别您的预约信息，请重新发起预约。例如：【帮我约李教练明天下午2点】";
-                }
-                pendingBookings.put(pendingKey, pending);
-                log.info("[预约上下文] 第{}次解析失败，继续等待", pending.retryCount);
-                String hint = "";
-                if (!pending.hasDate) {
-                    hint = "请提供日期，例如【明天】或【6月30日】";
-                } else if (!pending.hasTime) {
-                    hint = "请提供时间，例如【下午2点】或【14:00】";
-                }
-                return "未能识别您的输入，请重新输入。" + hint;
+                return "预约成功！已为您预约 " + pending.trainerName + " 的课程，时间：" +
+                        apptTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n支付方式：" + label;
+            }
+        } else {
+                return result;
+            }
             }
         }
 
@@ -872,6 +878,90 @@ public class AIController {
                 return "根据您的要求，生成了以下健身动作示意图：\n" + imageUrl;
             }
             log.warn("图片生成失败，降级到普通对话");
+        }
+
+        // ---- 14.6 团课预约选择（用户从列表中选择）----
+        String groupPendKey = "group_" + (memberId != null ? memberId : "guest");
+        PendingBooking groupPend = pendingGroupBookings.get(groupPendKey);
+        if (groupPend != null && "GROUP".equals(groupPend.intentType)) {
+            log.info("命中【团课预约上下文】course={}, 待选择课程列表", groupPend.courseName);
+
+            // 解析用户选择的序号
+            String input = userMessage.trim();
+            int selectedIdx = -1;
+            try {
+                selectedIdx = Integer.parseInt(input) - 1;  // 用户从1开始数
+            } catch (NumberFormatException e) {
+                // 不是纯数字，尝试从日期/时间匹配课程
+                String inputDate = parseDate(userMessage);
+                String inputTime = parseTime(userMessage);
+                if (inputDate != null && groupPend.dateStr != null) {
+                    String[] options = groupPend.dateStr.split(",");
+                    for (int i = 0; i < options.length; i++) {
+                        String[] parts = options[i].split("\\|");
+                        if (parts.length >= 3 && parts[2].contains(inputDate)) {
+                            selectedIdx = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (selectedIdx >= 0 && groupPend.dateStr != null) {
+                String[] options = groupPend.dateStr.split(",");
+                if (selectedIdx < options.length) {
+                    String[] parts = options[selectedIdx].split("\\|");
+                    if (parts.length >= 1) {
+                        try {
+                            Long classId = Long.parseLong(parts[0]);
+                            pendingGroupBookings.remove(groupPendKey);
+                            // 查询课程类型，决定是否弹支付
+                            GroupClass gcSel = groupClassMapper.selectById(classId);
+                            if (gcSel != null && "paid".equals(gcSel.getType()) && gcSel.getPrice() != null && gcSel.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                                pendingGroupBookings.remove(groupPendKey);
+                                return prepareGroupPayment(gcSel, memberId);
+                            }
+                            String result = gymTools.bookGroupClass(memberId, classId);
+                            log.info("[团课预约] 选择序号{}，预约结果: {}", selectedIdx + 1, result);
+                            return result;
+                        } catch (NumberFormatException ex) {
+                            log.warn("课程ID解析失败: {}", parts[0]);
+                        }
+                    }
+                }
+            }
+
+            // 无法识别选择
+            if (groupPend.retryCount >= 2) {
+                pendingGroupBookings.remove(groupPendKey);
+                return "未能识别您的选择，请重新发起预约。";
+                }
+            groupPend.retryCount++;
+            pendingGroupBookings.put(groupPendKey, groupPend);
+            return "请回复课程对应的序号（如回复 1、2）来选择您想预约的课程。";
+        }
+
+        // ---- 14.7 团课支付确认 ----
+        String payKey = "payment_" + (memberId != null ? memberId : "guest");
+        PendingBooking payPend = pendingGroupBookings.get(payKey);
+        if (payPend != null && "GROUP_PAYMENT".equals(payPend.intentType)) {
+            log.info("命中【团课支付确认】course={}", payPend.courseName);
+            String input = userMessage.trim().toLowerCase();
+            if (input.equals("confirm") || input.contains("确认") || input.equals("1") || input.contains("支付")) {
+                pendingGroupBookings.remove(payKey);
+                if (payPend.groupClassId != null) {
+                    String result = gymTools.bookGroupClass(memberId, payPend.groupClassId);
+                    log.info("[团课支付] 支付成功，预约结果: {}", result);
+                    return result;
+                } else {
+                    return "预约失败：未找到课程信息，请重新发起预约。";
+                }
+            } else if (input.contains("不") || input.contains("取消") || input.contains("算了") || input.contains("不要")) {
+                pendingGroupBookings.remove(payKey);
+                return "已取消支付，预约未完成。如有需要请重新预约。";
+            } else {
+                return "请点击「确认支付」完成预约，或回复「取消」放弃预约。";
+            }
         }
 
         // ---- 15. 默认：普通AI对话 ----
@@ -1182,7 +1272,7 @@ public class AIController {
                    .and(w -> w.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
                         .or()
                         .ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
-                   .last("LIMIT 3");
+                   .orderByDesc(com.gym.entity.MemberPrivatePackage::getEndDate).last("LIMIT 3");
                 java.util.List<com.gym.entity.MemberPrivatePackage> pkgs = memberPrivatePackageMapper.selectList(pw);
                 if (pkgs != null) {
                     for (com.gym.entity.MemberPrivatePackage p : pkgs) {
@@ -1560,9 +1650,23 @@ public class AIController {
                 (lowerMsg.contains("一周") && (lowerMsg.contains("吃") || lowerMsg.contains("食谱")));
     }
 
-    private String handleQueryClasses(String userMessage) {
+    private String handleQueryClasses(String userMessage, Long memberId) {
         String targetDateStr = parseDate(userMessage);
         LocalDateTime start, end;
+        String typeFilter = null;
+        Boolean allowVisitorFilter = null;
+
+        // 检测是否查询体验课（访客可见的课程）
+        if (userMessage.contains("体验课") || userMessage.contains("体验")) {
+            allowVisitorFilter = true;
+            log.info("[团课查询] 筛选体验课 allow_visitor=1");
+        }
+
+        // 检测是否查询免费/公益团课
+        if (userMessage.contains("免费") || userMessage.contains("公益")) {
+            typeFilter = "free";
+            log.info("[团课查询] 筛选类型: free");
+        }
 
         if (targetDateStr != null) {
             LocalDate targetDate = LocalDate.parse(targetDateStr);
@@ -1573,10 +1677,38 @@ public class AIController {
             end = start.plusDays(7).withHour(22).withMinute(0).withSecond(0);
         }
 
-        String startStr = start.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));  // 按日期严格过滤
+        String startStr = start.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String endStr = end.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
-        String result = gymTools.queryAvailableClasses(startStr, endStr);
+        String result = gymTools.queryAvailableClasses(startStr, endStr, typeFilter, allowVisitorFilter);
+        // 存储本次查询结果到缓存（用于代词解析）
+        String cacheKey = "lastGC_" + (memberId != null ? memberId : "guest");
+        try {
+            // 根据同样的条件从数据库查询课程列表
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.gym.entity.GroupClass> qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            qw.ge(com.gym.entity.GroupClass::getStartTime, start)
+               .le(com.gym.entity.GroupClass::getStartTime, end)
+               .eq(com.gym.entity.GroupClass::getStatus, "scheduled")
+               .orderByAsc(com.gym.entity.GroupClass::getStartTime);
+            if (typeFilter != null) {
+                qw.eq(com.gym.entity.GroupClass::getType, typeFilter);
+            }
+            if (allowVisitorFilter != null && allowVisitorFilter) {
+                qw.eq(com.gym.entity.GroupClass::getAllowVisitor, 1);
+            }
+            java.util.List<com.gym.entity.GroupClass> cachedList = groupClassMapper.selectList(qw);
+            setCachedGroupClassList(cacheKey, cachedList);
+            // 如果是体验课查询，结果中标注"体验课"
+            if (allowVisitorFilter != null && allowVisitorFilter && !result.contains("体验课")) {
+                result = result.replace("可预约团课", "可预约体验课（访客可约）");
+                result = result.replace("没有可预约的团课", "没有可预约的体验课（访客可约）");
+            }
+        } catch (Exception e) {
+            log.warn("存储团课列表缓存失败", e);
+        }
+
+
+
 
         Pattern countPattern = Pattern.compile("推荐\\s*(\\d+)\\s*个");
         Matcher countMatcher = countPattern.matcher(userMessage);
@@ -1771,59 +1903,281 @@ private String nullToEmpty(Object obj) {
         Pattern trainerP = getTrainerNamePattern();
         Matcher tm = trainerP.matcher(userMessage);
         if (tm.find()) {
-            return tm.group(0);
+            return tm.group(1);
         }
         return null;
     }
 
+    // ====== 团课支付准备（返回支付确认信息，不直接预约） ======
+    private String prepareGroupPayment(GroupClass gc, Long memberId) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("课程名称：").append(gc.getName() != null ? gc.getName() : "团课").append("\n");
+            sb.append("原价：¥").append(gc.getPrice() != null ? gc.getPrice() : java.math.BigDecimal.ZERO).append("\n");
+
+            java.math.BigDecimal finalPrice = gc.getPrice() != null ? gc.getPrice() : java.math.BigDecimal.ZERO;
+            if (memberId != null && memberId > 0) {
+                Member m = memberMapper.selectById(memberId);
+                if (m != null && !m.isVisitor() && m.getLevel() != null) {
+                    try {
+                        java.math.BigDecimal discounted;
+                            String __level = m.getLevel();
+                            java.math.BigDecimal __discounted = gc.getPrice();
+                            if (__level != null) {
+                                if (__level.contains("铂金")) {
+                                    __discounted = gc.getPrice().multiply(new java.math.BigDecimal("0.8"));
+                                } else if (__level.contains("黄金")) {
+                                    __discounted = gc.getPrice().multiply(new java.math.BigDecimal("0.9"));
+                                }
+                            }
+                            discounted = __discounted;
+                        java.math.BigDecimal saved = gc.getPrice().subtract(discounted);
+                        if (saved.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                            sb.append(m.getLevel()).append("折扣：-¥").append(saved.setScale(2, java.math.RoundingMode.HALF_UP)).append("\n");
+                            finalPrice = discounted;
+                        }
+                    } catch (Exception e) {
+                        log.warn("计算折扣失败", e);
+                    }
+                }
+            }
+            sb.append("实付金额：¥").append(finalPrice.setScale(2, java.math.RoundingMode.HALF_UP)).append("\n");
+            sb.append("\n---\n**PAYMENT_GROUP**\nconfirm\n");
+
+            // 保存到待支付上下文
+            String groupKey = "payment_" + (memberId != null ? memberId : "guest");
+            String userType = "member";
+            if (memberId != null && memberId > 0) {
+                Member m = memberMapper.selectById(memberId);
+                if (m != null && m.isVisitor()) userType = "visitor";
+            }
+            PendingBooking pp = new PendingBooking(memberId, gc.getName(), gc.getId(), true, true, 
+                java.time.LocalDate.now().toString(), userType);
+            pp.intentType = "GROUP_PAYMENT";
+            pp.paymentMethod = null;
+            pendingGroupBookings.put(groupKey, pp);
+            log.info("[团课支付] 等待用户确认支付: course={}, price={}", gc.getName(), finalPrice);
+
+            sb.append("请点击「确认支付」完成预约");
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("团课支付准备失败", e);
+            return gymTools.bookGroupClass(memberId, gc.getId());
+        }
+    }
+
+
     private String handleBookGroupClass(String userMessage, Long memberId) {
-        String[] keywords = {"动感单车", "瑜伽", "搏击", "杠铃", "普拉提", "有氧", "力量", "单车", "操课", "舞蹈", "尊巴"};
+        // 清除该会员之前的团课上下文，避免残留影响
+        String _ctxKey = "group_" + (memberId != null ? memberId : "guest");
+        pendingGroupBookings.remove(_ctxKey);
+        String _cacheKey = "lastGC_" + (memberId != null ? memberId : "guest");
+        clearCachedGroupClassList(_cacheKey);
+        String[] keywords = {"动感单车", "瑜伽", "搏击", "杠铃", "普拉提", "有氧", "力量", "单车", "操课", "舞蹈", "尊巴", "HIIT"};
+        String lowerMsgForKW = userMessage.toLowerCase();
         String courseKeyword = null;
         for (String kw : keywords) {
-            if (userMessage.contains(kw)) {
+            if (lowerMsgForKW.contains(kw.toLowerCase())) {
                 courseKeyword = kw;
                 break;
             }
         }
+        log.info("[handleBookGroupClass] courseKeyword={}, userMessage={}", courseKeyword, userMessage);
         if (courseKeyword == null) {
-            Pattern p = Pattern.compile("([\\u4e00-\\u9fa5]{2,}课)");
-            Matcher m = p.matcher(userMessage);
-            if (m.find()) {
-                courseKeyword = m.group(0);
-                String[] genericTerms = {"团课","约课","预约课","课程","课类"};
-                boolean isGeneric = false;
-                for (String gt : genericTerms) {
-                    if (courseKeyword.contains(gt)) { isGeneric = true; break; }
+            // DB查询：从消息中提取课程名（匹配数据库中的课程名称）
+            String lowerMsg = userMessage.toLowerCase();
+            java.util.List<com.gym.entity.GroupClass> allScheduled = groupClassMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.gym.entity.GroupClass>()
+                    .eq(com.gym.entity.GroupClass::getStatus, "scheduled")
+                    .gt(com.gym.entity.GroupClass::getStartTime, java.time.LocalDateTime.now())
+            );
+            if (allScheduled != null) {
+                for (com.gym.entity.GroupClass gc : allScheduled) {
+                    if (gc.getName() != null && lowerMsg.contains(gc.getName().toLowerCase())) {
+                        courseKeyword = gc.getName();
+                        break;
+                    }
                 }
-                if (isGeneric) { courseKeyword = null; }
+                // 如果还没匹配到，尝试匹配课程名的前2-4个字
+                if (courseKeyword == null) {
+                    for (com.gym.entity.GroupClass gc : allScheduled) {
+                        if (gc.getName() != null && gc.getName().length() >= 2) {
+                            String shortName = gc.getName().substring(0, Math.min(gc.getName().length(), 4));
+                            if (lowerMsg.contains(shortName.toLowerCase())) {
+                                courseKeyword = shortName;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
         if (courseKeyword == null) {
             return "请告诉我您想预约哪门团课，例如「帮我预约动感单车」";
         }
 
+        // 尝试从用户输入中提取日期/时间，用于过滤课程
+        String targetDateStr = parseDate(userMessage);
+        String targetTimeStr = parseTime(userMessage);
+
+        // 查询所有匹配该课程名的未来排期
         LambdaQueryWrapper<GroupClass> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(GroupClass::getName, courseKeyword)
                 .eq(GroupClass::getStatus, "scheduled")
                 .gt(GroupClass::getStartTime, LocalDateTime.now())
-                .orderByAsc(GroupClass::getStartTime)
-                .last("LIMIT 1");
-        GroupClass gc = groupClassMapper.selectOne(wrapper);
+                .orderByAsc(GroupClass::getStartTime);
 
-        if (gc == null && courseKeyword.endsWith("课") && courseKeyword.length() > 1) {
-            String withoutKe = courseKeyword.substring(0, courseKeyword.length() - 1);
-            wrapper.like(GroupClass::getName, withoutKe);
-            gc = groupClassMapper.selectOne(wrapper);
+        // 如果用户指定了日期，按日期过滤
+        if (targetDateStr != null) {
+            try {
+                java.time.LocalDate td = java.time.LocalDate.parse(targetDateStr);
+                wrapper.between(GroupClass::getStartTime, td.atStartOfDay(), td.atTime(23, 59, 59));
+            } catch (Exception e) {
+                log.warn("日期解析失败: {}", targetDateStr);
+            }
+        }
+        // 如果用户指定了时间，也按时间过滤（可选增强）
+
+        List<GroupClass> classes = groupClassMapper.selectList(wrapper);
+        log.info("[handleBookGroupClass] {} 查询到 {} 节课程", courseKeyword, classes != null ? classes.size() : 0);
+
+        if (classes == null || classes.isEmpty()) {
+            // 尝试去掉"课"字再查一次
+            if (courseKeyword.endsWith("课") && courseKeyword.length() > 1) {
+                String withoutKe = courseKeyword.substring(0, courseKeyword.length() - 1);
+                wrapper = new LambdaQueryWrapper<>();
+                wrapper.like(GroupClass::getName, withoutKe)
+                        .eq(GroupClass::getStatus, "scheduled")
+                        .gt(GroupClass::getStartTime, LocalDateTime.now())
+                        .orderByAsc(GroupClass::getStartTime);
+                if (targetDateStr != null) {
+                    try {
+                        java.time.LocalDate td = java.time.LocalDate.parse(targetDateStr);
+                        wrapper.between(GroupClass::getStartTime, td.atStartOfDay(), td.atTime(23, 59, 59));
+                    } catch (Exception e) {}
+                }
+                classes = groupClassMapper.selectList(wrapper);
+            }
+            if (classes == null || classes.isEmpty()) {
+                return "未找到与「" + courseKeyword + "」相关的可预约课程，请确认课程名称或稍后再试。";
+            }
         }
 
-        if (gc == null) {
-            return "未找到与「" + courseKeyword + "」相关的可预约课程，请确认课程名称或稍后再试。";
+        // 只有一节 → 检查类型，决定是否弹支付
+        // 存储到代词解析缓存
+        String cacheKeyGC2 = "lastGC_" + (memberId != null ? memberId : "guest");
+        setCachedGroupClassList(cacheKeyGC2, classes);
+        
+
+        if (classes.size() == 1) {
+            GroupClass gc = classes.get(0);
+            // 检查是否付费课程
+            if ("paid".equals(gc.getType()) && gc.getPrice() != null && gc.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                return prepareGroupPayment(gc, memberId);
+            }
+            // 公益课直接预约
+            return gymTools.bookGroupClass(memberId, gc.getId());
         }
 
-        return gymTools.bookGroupClass(memberId, gc.getId());
+
+        // 有多节 → 列出所有排期，让用户选择
+        String userType = "member";
+        if (memberId != null && memberId > 0) {
+            Member m = memberMapper.selectById(memberId);
+            if (m != null && m.isVisitor()) userType = "visitor";
+        }
+
+        // 保存课程列表到上下文
+        String groupKey = "group_" + (memberId != null ? memberId : "guest");
+        PendingBooking gp = new PendingBooking(memberId, courseKeyword, null, false, false, null, userType);
+        gp.courseName = courseKeyword;
+        gp.groupClassId = null;  // 用户还未选择具体课程
+        gp.retryCount = 0;
+        // 将课程列表序列化为简单的字符串（id|name|startTime 格式）
+        StringBuilder sb = new StringBuilder();
+        java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("MM月dd日 HH:mm");
+        sb.append("找到 ").append(classes.size()).append(" 节").append(courseKeyword).append("课程：\n");
+        // 批量查询教练姓名
+        java.util.Map<Long, String> trainerNameMap = new java.util.HashMap<>();
+        try {
+            for (GroupClass gc2 : classes) {
+                if (gc2.getTrainerId() != null) {
+                    com.gym.entity.Trainer t = trainerMapper.selectById(gc2.getTrainerId());
+                    if (t != null) {
+                        trainerNameMap.put(gc2.getTrainerId(), t.getName());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("查询教练信息失败", e);
+        }
+        java.util.List<String> classOptions = new java.util.ArrayList<>();
+        java.time.format.DateTimeFormatter dtf2 = java.time.format.DateTimeFormatter.ofPattern("MM月dd日 HH:mm");
+        for (int i = 0; i < classes.size(); i++) {
+            GroupClass gc = classes.get(i);
+            String timeStr2 = gc.getStartTime() != null ? gc.getStartTime().format(dtf2) : "待定";
+            int remaining = (gc.getMaxCapacity() != null ? gc.getMaxCapacity() : 0) - (gc.getEnrolled() != null ? gc.getEnrolled() : 0);
+            String trainerName = (gc.getTrainerId() != null && trainerNameMap.containsKey(gc.getTrainerId()))
+                    ? trainerNameMap.get(gc.getTrainerId()) : "";
+            // 计算价格显示
+            String priceStr2 = (gc.getPrice() != null && gc.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0)
+                ? ("￥" + gc.getPrice().toString()) : "免费";
+            // 计算剩余名额显示
+            int maxCap2 = gc.getMaxCapacity() != null ? gc.getMaxCapacity() : 0;
+            int enrolled2 = gc.getEnrolled() != null ? gc.getEnrolled() : 0;
+            int remaining2 = maxCap2 - enrolled2;
+            String capStr;
+            if (remaining2 > 0) {
+                capStr = "剩余 " + remaining2 + " 人";
+            } else if (remaining2 == 0) {
+                capStr = "已满";
+            } else {
+                capStr = "已满（超额 " + (-remaining2) + " 人）";
+            }
+            sb.append(i + 1).append(". ").append(gc.getName() != null ? gc.getName() : courseKeyword)
+              .append(" - ").append(trainerName)
+              .append(" - ").append(timeStr2)
+              .append(" - ").append(priceStr2)
+              .append("（").append(capStr).append("）\n");
+            classOptions.add(gc.getId() + "|" + gc.getName() + "|" + (gc.getStartTime() != null ? gc.getStartTime().toString() : "") + "|" + trainerName);
+        }
+        gp.dateStr = String.join(",", classOptions);  // 偷个懒：用 dateStr 存课程列表字符串
+        pendingGroupBookings.put(groupKey, gp);
+        log.info("[团课预约] 保存课程列表: {} 节可供选择", classes.size());
+        // 存储到代词解析缓存
+        String cacheKeyGC = "lastGC_" + (memberId != null ? memberId : "guest");
+        setCachedGroupClassList(cacheKeyGC, classes);
+        return sb.toString() + "\n请回复序号选择（如回复 1、2）。";
     }
 
+
     // ====== 校验日期是否过期 ======
+    // ====== 团课列表缓存清理（过期5分钟）======
+    private java.util.List<com.gym.entity.GroupClass> getCachedGroupClassList(String sessionKey) {
+        Long time = lastGroupClassListTime.get(sessionKey);
+        if (time == null || (System.currentTimeMillis() - time) > 300000L) {
+            lastGroupClassListCache.remove(sessionKey);
+            lastGroupClassListTime.remove(sessionKey);
+            return null;
+        }
+        return lastGroupClassListCache.get(sessionKey);
+    }
+    
+    private void setCachedGroupClassList(String sessionKey, java.util.List<com.gym.entity.GroupClass> list) {
+        if (list == null || list.isEmpty()) {
+            lastGroupClassListCache.remove(sessionKey);
+            lastGroupClassListTime.remove(sessionKey);
+            return;
+        }
+        lastGroupClassListCache.put(sessionKey, list);
+        lastGroupClassListTime.put(sessionKey, System.currentTimeMillis());
+    }
+    
+    private void clearCachedGroupClassList(String sessionKey) {
+        lastGroupClassListCache.remove(sessionKey);
+        lastGroupClassListTime.remove(sessionKey);
+    }
+
     private String validateDateNotPast(String dateStr) {
         try {
             java.time.LocalDate date = java.time.LocalDate.parse(dateStr);
@@ -1861,6 +2215,10 @@ private String nullToEmpty(Object obj) {
         Long memberId;
         Long trainerId;
         String trainerName;
+        String courseName;
+        Long groupClassId;
+        String intentType;  // "PT" = 私教, "GROUP" = 团课
+        String userType;    // "member" / "visitor"
         boolean hasDate;
         boolean hasTime;
         String dateStr;
@@ -1872,6 +2230,26 @@ private String nullToEmpty(Object obj) {
             this.memberId = memberId;
             this.trainerId = trainerId;
             this.trainerName = trainerName;
+            this.courseName = null;
+            this.groupClassId = null;
+            this.intentType = "PT";
+            this.userType = null;
+            this.hasDate = hasDate;
+            this.hasTime = hasTime;
+            this.dateStr = dateStr;
+            this.timeStr = null;
+            this.retryCount = 0;
+            this.paymentMethod = null;
+        }
+
+        PendingBooking(Long memberId, String courseName, Long groupClassId, boolean hasDate, boolean hasTime, String dateStr, String userType) {
+            this.memberId = memberId;
+            this.trainerId = null;
+            this.trainerName = null;
+            this.courseName = courseName;
+            this.groupClassId = groupClassId;
+            this.intentType = "GROUP";
+            this.userType = userType;
             this.hasDate = hasDate;
             this.hasTime = hasTime;
             this.dateStr = dateStr;

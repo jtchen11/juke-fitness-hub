@@ -353,13 +353,13 @@ public class ClassBookingController {
                 gc.setEnrolled(gc.getEnrolled() - 1);
                 groupClassMapper.updateById(gc);
             }
-            // 访客取消体验课，归还体验机会
+            // Issue 2: 访客取消体验课，归还体验机会（无论课程是否标注allow_visitor）
             Member cancelMember = memberMapper.selectById(booking.getMemberId());
             if (cancelMember != null && cancelMember.isVisitor()
-                && gc.getAllowVisitor() != null && gc.getAllowVisitor()
                 && cancelMember.getExperienceUsed() != null && cancelMember.getExperienceUsed()) {
                 cancelMember.setExperienceUsed(false);
                 memberMapper.updateById(cancelMember);
+                log.info("[取消预约] 访客ID={} 取消体验课，experience_used已重置为false", booking.getMemberId());
             }
             booking.setPaymentStatus("cancelled");
             booking.setStatus("cancelled");

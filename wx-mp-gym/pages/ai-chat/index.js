@@ -8,6 +8,7 @@ var chunkDecoder = new TextDecoder("utf-8");
 // SSE 跨块缓冲（累积不完整的分割事件）
 var sseBuffer = "";
 var hasReceivedChunk = false;
+var _completeHandled = false;
 
 function arrayBufferToString(buffer) {
   return chunkDecoder.decode(buffer, { stream: true });
@@ -137,6 +138,7 @@ Page({
       enableChunked: true,
       timeout: 120000,
       success: function(res) {
+        if (_completeHandled) { _completeHandled = false; return; }
         if (streamingReq === req && _this.data.isStreaming) {
           _this.finishStreaming();
         }
@@ -185,6 +187,29 @@ Page({
             } else if (evt.type === "tool_result") {
               var toolText = evt.content || "";
               // 检测 **PAYMENT** 标记，解析为支付按钮
+              if (toolText.indexOf("**PAYMENT_GROUP**") >= 0) {
+                var pparts = toolText.split("**PAYMENT_GROUP**");
+                var displayText = pparts[0].trim();
+                var optionsText = pparts[1] || "";
+                var payOptions = [];
+                if (optionsText.indexOf("confirm") >= 0 || optionsText.indexOf("确认") >= 0) {
+                  payOptions.push({ label: "确认支付", sub: "", payValue: "confirm" });
+                }
+                console.log("[payment] group tool_result parsed", payOptions.length, "options");
+                if (payOptions.length > 0) {
+                  var msgs = _this.data.messages;
+                  for (var mi = msgs.length - 1; mi >= 0; mi--) {
+                    if (msgs[mi].role === "ai") {
+                      msgs[mi].content = displayText;
+                      msgs[mi].paymentOptions = payOptions;
+                      msgs[mi].isStreaming = false;
+                      break;
+                    }
+                  }
+                  _this.setData({ messages: msgs, isStreaming: false, scrollTarget: "bottom" });
+                  continue;
+                }
+              }
               if (toolText.indexOf("**PAYMENT**") >= 0) {
                 var pparts = toolText.split("**PAYMENT**");
                 var displayText = pparts[0].trim();
@@ -245,6 +270,31 @@ Page({
               _this.finishStreaming();
             } else if (evt.type === "complete") {
               var fullText = evt.full || "";
+              if (fullText.indexOf("**PAYMENT_GROUP**") >= 0) {
+                console.log("[payment] fullText contains **PAYMENT_GROUP**");
+                var pparts = fullText.split("**PAYMENT_GROUP**");
+                var displayText = pparts[0].trim();
+                var optionsText = pparts[1] || "";
+                var payOptions = [];
+                if (optionsText.indexOf("confirm") >= 0 || optionsText.indexOf("确认") >= 0) {
+                  payOptions.push({ label: "确认支付", sub: "", payValue: "confirm" });
+                }
+                console.log("[payment] group parsed", payOptions.length, "options");
+                if (payOptions.length > 0) {
+                  _completeHandled = true;
+                  var msgs = _this.data.messages;
+                  for (var mi = msgs.length - 1; mi >= 0; mi--) {
+                    if (msgs[mi].role === "ai") {
+                      msgs[mi].content = displayText;
+                      msgs[mi].paymentOptions = payOptions;
+                      msgs[mi].isStreaming = false;
+                      break;
+                    }
+                  }
+                  _this.setData({ messages: msgs, isStreaming: false, scrollTarget: "bottom" });
+                  continue;
+                }
+              }
               if (fullText.indexOf("**PAYMENT**") >= 0) {
                 console.log("[payment] fullText contains **PAYMENT**");
                 var pparts = fullText.split("**PAYMENT**");
@@ -274,6 +324,7 @@ Page({
                 }
                 console.log("[payment] parsed", payOptions.length, "options");
                 if (payOptions.length > 0) {
+                  _completeHandled = true;
                   var msgs = _this.data.messages;
                   for (var mi = msgs.length - 1; mi >= 0; mi--) {
                     if (msgs[mi].role === "ai") {

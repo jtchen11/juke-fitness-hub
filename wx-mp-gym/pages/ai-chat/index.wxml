@@ -15,13 +15,13 @@
     <view class="date-divider" wx:if="{{showDateDivider}}"><text>{{dateDividerText}}</text></view>
     <view class="msg msg-{{item.role}}" wx:for="{{messages}}" wx:for-index="msgIdx" wx:key="msgIdx">
       <view class="msg-avatar">{{item.role==="ai" ? "AI" : item.role==="system" ? "📌" : "我"}}</view>
-      <view class="msg-bubble">
+      <view class="msg-bubble" style="white-space:pre-wrap;">
         <text wx:if="{{item.isStreaming && !item.content}}">正在输入<text class="streaming-dots">...</text></text>
         <text wx:else>{{item.content}}</text>
-        <view wx:if="{{item.paymentOptions}}" class="payment-buttons">
-          <view class="payment-btn" wx:for="{{item.paymentOptions}}" wx:for-index="optIdx" wx:key="optIdx" data-pay="{{item.payValue}}" bindtap="onPaymentSelect">
-            <text>{{item.label}}</text>
-            <text wx:if="{{item.sub}}" class="payment-sub">{{item.sub}}</text>
+        <view wx:if="{{item.paymentOptions && item.paymentOptions.length > 0}}" class="payment-buttons">
+          <view class="payment-btn" wx:for="{{item.paymentOptions}}" wx:for-index="optIdx" wx:for-item="opt" wx:key="optIdx" data-pay="{{opt.payValue}}" bindtap="onPaymentSelect">
+            <text>{{opt.label}}</text>
+            <text wx:if="{{opt.sub}}" class="payment-sub">{{opt.sub}}</text>
           </view>
         </view>
       </view>

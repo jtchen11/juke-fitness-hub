@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.lang.Boolean;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -60,21 +61,38 @@ public class GymTools {
     }
 
     public String queryAvailableClasses(String startTime, String endTime, String type) {
+        return queryAvailableClasses(startTime, endTime, type, null);
+    }
+
+    public String queryAvailableClasses(String startTime, String endTime, String type, Boolean allowVisitor) {
         try {
             LocalDateTime start = LocalDateTime.parse(startTime, FORMATTER);
             LocalDateTime end = LocalDateTime.parse(endTime, FORMATTER);
-            List<GroupClass> classes = groupClassService.getAvailableClasses(start, end, type);
+            List<GroupClass> classes = groupClassService.getAvailableClasses(start, end, type, allowVisitor);
 
             if (classes.isEmpty()) {
                 return "【最终回答】在 " + startTime + " 到 " + endTime + " 范围内没有可预约的团课。建议扩大时间范围或选择其他日期。无需继续调用工具。";
             }
 
             StringBuilder sb = new StringBuilder();
-            sb.append("【最终回答】共找到 ").append(classes.size()).append(" 门可预约团课：\n");
+            boolean isFreeFilter = "free".equals(type);
+            sb.append("【最终回答】共找到 ").append(classes.size()).append(isFreeFilter ? " 门免费可预约团课：\n" : " 门可预约团课：\n");
+            java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("MM月dd日 HH:mm");
             for (int i = 0; i < classes.size(); i++) {
                 GroupClass gc = classes.get(i);
-                sb.append(i + 1).append(". 课程：").append(gc.getName())
-                        .append("，剩余名额：").append(gc.getMaxCapacity() - gc.getEnrolled()).append(" 人\n");
+                String timeStr = gc.getStartTime() != null ? gc.getStartTime().format(dtf) : "";
+                String endTimeStr = gc.getEndTime() != null ? "" : "";
+                if (gc.getEndTime() != null) { endTimeStr = gc.getEndTime().format(dtf); }
+                String priceStr = (gc.getPrice() != null && gc.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0) ? "￥" + gc.getPrice().toString() : "免费";
+                int remaining = gc.getMaxCapacity() - gc.getEnrolled();
+                sb.append(i + 1).append(". ").append(gc.getName() != null ? gc.getName() : "")
+                        .append(" - ").append(timeStr);
+                if (gc.getEndTime() != null) {
+                    String[] endParts = endTimeStr.split(" ");
+                    if (endParts.length > 1) { sb.append("-").append(endParts[1]); }
+                }
+                sb.append(" - ").append(priceStr)
+                        .append("（剩余 ").append(remaining).append(" 人）\n");
             }
             sb.append("\n请根据以上信息为用户推荐合适的团课。无需继续调用工具。");
             return sb.toString();
@@ -152,7 +170,7 @@ public class GymTools {
         }
     }
 
-    @Tool("根据会员等级推荐适合的教练，参数：会员ID")
+    @Tool("根据会员等级和体测数据推荐适合的教练，参数：会员ID")
     public String recommendTrainerByLevel(Long memberId) {
         try {
             if (memberId == null || memberId <= 0) {
@@ -162,20 +180,62 @@ public class GymTools {
             if (member == null) {
                 return "【最终回答】会员（ID：" + memberId + "）不存在，请确认会员ID是否正确。无需继续调用工具。";
             }
+            // P2-8: 访客拦截
+            if (member.isVisitor()) {
+                return "【最终回答】访客暂不支持教练推荐功能，请注册会员后再使用。无需继续调用工具。";
+            }
             String level = member.getLevel();
-            if (level == null) {
-                level = "普通会员";
+            if (level == null) level = "普通会员";
+            // P2-9: 查询最新体测数据
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<FitnessTest> fw =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            fw.eq(FitnessTest::getMemberId, memberId).orderByDesc(FitnessTest::getTestDate).last("LIMIT 1");
+            FitnessTest ft = fitnessTestMapper.selectOne(fw);
+            String goal = "塑形";  // 默认
+            if (ft != null && ft.getBodyFatPercent() != null) {
+                double bf = ft.getBodyFatPercent().doubleValue();
+                String gender = member.getGender();
+                boolean isHigh = ("男".equals(gender) && bf > 25) || (!"男".equals(gender) && bf > 32);
+                if (isHigh) { goal = "减脂"; }
             }
-            StringBuilder sb = new StringBuilder();
-            sb.append("【最终回答】当前会员等级：").append(level).append("\n");
-            if ("铂金会员".equals(level)) {
-                sb.append("🌟 铂金会员专享：推荐张教练（铂金专属教练），专长：康复拉伸，价格：400元/小时，可优先预约。");
-            } else if ("黄金会员".equals(level)) {
-                sb.append("🌟 黄金会员专享：推荐王教练，专长：增肌力量，价格：350元/小时（黄金会员享9折优惠）。");
+            // 按会员等级确定目标价格区间
+            double maxPrice;
+            if ("铂金会员".equals(level)) { maxPrice = 9999; }
+            else if ("黄金会员".equals(level)) { maxPrice = 350; }
+            else { maxPrice = 300; }
+            // 查询匹配的教练
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Trainer> tw =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            tw.eq(Trainer::getStatus, "active");
+            if (maxPrice < 9999) { tw.le(Trainer::getPricePerHour, maxPrice); }
+            if ("减脂".equals(goal)) {
+                tw.like(Trainer::getSpecialty, "减脂");
             } else {
-                sb.append("推荐李教练，专长：减脂塑形，价格：300元/小时。");
+                // 塑形优先，其次增肌/康复
+                tw.and(w -> w.like(Trainer::getSpecialty, "塑形")
+                    .or().like(Trainer::getSpecialty, "增肌")
+                    .or().like(Trainer::getSpecialty, "康复"));
             }
-            sb.append("\n以上推荐仅供参考，具体可根据会员需求调整。无需继续调用工具。");
+            java.util.List<Trainer> trainers = trainerMapper.selectList(tw);
+            StringBuilder sb = new StringBuilder();
+            sb.append("【最终回答】当前会员等级：").append(level);
+            if (ft != null && ft.getBodyFatPercent() != null) {
+                sb.append("，体脂率：").append(ft.getBodyFatPercent()).append("%");
+            }
+            sb.append("，建议方向：").append(goal).append("\n");
+            if (trainers == null || trainers.isEmpty()) {
+                sb.append("暂未找到完全匹配的教练，推荐李教练，专长：减脂塑形，价格：300元/小时。");
+            } else {
+                for (int i = 0; i < Math.min(trainers.size(), 3); i++) {
+                    Trainer t = trainers.get(i);
+                    sb.append(i+1).append(". ").append(t.getName()).append("教练");
+                    if (t.getSpecialty() != null) sb.append("，专长：").append(t.getSpecialty());
+                    if (t.getPricePerHour() != null) sb.append("，价格：").append(t.getPricePerHour()).append("元/小时");
+                    if (t.getIntro() != null) sb.append("，简介：").append(t.getIntro());
+                    sb.append("\n");
+                }
+            }
+            sb.append("以上推荐仅供参考，具体可根据会员需求调整。无需继续调用工具。");
             return sb.toString();
         } catch (Exception e) {
             return "【最终回答】推荐失败，系统异常：" + e.getMessage() + "。无需继续调用工具。";
