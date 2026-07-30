@@ -100,4 +100,15 @@
   </view>
 
   <tab-bar/>
+
+  <!-- 8. 访客体验课弹窗 -->
+  <view class="experience-overlay" wx:if="{{showExperiencePopup}}" bindtap="closeExperiencePopup">
+    <view class="experience-popup" catchtap="">
+      <view class="popup-icon">🎉</view>
+      <view class="popup-title">恭喜您获得 1 次免费体验课机会！</view>
+      <view class="popup-desc">首次预约可免费体验任意团课一次，快来试试吧！</view>
+      <button class="popup-btn" bindtap="goExperienceBooking">去预约</button>
+      <view class="popup-close" bindtap="closeExperiencePopup">稍后再说</view>
+    </view>
+  </view>
 </view>

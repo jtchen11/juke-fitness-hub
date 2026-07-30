@@ -1,4 +1,4 @@
-﻿const app = getApp();
+const app = getApp();
 const request = require('../../utils/request.js');
 Page({
   data: { tab: 'group', dateIdx: 0, ptDateIdx: 0, dates: [], ptDates: [], typeFilter: '', specFilter: '', courses: [], coaches: [], showLoginModal: false, isLoggedIn: false },

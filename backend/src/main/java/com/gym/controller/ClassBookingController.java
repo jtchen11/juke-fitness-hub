@@ -181,39 +181,58 @@ public class ClassBookingController {
             return result;
         }
 
-        // 8. 计算支付金额
+        // 8. 计算支付金额和折扣
         BigDecimal price = gc.getPrice() != null ? gc.getPrice() : BigDecimal.ZERO;
 
-        // 9. 创建预约记录（状态为待支付）
+        // 9. 判断是否需要弹支付
+        boolean isVisitorWithVoucher = member.isVisitor() && gc.getAllowVisitor() != null && gc.getAllowVisitor();
+        boolean needsPayment = "paid".equals(gc.getType()) && price.compareTo(BigDecimal.ZERO) > 0 && !member.isVisitor();
+
+        // 10. 创建预约记录
         booking.setBookingTime(LocalDateTime.now());
         booking.setStatus("booked");
-        booking.setPaymentStatus("unpaid");
+        booking.setPaymentStatus(needsPayment ? "unpaid" : "paid");
+        if (!needsPayment) {
+            booking.setPayTime(LocalDateTime.now());
+        }
         booking.setPaidAmount(price);
         classBookingMapper.insert(booking);
 
-        // 9.5 准会员预约体验课后标记
-        if (!member.isActiveMember() && gc.getAllowVisitor() != null && gc.getAllowVisitor()) {
+        // 11. 准会员预约体验课后标记
+        if (member.isVisitor() && gc.getAllowVisitor() != null && gc.getAllowVisitor()) {
             member.setExperienceUsed(true);
             memberMapper.updateById(member);
         }
 
-        // 9.6 免费/体验课直接增加已预约人数（无需支付）
-        if ("free".equals(gc.getType()) || price.compareTo(BigDecimal.ZERO) == 0 || (gc.getAllowVisitor() != null && gc.getAllowVisitor())) {
+        // 12. 直接增加已预约人数（免费课/体验课/已支付）
+        if (!needsPayment) {
             gc.setEnrolled(gc.getEnrolled() + 1);
             groupClassMapper.updateById(gc);
-            log.info("预约成功 courseId={} enrolled={}", gc.getId(), gc.getEnrolled());
+            log.info("预约成功 (直销) courseId={} enrolled={}", gc.getId(), gc.getEnrolled());
             result.put("success", true);
             result.put("message", "预约成功");
             result.put("amount", BigDecimal.ZERO);
             return result;
         }
 
-        // 10. 返回支付信息
+        // 13. 付费课：前端已弹确认，直接创建为已支付
+        // 应用会员折扣
+        String levelName = member.getLevel() != null ? member.getLevel() : "\u666e\u901a\u4f1a\u5458";
+        com.gym.enums.MemberLevel level = com.gym.enums.MemberLevel.fromDisplayName(levelName);
+        int discount = level.getDiscountPercent();
+        java.math.BigDecimal discountedPrice = price
+                .multiply(java.math.BigDecimal.valueOf(100 - discount))
+                .divide(java.math.BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+        booking.setPaymentStatus("paid");
+        booking.setPayTime(java.time.LocalDateTime.now());
+        booking.setPaidAmount(discountedPrice);
+        classBookingMapper.updateById(booking);
+        gc.setEnrolled(gc.getEnrolled() + 1);
+        groupClassMapper.updateById(gc);
+        log.info("\u9884\u7ea6\u6210\u529f (\u4ed8\u8d39) courseId={} enrolled={} \u5b9e\u4ed8={}", gc.getId(), gc.getEnrolled(), discountedPrice);
         result.put("success", true);
-        result.put("message", "预约已创建，请完成支付");
-        result.put("bookingId", booking.getId());
-        result.put("amount", price);
-        result.put("className", gc.getName());
+        result.put("message", "\u9884\u7ea6\u6210\u529f\uff01");
+        result.put("amount", BigDecimal.ZERO);
         return result;
     }
 
@@ -338,6 +357,15 @@ public class ClassBookingController {
             }
         }
 
+        // ====== 先处理访客体验课次数归还（移到if/else之前）======
+        Member cancelMember = memberMapper.selectById(booking.getMemberId());
+        if (cancelMember != null && cancelMember.isVisitor()
+            && cancelMember.getExperienceUsed() != null && cancelMember.getExperienceUsed()) {
+            cancelMember.setExperienceUsed(false);
+            memberMapper.updateById(cancelMember);
+            log.info("[取消预约] 访客ID={} 取消体验课，experience_used已重置为false", booking.getMemberId());
+        }
+
         // 原有退款/取消逻辑...
         if ("paid".equals(booking.getPaymentStatus())) {
             booking.setPaymentStatus("refunded");
@@ -352,16 +380,7 @@ public class ClassBookingController {
                                     if (gc != null && gc.getEnrolled() != null && gc.getEnrolled() > 0) {
                 gc.setEnrolled(gc.getEnrolled() - 1);
                 groupClassMapper.updateById(gc);
-            }
-            // Issue 2: 访客取消体验课，归还体验机会（无论课程是否标注allow_visitor）
-            Member cancelMember = memberMapper.selectById(booking.getMemberId());
-            if (cancelMember != null && cancelMember.isVisitor()
-                && cancelMember.getExperienceUsed() != null && cancelMember.getExperienceUsed()) {
-                cancelMember.setExperienceUsed(false);
-                memberMapper.updateById(cancelMember);
-                log.info("[取消预约] 访客ID={} 取消体验课，experience_used已重置为false", booking.getMemberId());
-            }
-            booking.setPaymentStatus("cancelled");
+            }            booking.setPaymentStatus("cancelled");
             booking.setStatus("cancelled");
             classBookingMapper.updateById(booking);
             return successResponse("取消预约成功");

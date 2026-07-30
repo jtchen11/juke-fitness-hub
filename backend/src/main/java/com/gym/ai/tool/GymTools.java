@@ -83,7 +83,7 @@ public class GymTools {
                 String timeStr = gc.getStartTime() != null ? gc.getStartTime().format(dtf) : "";
                 String endTimeStr = gc.getEndTime() != null ? "" : "";
                 if (gc.getEndTime() != null) { endTimeStr = gc.getEndTime().format(dtf); }
-                String priceStr = (gc.getPrice() != null && gc.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0) ? "￥" + gc.getPrice().toString() : "免费";
+                String priceStr = ("free".equals(gc.getType()) || gc.getPrice() == null || gc.getPrice().compareTo(java.math.BigDecimal.ZERO) <= 0) ? "免费" : "￥" + gc.getPrice().toString();
                 int remaining = gc.getMaxCapacity() - gc.getEnrolled();
                 sb.append(i + 1).append(". ").append(gc.getName() != null ? gc.getName() : "")
                         .append(" - ").append(timeStr);
@@ -112,7 +112,11 @@ public class GymTools {
             }
             String result = groupClassService.bookClass(memberId, classId);
             if (result != null && result.contains("成功")) {
-                return "【最终回答】" + result + "。无需继续调用工具。";
+                                com.gym.entity.Member m = memberMapper.selectById(memberId);
+                if (m != null && m.isVisitor()) {
+                    return "【最终回答】预约成功！您已使用免费体验券预约课程，剩余体验次数：0。无需继续调用工具。";
+                }
+                return "【最终回答】" + result + "无需继续调用工具。";
             } else {
                 return "【最终回答】预约失败：" + (result != null ? result : "未知错误，请重试") + "。无需继续调用工具。";
             }

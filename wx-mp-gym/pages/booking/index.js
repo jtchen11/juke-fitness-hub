@@ -10,7 +10,7 @@ Page({
     difficultyTag: 'beginner',
     trainerAvatarUrl: '',
     trainerIntro: '',
-    btnText: '确认预约',
+    btnText: '\u786e\u8ba4\u9884\u7ea6',
     isExperienceFree: false,
     showLoginModal: false,
     showPayModal: false,
@@ -46,7 +46,7 @@ Page({
       var formatted = _this.formatTimeSlot(r.startTime, r.endTime);
       var diffTag = _this.mapDifficulty(r.difficulty);
       var isFree = r.allowVisitor && _this.isVisitorUser() && !_this.isExperienceUsed();
-      var btn = isFree ? '免费体验预约' : '确认预约';
+      var btn = isFree ? '\u514d\u8d39\u4f53\u9a8c\u9884\u7ea6' : '\u786e\u8ba4\u9884\u7ea6';
       var coverUrl = _this.resolveImageUrl(r.coverImage, 'group_class');
 
       _this.setData({
@@ -81,7 +81,7 @@ Page({
   },
 
   mapDifficulty: function(diff) {
-    var map = { '初级': 'beginner', '中级': 'intermediate', '高级': 'advanced' };
+    var map = { '\u521d\u7ea7': 'beginner', '\u4e2d\u7ea7': 'intermediate', '\u9ad8\u7ea7': 'advanced' };
     return map[diff] || 'beginner';
   },
 
@@ -104,7 +104,7 @@ Page({
 
   isVisitorUser: function() {
     var user = app.globalData.userInfo || {};
-    return user.level === '访客';
+    return user.level === '\u8bbf\u5ba2';
   },
 
   isExperienceUsed: function() {
@@ -115,6 +115,46 @@ Page({
   confirmBooking: function() {
     var _this = this;
     var t = _this.data;
+    var price = parseFloat(t.course.price || 0);
+    var isPaid = t.course.type === 'paid' && price > 0;
+    var user = app.globalData.userInfo || {};
+    var isMember = user.level && user.level !== '\u8bbf\u5ba2';
+
+    if (isPaid && isMember) {
+      _this.setData({ loading: true });
+    // \u67e5\u4f1a\u5458\u7b49\u7ea7\u6298\u6263
+      var memberId = user.memberId;
+      request.get('/api/members/' + memberId + '/benefits', null, function(ben) {
+        _this.setData({ loading: false });
+        var discountPct = (ben && ben.discount) || 0;
+        var discounted = price * (100 - discountPct) / 100;
+        var content = '\u8bfe\u7a0b\u540d\u79f0\uff1a' + t.course.name;
+        content += '\n\u539f\u4ef7\uff1a\u00a5' + price.toFixed(2);
+        if (discountPct > 0) {
+          var levelName = ben.levelName || '';
+          content += '\n' + levelName + '\u6298\u6263\uff1a-\u00a5' + (price - discounted).toFixed(2) + '\uff08' + discountPct + '%\uff09';
+        }
+        content += '\n\u5b9e\u4ed8\u91d1\u989d\uff1a\u00a5' + discounted.toFixed(2);
+        wx.showModal({
+          title: '\u786e\u8ba4\u652f\u4ed8',
+          content: content,
+          cancelText: '\u53d6\u6d88',
+          confirmText: '\u786e\u8ba4\u652f\u4ed8',
+          success: function(res) {
+            if (res.confirm) {
+              _this.doBook();
+            }
+          }
+        });
+      });
+    } else {
+      this.doBook();
+    }
+  },
+
+  doBook: function() {
+    var _this = this;
+    var t = _this.data;
     _this.setData({ loading: true });
     request.post('/api/class-bookings', {
       classId: t.course.id,
@@ -122,20 +162,16 @@ Page({
     }, function(r) {
       _this.setData({ loading: false });
       if (r && r.success) {
-        if (r.amount && parseFloat(r.amount) > 0) {
-          _this.setData({
-            showPayModal: true,
-            payBookingId: r.bookingId,
-            payAmount: r.amount,
-            payClassName: r.className || t.course.name
-          });
-        } else {
-          wx.showToast({ title: "预约成功", icon: "success" });
-          _this.loadCourse(t.course.id);
-          setTimeout(function() { wx.navigateBack(); }, 1500);
-        }
+        var msg = r.message || '\u9884\u7ea6\u6210\u529f';
+        wx.showModal({
+          title: '\u9884\u7ea6\u6210\u529f',
+          content: msg,
+          showCancel: false,
+          confirmText: '\u77e5\u9053\u4e86',
+          success: function() { wx.navigateBack(); }
+        });
       } else {
-        wx.showToast({ title: (r && r.message) || '预约失败', icon: 'none' });
+        wx.showToast({ title: (r && r.message) || '\u9884\u7ea6\u5931\u8d25', icon: 'none' });
       }
     });
   },
@@ -146,16 +182,21 @@ Page({
     request.post('/api/class-bookings/' + _this.data.payBookingId + '/pay', null, function(r) {
       _this.setData({ loading: false, showPayModal: false });
       if (r && r.success) {
-        wx.showToast({ title: '支付成功', icon: 'success' });
+        wx.showToast({ title: '\u652f\u4ed8\u6210\u529f', icon: 'success' });
         setTimeout(function() { wx.navigateBack(); }, 1500);
       } else {
-        wx.showToast({ title: (r && r.message) || '支付失败', icon: 'none' });
+        wx.showToast({ title: (r && r.message) || '\u652f\u4ed8\u5931\u8d25', icon: 'none' });
       }
     });
   },
 
   closePayModal: function() {
-    this.setData({ showPayModal: false });
+    var _this = this;
+    var bookingId = _this.data.payBookingId;
+    if (bookingId) {
+      request.post('/api/class-bookings/' + bookingId + '/cancel', null, function(r) {});
+    }
+    this.setData({ showPayModal: false, payBookingId: null, payAmount: 0, payClassName: '' });
   },
 
   onLoginClose: function() {

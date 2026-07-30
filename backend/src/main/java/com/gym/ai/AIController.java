@@ -919,6 +919,9 @@ public class AIController {
                             GroupClass gcSel = groupClassMapper.selectById(classId);
                             if (gcSel != null && "paid".equals(gcSel.getType()) && gcSel.getPrice() != null && gcSel.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0) {
                                 pendingGroupBookings.remove(groupPendKey);
+                                // 访客使用体验券，不弹支付
+                                String visitorResult = handleVisitorGroupVoucher(memberId, gcSel);
+                                if (visitorResult != null) return visitorResult;
                                 return prepareGroupPayment(gcSel, memberId);
                             }
                             String result = gymTools.bookGroupClass(memberId, classId);
@@ -1909,6 +1912,22 @@ private String nullToEmpty(Object obj) {
     }
 
     // ====== 团课支付准备（返回支付确认信息，不直接预约） ======
+    // 访客团课体验券处理：如有体验券可用则直接预约，否则返回错误提示
+    private String handleVisitorGroupVoucher(Long memberId, GroupClass gc) {
+        if (memberId == null || memberId <= 0) return null;
+        Member m = memberMapper.selectById(memberId);
+        if (m == null || !m.isVisitor()) return null;
+        // 访客处理
+        if (gc.getAllowVisitor() == null || !gc.getAllowVisitor()) {
+            return "该课程不支持访客预约，请注册会员后再预约。";
+        }
+        if (Boolean.TRUE.equals(m.getExperienceUsed())) {
+            return "您已使用过体验课，请注册会员后再预约。";
+        }
+        // 有可用体验券：直接预约，不弹支付
+        return gymTools.bookGroupClass(memberId, gc.getId());
+    }
+
     private String prepareGroupPayment(GroupClass gc, Long memberId) {
         try {
             StringBuilder sb = new StringBuilder();
@@ -2073,6 +2092,9 @@ private String nullToEmpty(Object obj) {
             GroupClass gc = classes.get(0);
             // 检查是否付费课程
             if ("paid".equals(gc.getType()) && gc.getPrice() != null && gc.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                // 访客使用体验券，不弹支付
+                String visitorResult = handleVisitorGroupVoucher(memberId, gc);
+                if (visitorResult != null) return visitorResult;
                 return prepareGroupPayment(gc, memberId);
             }
             // 公益课直接预约
