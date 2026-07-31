@@ -11,7 +11,7 @@
 
   <view class="list-area">
     <view wx:if="{{list.length===0}}" class="empty-state"><text>暂无预约记录</text></view>
-    <view class="booking-card" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="goDetail">
+    <view class="booking-card" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" data-type="{{item.type}}" data-trainer-id="{{item.trainerId}}" data-class-id="{{item.classId}}" bindtap="goDetail">
       <view class="card-top">
         <view class="card-left">
           <text class="card-type">{{item.typeLabel}}</text>
