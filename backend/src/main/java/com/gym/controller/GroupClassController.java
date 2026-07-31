@@ -193,6 +193,10 @@ public class GroupClassController {
         if (groupClass.getPrice() == null) {
             groupClass.setPrice(BigDecimal.ZERO);
         }
+        // Issue 3: 免费课强制价格为0，忽略表单传入的价格
+        if ("free".equals(groupClass.getType())) {
+            groupClass.setPrice(BigDecimal.ZERO);
+        }
         groupClassMapper.insert(groupClass);
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
@@ -203,6 +207,10 @@ public class GroupClassController {
     @PutMapping("/{id}")
     public Map<String, Object> update(@PathVariable Long id, @RequestBody GroupClass groupClass) {
         groupClass.setId(id);
+        // Issue 3: 免费课强制价格为0，忽略表单传入的价格
+        if ("free".equals(groupClass.getType())) {
+            groupClass.setPrice(BigDecimal.ZERO);
+        }
         groupClassMapper.updateById(groupClass);
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);

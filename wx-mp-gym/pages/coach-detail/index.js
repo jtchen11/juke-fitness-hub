@@ -129,11 +129,9 @@ Page({
     var pricePerHour = coach.pricePerHour || 300;
     var discountPct = (benefits && benefits.discount) || 0;
     var discounted = pricePerHour * (100 - discountPct) / 100;
-    var priceText = '\u5355\u6b21\u4ed8\u8d39 \u00a5' + pricePerHour;
+    var priceText = '\u5355\u6b21\u4ed8\u8d39 \u00a5' + pricePerHour.toFixed(2);
     if (discountPct > 0) {
-      priceText += ' \u2192 \u00a5' + discounted.toFixed(2) + '\uff08' + (benefits.levelName || '') + discountPct + '%\u6298\uff09';
-    } else {
-      priceText += '\u00a5' + pricePerHour.toFixed(2);
+      priceText = '\u5355\u6b21\u4ed8\u8d39 \u00a5' + discounted.toFixed(2) + '\uff08\u5df2\u4eab' + (benefits.levelName || '') + discountPct + '%\u6298\u6263\uff0c\u539f\u4ef7\u00a5' + pricePerHour.toFixed(2) + '\uff09';
     }
     itemList.push(priceText);
     itemData.push({ useFree: false, packageId: null, label: 'single' });

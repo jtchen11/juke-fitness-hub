@@ -41,6 +41,10 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
         if (member.isVisitor()) {
             return "访客无法预约私教课，请注册会员后再预约";
         }
+        // 过期会员校验
+        if (member.isExpired()) {
+            return "您的会员已过期，请续费后再预约";
+        }
 
         // 2. 校验教练
         Trainer trainer = trainerMapper.selectById(trainerId);
@@ -167,7 +171,9 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
                     discountInfo = "\n" + levelName + "折扣：-￥" + price.subtract(discounted) + "（" + discountPct + "%）";
                 }
             }
-            return "私教预约成功！\n课程：私教课（" + trainer.getName() + "）\n原价：￥" + price + discountInfo + "\n实付金额：￥" + discounted;
+            String timeRange = appointmentTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                    + "-" + appointmentTime.plusMinutes(durationMinutes != null ? durationMinutes : 60).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+            return "私教预约成功！\n课程：私教课（" + trainer.getName() + "）\n时间：" + timeRange + "\n原价：￥" + price + discountInfo + "\n实付金额：￥" + discounted;
         }
         return "私教预约成功！";
     }

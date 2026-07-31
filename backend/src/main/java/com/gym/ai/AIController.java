@@ -379,8 +379,8 @@ public class AIController {
 
         // ---- 1. 查询我的私教课 ----
         // ---- 1. 查询我的私教课 / 剩余课时 ----
-        if (lowerMsg.contains("我的私教") || lowerMsg.contains("我的预约") ||
-                (lowerMsg.contains("私教") && (lowerMsg.contains("查询") || lowerMsg.contains("看看") || lowerMsg.contains("还剩") || lowerMsg.contains("剩余") || lowerMsg.contains("几次") || lowerMsg.contains("几节")))) {
+        if (lowerMsg.contains("我的私教") || lowerMsg.contains("我的私教预约") ||
+                (lowerMsg.contains("私教") && (lowerMsg.contains("查询") || lowerMsg.contains("看看") || lowerMsg.contains("还剩") || lowerMsg.contains("剩余") || lowerMsg.contains("几次") || lowerMsg.contains("几节") || lowerMsg.contains("预约了什么") || (lowerMsg.contains("约了什么") && !lowerMsg.contains("要")) || lowerMsg.contains("预约记录")))) {
             if (lowerMsg.contains("还剩") || lowerMsg.contains("剩余") || lowerMsg.contains("几次") || lowerMsg.contains("几节")) {
                 log.info("✅ 命中【查询私教剩余课时】分支");
                 return gymTools.getMyPackageInfo(memberId);
@@ -397,12 +397,20 @@ public class AIController {
         // ---- 1.5 推荐团课（优先于查询我的团课） ----
         if (lowerMsg.contains("推荐") && lowerMsg.contains("团课")) {
             log.info("命中【推荐团课】分支");
-            return handleQueryClasses(userMessage, memberId);
+            LocalDateTime now = LocalDateTime.now().withHour(8).withMinute(0).withSecond(0);
+            String recStart = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String recEnd = now.plusDays(7).withHour(22).withMinute(0).withSecond(0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            return gymTools.recommendGroupClasses(recStart, recEnd);
         }
 
         // ---- 2. 查询我的团课记录（精确匹配） ----
-        if ((lowerMsg.contains("我的团课") || lowerMsg.contains("我报名的团课") || lowerMsg.contains("我预约的团课")) ||
-                (lowerMsg.contains("团课") && (lowerMsg.contains("我的") || lowerMsg.contains("我看") || lowerMsg.contains("我报") || lowerMsg.contains("我约的")))) {
+        if ((lowerMsg.contains("我的团课") || lowerMsg.contains("我报名的团课") || lowerMsg.contains("我预约的团课")
+                || lowerMsg.contains("我约的团课") || lowerMsg.contains("团课预约记录") || lowerMsg.contains("团课报名记录"))
+                || (lowerMsg.contains("团课") && (lowerMsg.contains("我的") || lowerMsg.contains("我看")
+                        || lowerMsg.contains("我报") || lowerMsg.contains("我约的")
+                        || lowerMsg.contains("我预约了什么") || lowerMsg.contains("我预约了哪些")
+                        || (lowerMsg.contains("约了什么") && !lowerMsg.contains("要"))
+                        || (lowerMsg.contains("约了哪些") && !lowerMsg.contains("要"))))) {
             log.info("命中【查询我的团课记录】分支");
             return gymTools.queryMyClassBookings(memberId);
         }
@@ -421,24 +429,28 @@ public class AIController {
         }
 
         // ---- 2.8 查询我的所有预约（团课+私教） ----
-        if ((lowerMsg.contains("我") && (lowerMsg.contains("约了什么课") || lowerMsg.contains("约了哪些课") || lowerMsg.contains("的预约"))) ||
-                (lowerMsg.contains("我的") && (lowerMsg.contains("所有预约") || lowerMsg.contains("全部预约")))) {
+        if ((lowerMsg.contains("我") && (lowerMsg.contains("约了什么课") || lowerMsg.contains("约了哪些课")
+                || lowerMsg.contains("的预约") || lowerMsg.contains("预约了什么课") || lowerMsg.contains("预约了哪些课")
+                || (lowerMsg.contains("预约了什么") && !lowerMsg.contains("要"))
+                || (lowerMsg.contains("约了什么") && !lowerMsg.contains("课") && !lowerMsg.contains("团课")
+                        && !lowerMsg.contains("私教") && !lowerMsg.contains("要"))))
+                || (lowerMsg.contains("我的") && (lowerMsg.contains("所有预约") || lowerMsg.contains("全部预约")))) {
             log.info("命中【查询所有预约】分支（团课+私教）");
             String classBookings = gymTools.queryMyClassBookings(memberId);
             String ptBookings = gymTools.queryMyPTBookings(memberId);
             StringBuilder sb = new StringBuilder();
-            sb.append("\u3010\u60a8\u7684\u5168\u90e8\u9884\u7ea6\u3011\n\n");
-            sb.append("--- \u56e2\u8bfe\u9884\u7ea6 ---\n");
-            if (classBookings != null && !classBookings.contains("\u6682\u65e0") && !classBookings.contains("\u8bf7\u5148\u767b\u5f55")) {
+            sb.append("【您的全部预约】\n\n");
+            sb.append("--- 团课预约 ---\n");
+            if (classBookings != null && !classBookings.contains("暂无") && !classBookings.contains("请先登录")) {
                 sb.append(classBookings);
             } else {
-                sb.append("\u6682\u65e0\u56e2\u8bfe\u9884\u7ea6\n");
+                sb.append("暂无团课预约\n");
             }
-            sb.append("\n--- \u79c1\u6559\u8bfe\u9884\u7ea6 ---\n");
-            if (ptBookings != null && !ptBookings.contains("\u6682\u65e0") && !ptBookings.contains("\u8bf7\u5148\u767b\u5f55")) {
+            sb.append("\n--- 私教课预约 ---\n");
+            if (ptBookings != null && !ptBookings.contains("暂无") && !ptBookings.contains("请先登录")) {
                 sb.append(ptBookings);
             } else {
-                sb.append("\u6682\u65e0\u79c1\u6559\u8bfe\u9884\u7ea6\n");
+                sb.append("暂无私教课预约\n");
             }
             return sb.toString();
         }
@@ -577,8 +589,24 @@ public class AIController {
         String groupPendKey14 = "group_" + (memberId != null ? memberId : "guest");
         PendingBooking groupPend14 = pendingGroupBookings.get(groupPendKey14);
         if (pending != null && groupPend14 != null && userMessage.trim().matches("\\d+")) {
-            log.info("[私教上下文] 输入为纯数字，且存在团课上下文，跳过私教上下文处理");
-            pending = null;
+            // 私教流程正在等待支付选择（选项1/2/3），优先处理私教支付，避免被团课序号抢占
+            boolean ptWaitingPayment = pending.hasDate && pending.hasTime && pending.paymentMethod == null;
+            if (ptWaitingPayment && userMessage.trim().matches("[123]")) {
+                log.info("[私教上下文] 私教流程等待支付选择（输入{}），优先处理私教支付，跳过团课序号处理", userMessage.trim());
+            } else {
+                boolean validGroupChoice = false;
+                if (groupPend14.dateStr != null) {
+                    try {
+                        int num = Integer.parseInt(userMessage.trim());
+                        String[] groupOpts = groupPend14.dateStr.split(",");
+                        validGroupChoice = (num >= 1 && num <= groupOpts.length);
+                    } catch (NumberFormatException ignored) {}
+                }
+                if (validGroupChoice) {
+                    log.info("[私教上下文] 输入为纯数字，且是有效的团课序号，跳过私教上下文处理");
+                    pending = null;
+                }
+            }
         }
         if (pending != null) {
             log.info("命中【待完成预约上下文】pendingKey={}, hasDate={}, dateStr={}, hasTime={}", 
@@ -597,8 +625,18 @@ public class AIController {
                         return "日期时间格式有误，请使用类似【明天下午2点】的格式。";
                     }
                 }
-                pendingBookings.remove(pendingKey);
-                log.info("[预约上下文] 已获取日期和时间，检查支付方式");
+                // 校验预约时间是否已过
+                if (apptTime.isBefore(LocalDateTime.now())) {
+                    pendingBookings.remove(pendingKey);
+                    return "预约时间已过，请选择未来的时间。";
+                }
+                pending.hasDate = true;
+                pending.dateStr = dateStr;
+                pending.hasTime = true;
+                pending.timeStr = timeStr;
+                pending.retryCount = 0;
+                pendingBookings.put(pendingKey, pending);
+                log.info("[预约上下文] 已获取日期和时间，更新上下文，检查支付方式");
                 // 校验时间范围
                 int hour = apptTime.getHour();
                 int min = apptTime.getMinute();
@@ -630,6 +668,7 @@ public class AIController {
                        .orderByDesc(com.gym.entity.MemberPrivatePackage::getEndDate).last("LIMIT 1");
                     try { com.gym.entity.MemberPrivatePackage pkg1 = memberPrivatePackageMapper.selectOne(pw1); if (pkg1 != null) pkgId1 = pkg1.getId(); } catch (Exception e) { log.warn("查询课程包失败", e); }
                 }
+                log.info("[预约执行] 打算执行私教预约：memberId={}, trainerId={}, time={}, paymentMethod={}, useFree={}, pkgId={}", pending.memberId, pending.trainerId, apptTime, pending.paymentMethod, useFree1, pkgId1);
                 String result1 = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId1, useFree1);
                 pendingBookings.remove(pendingKey);
             if (result1.startsWith("私教预约成功")) {
@@ -708,7 +747,12 @@ public class AIController {
                         return "未能识别您的时间，请用【下午2点】或【14:00】格式重新输入。";
                     }
                 }
-                pendingBookings.remove(pendingKey);
+                // 校验预约时间是否已过
+                if (apptTime.isBefore(LocalDateTime.now())) {
+                    pendingBookings.remove(pendingKey);
+                    return "预约时间已过，请选择未来的时间。";
+                }
+                // ??????????????????????????
                 log.info("[预约上下文] 已获取时间，执行预约");
                 // 校验冲突
                 String conflictMsg2 = checkBookingConflict(pending.memberId, apptTime);
@@ -725,6 +769,11 @@ public class AIController {
                     pendingBookings.remove(pendingKey);
                     return "预约时间必须在上午9点到晚上9点之间，请重新选择。";
                 }
+                // 更新上下文：已收集时间，等待支付方式
+                pending.hasTime = true;
+                pending.timeStr = timeStr;
+                pending.retryCount = 0;
+                pendingBookings.put(pendingKey, pending);
                 // 检查支付方式
                 String payResult2 = processPaymentChoice(userMessage, pending, pendingKey);
                 if (payResult2 != null) {
@@ -748,12 +797,16 @@ public class AIController {
                        .last("LIMIT 1");
                     try { com.gym.entity.MemberPrivatePackage pkg2 = memberPrivatePackageMapper.selectOne(pw2); if (pkg2 != null) pkgId2 = pkg2.getId(); } catch (Exception e) { log.warn("查询课程包失败", e); }
                 }
+                    log.info("[预约执行] 打算执行私教预约：memberId={}, trainerId={}, time={}, paymentMethod={}, useFree={}, pkgId={}", pending.memberId, pending.trainerId, apptTime, pending.paymentMethod, useFree2, pkgId2);
                 String result2 = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId2, useFree2);
                 pendingBookings.remove(pendingKey);
                 if (result2.startsWith("私教预约成功")) {
                     String label2 = "单次付费";
                     if (useFree2) label2 = "免费私教课";
                     else if (pkgId2 != null) label2 = "课程包扣费";
+                    if (result2.contains("原价") || result2.contains("时间")) {
+                        return result2 + "\n支付方式：" + label2;
+                    }
                     return "预约成功！已为您预约 " + pending.trainerName + " 的课程，时间：" +
                             apptTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n支付方式：" + label2;
                 } else {
@@ -785,6 +838,11 @@ public class AIController {
                         pendingBookings.put(pendingKey, pending);
                         return "日期时间格式有误，请重新发起预约。";
                     }
+                }
+                // 校验预约时间是否已过
+                if (apptTime.isBefore(LocalDateTime.now())) {
+                    pendingBookings.remove(pendingKey);
+                    return "预约时间已过，请选择未来的时间。";
                 }
                 // 校验时间范围
                 int hour = apptTime.getHour();
@@ -819,6 +877,7 @@ public class AIController {
                         log.warn("查询课程包失败", e);
                     }
                 }
+                log.info("[预约执行] 打算执行私教预约：memberId={}, trainerId={}, time={}, paymentMethod={}, useFree={}, pkgId={}", pending.memberId, pending.trainerId, apptTime, pending.paymentMethod, useFree, pkgId);
                 String result = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId, useFree);
                 pendingBookings.remove(pendingKey);
         if (result.startsWith("私教预约成功")) {
@@ -840,7 +899,7 @@ public class AIController {
 
                 // ---- 11.5 具体教练名检测（解决"李教练的"进入预约）----
         String detectedTrainer = extractTrainerName(userMessage);
-        if (detectedTrainer != null && !lowerMsg.contains("查询") && !lowerMsg.contains("看看") && !lowerMsg.contains("介绍") && !lowerMsg.contains("怎么样") && !lowerMsg.contains("评价")) {
+        if (detectedTrainer != null && !lowerMsg.contains("查询") && !lowerMsg.contains("看看") && !lowerMsg.contains("介绍") && !lowerMsg.contains("怎么样") && !lowerMsg.contains("评价") && !lowerMsg.contains("有什么") && !lowerMsg.contains("有哪些") && !lowerMsg.contains("列表") && !lowerMsg.contains("谁")) {
             log.info("✔️ 命中【具体教练名预约】分支: detected={}", detectedTrainer);
             lastMentionedCoaches.put(sessionId, detectedTrainer);
             return handleBooking(userMessage, memberId);
@@ -869,7 +928,19 @@ public class AIController {
             }
             return "该教练" + (coachName != null ? coachName : "") + "的可预约时段，请您拨打前台电话或到店咨询。";
         }
-        // ---- 13.7 模糊预约意图引导 ----        if ((lowerMsg.contains("约课") || lowerMsg.contains("约一下") || lowerMsg.contains("想约") ||                lowerMsg.contains("要约") || lowerMsg.equals("约") || lowerMsg.equals("预约"))                && !lowerMsg.contains("团课") && !lowerMsg.contains("私教") && !lowerMsg.contains("教练")) {            log.info("✅ 命中【模糊预约意图】分支");            return "请问您想预约团课还是私教课？团课请回复课程名称（如动感单车），私教课请提供教练姓名。";        }        // ---- 14. 图片生成 ----
+        // ---- 13.7 模糊预约意图引导 ----
+        if ((lowerMsg.contains("约课") || lowerMsg.contains("约一下") || lowerMsg.contains("想约") ||
+                lowerMsg.contains("要约") || lowerMsg.equals("约") || lowerMsg.equals("预约"))
+                && !lowerMsg.contains("团课") && !lowerMsg.contains("私教") && !lowerMsg.contains("教练")) {
+            log.info("✅ 命中【模糊预约意图】分支");
+            return "请问您想预约团课还是私教课？团课请回复课程名称（如动感单车），私教课请提供教练姓名。";
+        }
+        // ---- 13.8 模糊引导后选择私教 ----
+        if (lowerMsg.equals("私教") || lowerMsg.equals("私教课") || lowerMsg.contains("私教吧")) {
+            log.info("✅ 命中【模糊引导-选择私教】分支");
+            return "好的，为您预约私教课。请提供教练姓名，例如「王教练」或「我要预约李教练」。";
+        }
+        // ---- 14. 图片生成 ----
         if (lowerMsg.contains("画") || lowerMsg.contains("图片") || lowerMsg.contains("图示") ||
                 lowerMsg.contains("姿势") || lowerMsg.contains("图解")) {
             log.info("✅ 命中【图片生成】分支");
@@ -1235,10 +1306,9 @@ public class AIController {
             return "__EXIT__";
         }
 
-        if (lower.equals("1") || lower.contains("免费")) { pending.paymentMethod = "free"; pendingBookings.put(pendingKey, pending); return null; }
-        if (lower.equals("2") || lower.contains("课程包")) { pending.paymentMethod = "package"; pendingBookings.put(pendingKey, pending); return null; }
-        if (lower.equals("3") || lower.contains("单次")) { pending.paymentMethod = "pay"; pendingBookings.put(pendingKey, pending); return null; }
-        // 没有识别到支付方式，查询可用选项
+        if (lower.equals("1") || lower.contains("免费")) { pending.paymentMethod = "free"; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择免费私教课，key={}", pendingKey); return null; }
+        if (lower.equals("2") || lower.contains("课程包")) { pending.paymentMethod = "package"; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择课程包，key={}", pendingKey); return null; }
+        if (lower.equals("3") || lower.contains("单次")) { pending.paymentMethod = "pay"; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择单次付费，key={}", pendingKey); return null; }
         try {
             // ====== 诊断：打印会员课程包原始数据 ======
             if (pending.memberId != null && pending.memberId > 0) {
@@ -1284,6 +1354,7 @@ public class AIController {
                 }
             }
             sb.append("3. 单次付费\n\n请回复数字或点击按钮选择");
+            log.info("[支付选择] 返回支付选项给用户，key={}, 选项文本长度={}", pendingKey, sb.length());
             return sb.toString();
         } catch (Exception e) {
             log.warn("查询支付方式失败", e);
@@ -1371,6 +1442,10 @@ public class AIController {
                 return "预约失败：日期或时间格式不正确，请使用类似【6月30日下午2点】或【2026-06-30 14:00】的格式。";
             }
         }
+        // 校验预约时间是否已过
+        if (appointmentTime.isBefore(LocalDateTime.now())) {
+            return "预约时间已过，请选择未来的时间。";
+        }
         long t3 = System.currentTimeMillis();
         log.info("[预约耗时] 解析日期时间: {}ms", t3 - t2);
 
@@ -1424,6 +1499,7 @@ public class AIController {
             }
         }
 
+        log.info("[预约执行] 打算执行私教预约：memberId={}, trainerId={}, time={}, paymentMethod={}, useFree={}, pkgId={}", memberId, trainerId, appointmentTime, null, useFree, pkgId);
         String result = ptService.bookPersonalTraining(memberId, trainerId, appointmentTime, 60, pkgId, useFree);
         long t4 = System.currentTimeMillis();
         log.info("[预约耗时] 执行预约(DB): {}ms", t4 - t3);
@@ -1433,6 +1509,10 @@ public class AIController {
             String label = "单次付费";
             if (useFree) label = "免费私教课";
             else if (pkgId != null) label = "课程包扣费";
+            // 优先返回实际结果（含课程/时间/原价/实付明细），不足时再补支付方式
+            if (result.contains("原价") || result.contains("时间")) {
+                return result + "\n支付方式：" + label;
+            }
             return "预约成功！已为您预约 " + trainerName + " 的课程，时间：" +
                     appointmentTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "\n支付方式：" + label;
         } else {
@@ -1466,9 +1546,6 @@ public class AIController {
             int currentYear = LocalDateTime.now().getYear();
             int currentMonth = LocalDateTime.now().getMonthValue();
             int year = currentYear;
-            if (month < currentMonth || (month == currentMonth && day < LocalDateTime.now().getDayOfMonth())) {
-                year++;
-            }
             return String.format("%d-%02d-%02d", year, month, day);
         }
         // 支持"号"格式（如"28号"，默认当前年月）

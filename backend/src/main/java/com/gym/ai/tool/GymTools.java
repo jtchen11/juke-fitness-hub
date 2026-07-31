@@ -101,6 +101,60 @@ public class GymTools {
         }
     }
 
+    public String recommendGroupClasses(String startTime, String endTime) {
+        try {
+            LocalDateTime start = LocalDateTime.parse(startTime, FORMATTER);
+            LocalDateTime end = LocalDateTime.parse(endTime, FORMATTER);
+            java.util.List<GroupClass> classes = groupClassService.getAvailableClasses(start, end, null, null);
+
+            // 过滤已满员课程
+            java.util.List<GroupClass> available = new java.util.ArrayList<>();
+            for (GroupClass gc : classes) {
+                int enrolled = gc.getEnrolled() != null ? gc.getEnrolled() : 0;
+                int cap = gc.getMaxCapacity() != null ? gc.getMaxCapacity() : 0;
+                if (enrolled < cap) {
+                    available.add(gc);
+                }
+            }
+            if (available.isEmpty()) {
+                return "【最终回答】当前时间段没有可推荐的团课（课程均已满员）。无需继续调用工具。";
+            }
+
+            // 按预约人数降序排序，取前3门
+            available.sort((a, b) -> {
+                int ea = a.getEnrolled() != null ? a.getEnrolled() : 0;
+                int eb = b.getEnrolled() != null ? b.getEnrolled() : 0;
+                return Integer.compare(eb, ea);
+            });
+            int limit = Math.min(3, available.size());
+            java.util.List<GroupClass> top = available.subList(0, limit);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("【最终回答】为您推荐 ").append(top.size()).append(" 门热门团课：\n");
+            java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("MM月dd日 HH:mm");
+            for (int i = 0; i < top.size(); i++) {
+                GroupClass gc = top.get(i);
+                String timeStr = gc.getStartTime() != null ? gc.getStartTime().format(dtf) : "";
+                String endTimeStr = "";
+                if (gc.getEndTime() != null) { endTimeStr = gc.getEndTime().format(dtf); }
+                String priceStr = ("free".equals(gc.getType()) || gc.getPrice() == null || gc.getPrice().compareTo(java.math.BigDecimal.ZERO) <= 0) ? "免费" : "￥" + gc.getPrice().toString();
+                int remaining = gc.getMaxCapacity() - gc.getEnrolled();
+                sb.append(i + 1).append(". ").append(gc.getName() != null ? gc.getName() : "")
+                        .append(" - ").append(timeStr);
+                if (gc.getEndTime() != null) {
+                    String[] endParts = endTimeStr.split(" ");
+                    if (endParts.length > 1) { sb.append("-").append(endParts[1]); }
+                }
+                sb.append(" - ").append(priceStr)
+                        .append("（已约 ").append(gc.getEnrolled()).append(" 人，剩余 ").append(remaining).append(" 人）\n");
+            }
+            sb.append("\n如需预约请告诉我课程名称。无需继续调用工具。");
+            return sb.toString();
+        } catch (Exception e) {
+            return "【最终回答】推荐团课失败，时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式。无需继续调用工具。";
+        }
+    }
+
     @Tool("为会员预约团课，参数：会员ID，课程ID")
     public String bookGroupClass(Long memberId, Long classId) {
         try {
@@ -159,13 +213,23 @@ public class GymTools {
             if (trainers == null || trainers.isEmpty()) {
                 return "【最终回答】暂无教练信息。无需继续调用工具。";
             }
+            java.util.List<Trainer> activeTrainers = new java.util.ArrayList<>();
+            for (Trainer t : trainers) {
+                if ("active".equals(t.getStatus())) {
+                    activeTrainers.add(t);
+                }
+            }
+            if (activeTrainers.isEmpty()) {
+                return "【最终回答】暂无在职教练信息。无需继续调用工具。";
+            }
             StringBuilder sb = new StringBuilder();
-            sb.append("【最终回答】共 ").append(trainers.size()).append(" 位教练：\n");
-            for (int i = 0; i < trainers.size(); i++) {
-                Trainer t = trainers.get(i);
+            sb.append("【最终回答】共 ").append(activeTrainers.size()).append(" 位在职教练：\n");
+            for (int i = 0; i < activeTrainers.size(); i++) {
+                Trainer t = activeTrainers.get(i);
                 sb.append(i + 1).append(". ").append(t.getName())
                         .append("，专长：").append(t.getSpecialty() != null ? t.getSpecialty() : "未设置")
-                        .append("，价格：").append(t.getPricePerHour()).append("元/小时\n");
+                        .append("，价格：").append(t.getPricePerHour()).append("元/小时")
+                        .append("，状态：在职\n");
             }
             sb.append("无需继续调用工具。");
             return sb.toString();

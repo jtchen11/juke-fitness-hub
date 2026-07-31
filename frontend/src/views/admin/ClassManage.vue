@@ -778,6 +778,11 @@ const saveClass = async () => {
     return
   }
 
+  // Issue 3: 免费课强制价格为0
+  if (formData.value.type === 'free') {
+    formData.value.price = 0
+  }
+
   saving.value = true
   try {
     if (isEdit.value) {
