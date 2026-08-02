@@ -3,7 +3,8 @@ const request = require('../../utils/request.js');
 Page({
   data: { tab: 'group', dateIdx: 0, ptDateIdx: 0, dates: [], ptDates: [], typeFilter: '', specFilter: '', courses: [], coaches: [], showLoginModal: false, isLoggedIn: false },
 
-  onLoad() {
+  onLoad(options) {
+    if (options && options.tab === 'pt') { this.setData({ tab: 'pt' }); }
     this.generateDates();
     this.generatePtDates();
     this.loadCourses();

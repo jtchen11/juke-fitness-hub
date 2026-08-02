@@ -5,11 +5,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gym.entity.Member;
 import com.gym.entity.CheckIn;
+import com.gym.entity.MemberPrivatePackage;
 import com.gym.entity.PersonalTraining;
 import com.gym.entity.Trainer;
 import com.gym.entity.TrainerLeave;
 import com.gym.mapper.MemberMapper;
 import com.gym.mapper.PersonalTrainingMapper;
+import com.gym.mapper.MemberPrivatePackageMapper;
 import com.gym.mapper.CheckInMapper;
 import com.gym.mapper.TrainerMapper;
 import com.gym.mapper.TrainerLeaveMapper;
@@ -50,6 +52,9 @@ public class PersonalTrainingController {
 
     @Autowired
     private CheckInMapper ptCheckInMapper;  // ← 注入 Service
+
+    @Autowired
+    private MemberPrivatePackageMapper packageMapper;
 
     @GetMapping
     public Map<String, Object> list(
@@ -187,9 +192,33 @@ public class PersonalTrainingController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     public Map<String, Object> update(@PathVariable Long id, @RequestBody PersonalTraining pt) {
+        PersonalTraining old = ptMapper.selectById(id);
         pt.setId(id);
         ptMapper.updateById(pt);
+
+        // ====== 取消时归还免费次数 / 课程包课时（R009）======
+        if (old != null && "cancelled".equals(pt.getStatus()) && !"cancelled".equals(old.getStatus())) {
+            if (Boolean.TRUE.equals(old.getIsFree())) {
+                Member member = memberMapper.selectById(old.getMemberId());
+                if (member != null) {
+                    int used = member.getFreePtUsedMonth() != null ? member.getFreePtUsedMonth() : 0;
+                    if (used > 0) {
+                        member.setFreePtUsedMonth(used - 1);
+                        memberMapper.updateById(member);
+                    }
+                }
+            }
+            if (old.getPackageId() != null) {
+                MemberPrivatePackage pkg = packageMapper.selectById(old.getPackageId());
+                if (pkg != null) {
+                    pkg.setUsedSessions(pkg.getUsedSessions() - 1);
+                    pkg.setRemainingSessions(pkg.getRemainingSessions() + 1);
+                    packageMapper.updateById(pkg);
+                }
+            }
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
@@ -249,6 +278,16 @@ public class PersonalTrainingController {
                     member.setFreePtUsedMonth(used - 1);
                     memberMapper.updateById(member);
                 }
+            }
+        }
+
+        // ====== 如果取消的是课程包预约，归还课时 ======
+        if ("cancelled".equals(status) && pt.getPackageId() != null) {
+            MemberPrivatePackage pkg = packageMapper.selectById(pt.getPackageId());
+            if (pkg != null) {
+                pkg.setUsedSessions(pkg.getUsedSessions() - 1);
+                pkg.setRemainingSessions(pkg.getRemainingSessions() + 1);
+                packageMapper.updateById(pkg);
             }
         }
 

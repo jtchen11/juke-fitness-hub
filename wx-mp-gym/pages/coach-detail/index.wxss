@@ -43,3 +43,28 @@
 .btn-primary{width:100%;height:88rpx;background:#4A6CF7;border-radius:8px;color:#FFF;font-size:32rpx;font-weight:600;line-height:88rpx;border:none;margin-bottom:16rpx}
 
 .unit-inline{font-size:20rpx;color:#8A8AA0}
+
+/* Pay Modal */
+.pay-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center}
+.pay-modal{background:#FFF;border-radius:16px;width:640rpx;max-height:78vh;overflow:hidden;display:flex;flex-direction:column}
+.pay-modal-header{background:#4A6CF7;padding:36rpx 40rpx 28rpx;text-align:center;flex-shrink:0}
+.pay-modal-title{font-size:36rpx;font-weight:700;color:#FFF;display:block}
+.pay-modal-sub{font-size:24rpx;color:rgba(255,255,255,0.85);display:block;margin-top:8rpx}
+.pay-modal-body{flex:1;max-height:50vh;padding:8rpx 40rpx 0;box-sizing:border-box}
+.pay-item{display:flex;align-items:center;justify-content:space-between;padding:24rpx 8rpx;border-bottom:1rpx solid #F0F0F4}
+.pay-item:active{background:#F7F9FF}
+.pay-item-label{font-size:28rpx;color:#1A1A2E;flex:1;min-width:0;word-break:break-all}
+.pay-item-arrow{font-size:32rpx;color:#B0B0C0;margin-left:12rpx;flex-shrink:0}
+.pay-single-row{border-bottom:none}
+.pay-single{color:#4A6CF7;font-weight:600}
+.pay-children{margin-left:20rpx;border-left:2rpx solid #D6E6FF;padding-left:16rpx;background:#FAFCFF}
+.pay-item.pay-child{background:#FAFCFF}
+.pay-modal-footer{display:flex;padding:24rpx 40rpx 40rpx;flex-shrink:0}
+.pay-btn-cancel{flex:1;height:88rpx;line-height:84rpx;font-size:30rpx;margin:0;background:#FFF;border:2rpx solid #E8E8E8;border-radius:8px;color:#8A8AA0;text-align:center}
+.pay-btn-cancel::after{border:none}
+.pay-btn-confirm{flex:1;height:88rpx;line-height:88rpx;font-size:30rpx;margin:0;background:#4A6CF7;border-radius:8px;color:#FFF;text-align:center}
+.pay-btn-confirm::after{border:none}
+.success-body{max-height:40vh;padding:28rpx 40rpx 0;box-sizing:border-box}
+.success-msg{font-size:28rpx;color:#1A1A2E;line-height:1.7;white-space:pre-line;word-break:break-all;display:block}
+.btn-cancel{width:100%;height:80rpx;background:#FFF;border-radius:8px;color:#8A8AA0;font-size:28rpx;line-height:80rpx;border:2rpx solid #E8E8E8}
+.btn-cancel::after{border:none}

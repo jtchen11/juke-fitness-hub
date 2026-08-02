@@ -95,12 +95,22 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
             if (pkg == null) return "课程包不存在";
             if (!pkg.getMemberId().equals(memberId)) return "无权使用该课程包";
             if (pkg.getRemainingSessions() <= 0) return "课程包已用完";
+            // 首次使用时激活：start_date = 今天，end_date = 今天 + valid_days
+            if (pkg.getStartDate() == null) {
+                if (pkg.getActivationDeadline() != null && pkg.getActivationDeadline().isBefore(LocalDate.now())) {
+                    return "课程包已过期，无法激活";
+                }
+                pkg.setStartDate(LocalDate.now());
+                pkg.setEndDate(pkg.getValidDays() != null && pkg.getValidDays() > 0
+                        ? LocalDate.now().plusDays(pkg.getValidDays()) : null);
+            }
             if (pkg.getEndDate() != null && pkg.getEndDate().isBefore(LocalDate.now())) {
                 // Issue 3: 尝试自动查找另一个有效课程包
                 com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MemberPrivatePackage> fbw =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
                 fbw.eq(MemberPrivatePackage::getMemberId, memberId)
-                   .eq(MemberPrivatePackage::getStatus, "active")
+                   .ne(MemberPrivatePackage::getStatus, "refunded")
+                   .isNotNull(MemberPrivatePackage::getStartDate)
                    .gt(MemberPrivatePackage::getRemainingSessions, 0)
                    .and(w -> w.isNull(MemberPrivatePackage::getEndDate)
                         .or()

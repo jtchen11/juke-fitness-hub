@@ -15,7 +15,11 @@ Page({
     showLoginModal: false,
     showPayModal: false,
     payBookingId: null,
-    payAmount: 0,
+    payAmount: '0.00',
+    payOriginalPrice: '0.00',
+    payDiscount: '0.00',
+    payDiscountPct: 0,
+    payLevelName: '',
     payClassName: ''
   },
 
@@ -122,29 +126,22 @@ Page({
 
     if (isPaid && isMember) {
       _this.setData({ loading: true });
-    // \u67e5\u4f1a\u5458\u7b49\u7ea7\u6298\u6263
+      // \u67e5\u4f1a\u5458\u7b49\u7ea7\u6298\u6263\uff0c\u586b\u5145\u81ea\u5b9a\u4e49\u652f\u4ed8\u5f39\u7a97
       var memberId = user.memberId;
       request.get('/api/members/' + memberId + '/benefits', null, function(ben) {
         _this.setData({ loading: false });
         var discountPct = (ben && ben.discount) || 0;
         var discounted = price * (100 - discountPct) / 100;
-        var content = '\u8bfe\u7a0b\u540d\u79f0\uff1a' + t.course.name;
-        content += '\n\u539f\u4ef7\uff1a\u00a5' + price.toFixed(2);
-        if (discountPct > 0) {
-          var levelName = ben.levelName || '';
-          content += '\n' + levelName + '\u6298\u6263\uff1a-\u00a5' + (price - discounted).toFixed(2) + '\uff08' + discountPct + '%\uff09';
-        }
-        content += '\n\u5b9e\u4ed8\u91d1\u989d\uff1a\u00a5' + discounted.toFixed(2);
-        wx.showModal({
-          title: '\u786e\u8ba4\u652f\u4ed8',
-          content: content,
-          cancelText: '\u53d6\u6d88',
-          confirmText: '\u786e\u8ba4\u652f\u4ed8',
-          success: function(res) {
-            if (res.confirm) {
-              _this.doBook();
-            }
-          }
+        var levelName = (ben && ben.levelName) || '';
+        var discountAmount = price - discounted;
+        _this.setData({
+          showPayModal: true,
+          payClassName: t.course.name || '',
+          payOriginalPrice: price.toFixed(2),
+          payDiscountPct: discountPct,
+          payDiscount: discountAmount > 0 ? discountAmount.toFixed(2) : '0.00',
+          payLevelName: levelName,
+          payAmount: discounted.toFixed(2)
         });
       });
     } else {
@@ -162,6 +159,7 @@ Page({
     }, function(r) {
       _this.setData({ loading: false });
       if (r && r.success) {
+        _this.setData({ showPayModal: false });
         var msg = r.message || '\u9884\u7ea6\u6210\u529f';
         wx.showModal({
           title: '\u9884\u7ea6\u6210\u529f',
@@ -177,26 +175,13 @@ Page({
   },
 
   confirmPay: function() {
-    var _this = this;
-    _this.setData({ loading: true });
-    request.post('/api/class-bookings/' + _this.data.payBookingId + '/pay', null, function(r) {
-      _this.setData({ loading: false, showPayModal: false });
-      if (r && r.success) {
-        wx.showToast({ title: '\u652f\u4ed8\u6210\u529f', icon: 'success' });
-        setTimeout(function() { wx.navigateBack(); }, 1500);
-      } else {
-        wx.showToast({ title: (r && r.message) || '\u652f\u4ed8\u5931\u8d25', icon: 'none' });
-      }
-    });
+    // \u786e\u8ba4\u652f\u4ed8\u540e\u6267\u884c\u9884\u7ea6\uff08\u524d\u7aef\u63a7\u5236\uff1a\u70b9\u51fb\u786e\u8ba4\u624d\u8c03\u7528\u9884\u7ea6\u63a5\u53e3\uff09
+    this.doBook();
   },
 
   closePayModal: function() {
-    var _this = this;
-    var bookingId = _this.data.payBookingId;
-    if (bookingId) {
-      request.post('/api/class-bookings/' + bookingId + '/cancel', null, function(r) {});
-    }
-    this.setData({ showPayModal: false, payBookingId: null, payAmount: 0, payClassName: '' });
+    // \u53d6\u6d88\u5373\u7ec8\u6b62\u6d41\u7a0b\uff0c\u4e0d\u6267\u884c\u9884\u7ea6
+    this.setData({ showPayModal: false, payBookingId: null, payAmount: '0.00', payOriginalPrice: '0.00', payDiscount: '0.00', payDiscountPct: 0, payLevelName: '', payClassName: '' });
   },
 
   onLoginClose: function() {

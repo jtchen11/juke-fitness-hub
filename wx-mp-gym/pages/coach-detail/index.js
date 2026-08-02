@@ -11,7 +11,17 @@ Page({
     ptDateDisplay: '',
     slots: [],
     slotIdx: -1,
-    showLoginModal: false
+    showLoginModal: false,
+    showPayModal: false,
+    showSuccessModal: false,
+    successMsg: '',
+    successTitle: '预约成功',
+    payFreeText: '',
+    payActivePkgs: [],
+    payPendingPkgs: [],
+    payPendingExpanded: false,
+    paySingleText: '',
+    payBookingCtx: null
   },
 
   onLoad(params) {
@@ -78,7 +88,13 @@ Page({
     }
     _this.setData({ loading: true });
 
-    var memberId = (app.globalData.userInfo || {}).memberId;
+    var ui = app.globalData.userInfo || wx.getStorageSync("userInfo") || {};
+    var memberId = ui.memberId || ui.id;
+    console.log('[coach-detail] confirmBooking memberId=', memberId, 'userInfo=', ui);
+    if (!memberId) {
+      wx.showToast({ title: '请先登录', icon: 'none' });
+      return;
+    }
     var coach = t.coach;
     var appointmentTime = t.ptDate + ' ' + t.slots[t.slotIdx] + ':00';
 
@@ -104,50 +120,84 @@ Page({
 
   showPaymentPicker: function(memberId, coach, appointmentTime, benefits, packages) {
     var _this = this;
-    var itemList = [];
-    var itemData = [];
+    console.log('[coach-detail] showPaymentPicker memberId=', memberId, 'packages raw=', packages, 'benefits=', benefits);
+    var freeText = '';
+    var activePkgs = [];
+    var pendingPkgs = [];
 
     // 选项1：免费次数
     var freeRemaining = (benefits && benefits.freePtRemaining) || 0;
     if (freeRemaining > 0) {
-      itemList.push('\u514d\u8d39\u6b21\u6570\uff08\u5269\u4f59 ' + freeRemaining + ' \u6b21\uff09');
-      itemData.push({ useFree: true, packageId: null, label: 'free' });
+      freeText = '免费次数（剩余 ' + freeRemaining + ' 次）';
     }
 
-    // 选项2：课程包
+    // 选项2：课程包（已激活且有效全部列出；未激活未过期的收拢为“待激活”，点击展开后自动激活并使用）
     if (packages && packages.length > 0) {
       for (var i = 0; i < packages.length; i++) {
         var p = packages[i];
         var remaining = p.remainingSessions || 0;
         if (remaining <= 0) continue;
-        itemList.push('\u8bfe\u7a0b\u5305\uff08' + (p.packageName || '') + '\uff0c\u5269\u4f59 ' + remaining + ' \u8282\uff09');
-        itemData.push({ useFree: false, packageId: p.id, label: 'package_' + i });
+        if (p.startDate) {
+          activePkgs.push({ id: p.id, name: p.packageName || '私教包', remaining: remaining, endDate: p.endDate || '长期' });
+        } else {
+          pendingPkgs.push({ id: p.id, name: p.packageName || '私教包', remaining: remaining });
+        }
       }
     }
 
-    // 选项3：单次付费
+    // 选项3：单次付费（始终显示在最后）
     var pricePerHour = coach.pricePerHour || 300;
     var discountPct = (benefits && benefits.discount) || 0;
     var discounted = pricePerHour * (100 - discountPct) / 100;
-    var priceText = '\u5355\u6b21\u4ed8\u8d39 \u00a5' + pricePerHour.toFixed(2);
+    var priceText = '单次付费 ¥' + pricePerHour.toFixed(2);
     if (discountPct > 0) {
-      priceText = '\u5355\u6b21\u4ed8\u8d39 \u00a5' + discounted.toFixed(2) + '\uff08\u5df2\u4eab' + (benefits.levelName || '') + discountPct + '%\u6298\u6263\uff0c\u539f\u4ef7\u00a5' + pricePerHour.toFixed(2) + '\uff09';
+      priceText = '单次付费 ¥' + discounted.toFixed(2) + '（已享' + (benefits.levelName || '') + discountPct + '%折扣，原价¥' + pricePerHour.toFixed(2) + '）';
     }
-    itemList.push(priceText);
-    itemData.push({ useFree: false, packageId: null, label: 'single' });
 
-    if (itemList.length === 0) {
-      wx.showToast({ title: '\u6ca1\u6709\u53ef\u7528\u7684\u652f\u4ed8\u65b9\u5f0f', icon: 'none' });
+    console.log('[coach-detail] activePkgs=', activePkgs.length, 'pendingPkgs=', pendingPkgs.length, 'freeText=', freeText);
+    if (!freeText && activePkgs.length === 0 && pendingPkgs.length === 0) {
+      wx.showToast({ title: '没有可用的支付方式', icon: 'none' });
       return;
     }
 
-    wx.showActionSheet({
-      itemList: itemList,
-      success: function(res) {
-        var selected = itemData[res.tapIndex];
-        _this.doPTBook(memberId, coach.id, appointmentTime, selected.useFree, selected.packageId);
-      }
+    _this.setData({
+      showPayModal: true,
+      payFreeText: freeText,
+      payActivePkgs: activePkgs,
+      payPendingPkgs: pendingPkgs,
+      payPendingExpanded: false,
+      paySingleText: priceText,
+      payBookingCtx: { memberId: memberId, coachId: coach.id, appointmentTime: appointmentTime }
     });
+  },
+
+  togglePendingPay: function() {
+    this.setData({ payPendingExpanded: !this.data.payPendingExpanded });
+  },
+
+  closePayModal: function() {
+    this.setData({ showPayModal: false });
+  },
+
+  stopPropagation: function() {},
+
+  closeSuccessModal: function() {
+    this.setData({ showSuccessModal: false });
+    wx.navigateBack();
+  },
+
+  selectPayMethod: function(e) {
+    var _this = this;
+    var type = e.currentTarget.dataset.type;
+    var id = e.currentTarget.dataset.id;
+    var ctx = _this.data.payBookingCtx;
+    if (!ctx) return;
+    var useFree = false;
+    var packageId = null;
+    if (type === 'free') { useFree = true; }
+    else if (type === 'pkg') { packageId = Number(id); }
+    _this.setData({ showPayModal: false });
+    _this.doPTBook(ctx.memberId, ctx.coachId, ctx.appointmentTime, useFree, packageId);
   },
 
   doPTBook: function(memberId, trainerId, appointmentTime, useFree, packageId) {
@@ -164,13 +214,7 @@ Page({
       _this.setData({ loading: false });
       if (r && r.success) {
         var msg = r.message || '\u9884\u7ea6\u6210\u529f';
-        wx.showModal({
-          title: '\u9884\u7ea6\u6210\u529f',
-          content: msg,
-          showCancel: false,
-          confirmText: '\u77e5\u9053\u4e86',
-          success: function() { wx.navigateBack(); }
-        });
+        _this.setData({ showSuccessModal: true, successMsg: msg });
       } else {
         wx.showToast({ title: (r && r.message) || '\u9884\u7ea6\u5931\u8d25', icon: 'none' });
       }

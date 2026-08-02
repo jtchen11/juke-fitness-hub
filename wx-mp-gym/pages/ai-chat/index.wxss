@@ -43,3 +43,20 @@
   font-size: 24rpx;
   margin-left: 8rpx;
 }
+.payment-opt-wrap { display: flex; flex-direction: column; }
+.payment-children {
+  margin-left: 24rpx;
+  border-left: 2rpx solid #b3d4ff;
+  padding-left: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.payment-child-btn {
+  background: #f7f9ff;
+  border: 1rpx solid #d6e6ff;
+  border-radius: 10rpx;
+  padding: 12rpx 16rpx;
+}
+.payment-child-btn:active { background: #eaf1ff; }
+.child-label { color: #1A1A2E; }

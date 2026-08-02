@@ -58,11 +58,63 @@
 
   <!-- Login Modal -->
   <view class="login-mask" wx:if="{{showLoginModal}}" bindtap="onLoginClose">
-    <view class="login-modal" catchtap="">
+    <view class="login-modal" catchtap="stopPropagation">
       <text class="login-modal-title">请先登录</text>
       <text class="login-modal-desc">登录后即可预约教练</text>
       <button class="btn-primary" bindtap="onLogin">去登录</button>
       <button class="btn-cancel" bindtap="onLoginClose">取消</button>
+    </view>
+  </view>
+  <!-- Pay Modal（选择支付方式） -->
+  <view class="pay-mask" wx:if="{{showPayModal}}" bindtap="closePayModal">
+    <view class="pay-modal" catchtap="stopPropagation">
+      <view class="pay-modal-header">
+        <text class="pay-modal-title">选择支付方式</text>
+        <text class="pay-modal-sub">请选择本次私教课的支付方式</text>
+      </view>
+      <scroll-view class="pay-modal-body" scroll-y>
+        <view wx:if="{{payFreeText}}" class="pay-item" bindtap="selectPayMethod" data-type="free">
+          <text class="pay-item-label">{{payFreeText}}</text>
+          <text class="pay-item-arrow">›</text>
+        </view>
+        <view class="pay-item" wx:for="{{payActivePkgs}}" wx:key="id" bindtap="selectPayMethod" data-type="pkg" data-id="{{item.id}}">
+          <text class="pay-item-label">{{item.name}}（剩余 {{item.remaining}} 节，有效期至 {{item.endDate}}）</text>
+          <text class="pay-item-arrow">›</text>
+        </view>
+        <view class="pay-item" wx:if="{{payPendingPkgs.length > 0}}" catchtap="togglePendingPay">
+          <text class="pay-item-label">▶ 待激活课程包（{{payPendingPkgs.length}} 个）</text>
+          <text class="pay-item-arrow">{{payPendingExpanded ? '收起' : '展开'}}</text>
+        </view>
+        <view class="pay-children" wx:if="{{payPendingExpanded}}">
+          <view class="pay-item pay-child" wx:for="{{payPendingPkgs}}" wx:key="id" bindtap="selectPayMethod" data-type="pkg" data-id="{{item.id}}">
+            <text class="pay-item-label">{{item.name}}（点击激活，剩余 {{item.remaining}} 节）</text>
+            <text class="pay-item-arrow">›</text>
+          </view>
+        </view>
+        <view class="pay-item pay-single-row" bindtap="selectPayMethod" data-type="single">
+          <text class="pay-item-label pay-single">{{paySingleText}}</text>
+          <text class="pay-item-arrow">›</text>
+        </view>
+      </scroll-view>
+      <view class="pay-modal-footer">
+        <button class="pay-btn-cancel" bindtap="closePayModal">取消</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- Success Modal（预约成功） -->
+  <view class="pay-mask" wx:if="{{showSuccessModal}}" catchtap="closeSuccessModal">
+    <view class="pay-modal" catchtap="stopPropagation">
+      <view class="pay-modal-header">
+        <text class="pay-modal-title">✅ {{successTitle}}</text>
+        <text class="pay-modal-sub">预约已完成，请按时到店</text>
+      </view>
+      <scroll-view class="success-body" scroll-y>
+        <text class="success-msg">{{successMsg}}</text>
+      </scroll-view>
+      <view class="pay-modal-footer">
+        <button class="pay-btn-confirm" bindtap="closeSuccessModal">知道了</button>
+      </view>
     </view>
   </view>
 </view>

@@ -34,13 +34,23 @@
 .pkg-remaining{font-size:24rpx;color:#4A6CF7;font-weight:600}
 .empty-state{text-align:center;padding:60rpx 0;font-size:28rpx;color:#8A8AA0}
 /* pay modal */
-.pay-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999}
-.pay-modal{position:fixed;bottom:0;left:0;right:0;background:#FFF;border-radius:24rpx 24rpx 0 0;padding:40rpx;z-index:1000}
-.pay-title{font-size:32rpx;font-weight:600;color:#1A1A2E;text-align:center;display:block;margin-bottom:20rpx}
-.pay-detail{text-align:center;margin-bottom:30rpx}
-.pay-detail text{display:block;font-size:28rpx;color:#8A8AA0;margin-bottom:8rpx}
-.pay-amount{text-align:center;margin-bottom:30rpx}
-.pay-amount text{font-size:48rpx;font-weight:700;color:#FF5252}
-.pay-btns{display:flex;gap:20rpx}
-.pay-cancel{flex:1;text-align:center;padding:20rpx;border:2rpx solid #E8E8E8;border-radius:8px;color:#8A8AA0;font-size:28rpx}
-.pay-confirm{flex:1;text-align:center;padding:20rpx;background:#4A6CF7;border-radius:8px;color:#FFF;font-size:28rpx}
+.pay-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center}
+.pay-modal{background:#FFF;border-radius:16px;width:620rpx;overflow:hidden}
+.pay-modal-header{background:#4A6CF7;padding:36rpx 40rpx 28rpx;text-align:center;flex-shrink:0}
+.pay-modal-title{font-size:36rpx;font-weight:700;color:#FFF;display:block}
+.pay-modal-sub{font-size:24rpx;color:rgba(255,255,255,0.85);display:block;margin-top:8rpx}
+.pay-modal-body{padding:8rpx 40rpx 0}
+.pay-info-row{display:flex;justify-content:space-between;align-items:center;padding:24rpx 0;border-bottom:1rpx solid #F0F0F4}
+.pay-label{font-size:28rpx;color:#8A8AA0;flex-shrink:0}
+.pay-value{font-size:28rpx;color:#1A1A2E;font-weight:600;text-align:right;flex:1;margin-left:32rpx;word-break:break-all}
+.pay-value.pay-original{color:#8A8AA0;text-decoration:line-through;font-weight:400}
+.pay-divider{height:2rpx;background:#E8E8E8;margin:8rpx 0 0}
+.pay-total-row{border-bottom:none;padding-top:28rpx;padding-bottom:12rpx}
+.pay-total-label{font-size:30rpx;font-weight:600;color:#1A1A2E}
+.pay-total{color:#4A6CF7;font-size:42rpx;font-weight:700}
+.pay-saved{display:block;text-align:center;font-size:24rpx;color:#4A6CF7;padding-bottom:24rpx}
+.pay-modal-footer{display:flex;gap:24rpx;padding:0 40rpx 40rpx}
+.pay-btn-cancel{flex:1;height:88rpx;line-height:84rpx;font-size:30rpx;margin:0;background:#FFF;border:2rpx solid #E8E8E8;border-radius:8px;color:#8A8AA0;text-align:center}
+.pay-btn-confirm{flex:1;height:88rpx;line-height:88rpx;font-size:30rpx;margin:0;background:#4A6CF7;border-radius:8px;color:#FFF;text-align:center}
+.pkg-status.used{background:rgba(138,138,160,0.1);color:#8A8AA0}
+.pkg-status.pending{background:rgba(255,152,0,0.1);color:#FF9800}

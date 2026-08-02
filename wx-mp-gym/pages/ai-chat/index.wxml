@@ -19,9 +19,17 @@
         <text wx:if="{{item.isStreaming && !item.content}}">正在输入<text class="streaming-dots">...</text></text>
         <text wx:else>{{item.content}}</text>
         <view wx:if="{{item.paymentOptions && item.paymentOptions.length > 0}}" class="payment-buttons">
-          <view class="payment-btn" wx:for="{{item.paymentOptions}}" wx:for-index="optIdx" wx:for-item="opt" wx:key="optIdx" data-pay="{{opt.payValue}}" bindtap="onPaymentSelect">
-            <text>{{opt.label}}</text>
-            <text wx:if="{{opt.sub}}" class="payment-sub">{{opt.sub}}</text>
+          <view wx:for="{{item.paymentOptions}}" wx:for-index="optIdx" wx:for-item="opt" wx:key="optIdx" class="payment-opt-wrap">
+            <view class="payment-btn" data-pay="{{opt.payValue}}" data-msg="{{msgIdx}}" data-opt="{{optIdx}}" bindtap="onPaymentSelect">
+              <text>{{opt.label}}</text>
+              <text wx:if="{{opt.sub}}" class="payment-sub">{{opt.sub}}</text>
+            </view>
+            <view wx:if="{{opt.children && opt.children.length > 0 && item.paymentExpanded == optIdx}}" class="payment-children">
+              <view class="payment-child-btn" wx:for="{{opt.children}}" wx:for-index="ci" wx:for-item="child" wx:key="ci" data-pay="{{child.payValue}}" data-msg="{{msgIdx}}" data-opt="{{optIdx}}" data-child="1" bindtap="onPaymentSelect">
+                <text class="child-label">{{child.label}}</text>
+                <text wx:if="{{child.sub}}" class="payment-sub">{{child.sub}}</text>
+              </view>
+            </view>
           </view>
         </view>
       </view>

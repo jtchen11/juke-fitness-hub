@@ -679,7 +679,8 @@ public String generateMealPlanSkeleton(Long memberId) {
 
         LambdaQueryWrapper<MemberPrivatePackage> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MemberPrivatePackage::getMemberId, memberId)
-                .eq(MemberPrivatePackage::getStatus, "active")
+                .ne(MemberPrivatePackage::getStatus, "refunded")
+                .isNotNull(MemberPrivatePackage::getStartDate)
                 .gt(MemberPrivatePackage::getRemainingSessions, 0)
                 .and(w -> w.isNull(MemberPrivatePackage::getEndDate)
                         .or()

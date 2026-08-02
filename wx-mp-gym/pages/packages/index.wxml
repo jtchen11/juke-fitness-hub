@@ -30,7 +30,7 @@
     <view class="pkg-card" wx:for="{{list}}" wx:key="id">
       <view class="pkg-top">
         <text class="pkg-name">{{item.packageName}}</text>
-        <text class="pkg-status {{item.status}}">{{item.status==='active' ? '使用中' : item.status==='expired' ? '已过期' : '已退款'}}</text>
+        <text class="pkg-status {{item.statusClass}}">{{item.statusText}}</text>
       </view>
       <view class="pkg-progress">
         <view class="progress-bar"><view class="progress-fill" style="width:{{item.usedSessions/item.totalSessions*100}}%"></view></view>
@@ -45,15 +45,34 @@
 
   <view wx:if="{{showPayModal}}" class="pay-overlay" catchtap="closePayModal">
     <view class="pay-modal" catchtap="">
-      <text class="pay-title">确认购买</text>
-      <view class="pay-detail">
-        <text>{{payPkg.name}}</text>
-        <text>{{payPkg.sessions}}节课 · 有效期{{payPkg.validDays}}天</text>
+      <view class="pay-modal-header">
+        <text class="pay-modal-title">确认购买</text>
+        <text class="pay-modal-sub">请确认课程包信息</text>
       </view>
-      <view class="pay-amount"><text>¥{{payPkg.price}}</text></view>
-      <view class="pay-btns">
-        <view class="pay-cancel" bindtap="closePayModal">取消</view>
-        <view class="pay-confirm" bindtap="confirmBuy">确认支付</view>
+      <view class="pay-modal-body">
+        <view class="pay-info-row">
+          <text class="pay-label">课程包名称</text>
+          <text class="pay-value">{{payPkg.name}}</text>
+        </view>
+        <view class="pay-info-row">
+          <text class="pay-label">课时/有效期</text>
+          <text class="pay-value">{{payPkg.sessions}}节课 · {{payPkg.validDays}}天</text>
+        </view>
+        <view class="pay-info-row">
+          <text class="pay-label">原价</text>
+          <text class="pay-value pay-original">¥{{payOriginalPrice}}</text>
+        </view>
+        <view class="pay-divider"></view>
+        <view class="pay-info-row pay-total-row">
+          <text class="pay-label pay-total-label">实付金额</text>
+          <text class="pay-value pay-total">¥{{payFinalPrice}}</text>
+        </view>
+        <text wx:if="{{payDiscount>0}}" class="pay-saved">已享{{payLevelName}}{{payDiscount}}%折扣</text>
+        <text wx:else class="pay-saved">普通会员无折扣</text>
+      </view>
+      <view class="pay-modal-footer">
+        <button class="pay-btn-cancel" bindtap="closePayModal">取消</button>
+        <button class="pay-btn-confirm" bindtap="confirmBuy">确认购买</button>
       </view>
     </view>
   </view>

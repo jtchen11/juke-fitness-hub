@@ -70,13 +70,33 @@
   <!-- Pay Modal -->
   <view class="pay-mask" wx:if="{{showPayModal}}" catchtap="closePayModal">
     <view class="pay-modal" catchtap="">
-      <text class="pay-modal-title">确认支付</text>
-      <view class="pay-modal-body">
-        <view class="pay-info-row"><text class="pay-label">课程</text><text class="pay-value">{{payClassName}}</text></view>
-        <view class="pay-info-row"><text class="pay-label">应付金额</text><text class="pay-value price">¥{{payAmount}}</text></view>
+      <view class="pay-modal-header">
+        <text class="pay-modal-title">确认支付</text>
+        <text class="pay-modal-sub">请确认以下课程信息</text>
       </view>
-      <button class="btn-primary" bindtap="confirmPay" loading="{{loading}}">确认支付 ¥{{payAmount}}</button>
-      <button class="btn-cancel" bindtap="closePayModal">取消</button>
+      <view class="pay-modal-body">
+        <view class="pay-info-row">
+          <text class="pay-label">课程名称</text>
+          <text class="pay-value">{{payClassName}}</text>
+        </view>
+        <view class="pay-info-row">
+          <text class="pay-label">原价</text>
+          <text class="pay-value">¥{{payOriginalPrice}}</text>
+        </view>
+        <view class="pay-info-row" wx:if="{{payDiscountPct > 0}}">
+          <text class="pay-label">{{payLevelName}}折扣</text>
+          <text class="pay-value pay-discount">-¥{{payDiscount}}（{{payDiscountPct}}%）</text>
+        </view>
+        <view class="pay-divider"></view>
+        <view class="pay-info-row pay-total-row">
+          <text class="pay-label pay-total-label">实付金额</text>
+          <text class="pay-value pay-total">¥{{payAmount}}</text>
+        </view>
+      </view>
+      <view class="pay-modal-footer">
+        <button class="btn-cancel pay-btn-cancel" bindtap="closePayModal">取消</button>
+        <button class="btn-primary pay-btn-confirm" bindtap="confirmPay" loading="{{loading}}">确认支付</button>
+      </view>
     </view>
   </view>
 </view>

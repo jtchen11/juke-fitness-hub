@@ -216,9 +216,34 @@ Page({
                 var optionsText = pparts[1] || "";
                 var payOptions = [];
                 var optLines = optionsText.split("\n");
+                var lastMain = -1;
                 for (var oi = 0; oi < optLines.length; oi++) {
                   var optLine = optLines[oi].trim();
                   if (!optLine) continue;
+                  // 子行（待激活课程包的展开项）：以 "-" 或 "·" 开头
+                  if (optLine.indexOf("-") === 0 || optLine.indexOf("\u00b7") === 0) {
+                    if (lastMain < 0) continue;
+                    var restSub = optLine.substring(1).trim();
+                    var childPay = "";
+                    var pm2 = restSub.match(/\[pkg=(\d+)\]/);
+                    if (pm2) {
+                      childPay = "pkg=" + pm2[1];
+                      restSub = restSub.replace(/\[pkg=\d+\]/, "").trim();
+                    }
+                    var labelSub = restSub;
+                    var subSub = "";
+                    var cpp1 = restSub.indexOf("(");
+                    var cpp2 = restSub.indexOf("\uff08");
+                    var cppos = (cpp1 >= 0 && (cpp2 < 0 || cpp1 < cpp2)) ? cpp1 : cpp2;
+                    if (cppos >= 0) {
+                      labelSub = restSub.substring(0, cppos).trim();
+                      var csubEnd = restSub.lastIndexOf(")") >= 0 ? restSub.lastIndexOf(")") : restSub.lastIndexOf("\uff09");
+                      if (csubEnd > cppos) { subSub = restSub.substring(cppos + 1, csubEnd).trim(); }
+                    }
+                    if (!payOptions[lastMain].children) payOptions[lastMain].children = [];
+                    payOptions[lastMain].children.push({ label: labelSub, sub: subSub, payValue: childPay });
+                    continue;
+                  }
                   var dotPos = optLine.indexOf(".");
                   if (dotPos > 0 && dotPos < 3) {
                     var val = optLine.substring(0, dotPos).trim();
@@ -233,7 +258,8 @@ Page({
                       var subEnd = rest.lastIndexOf(")") >= 0 ? rest.lastIndexOf(")") : rest.lastIndexOf("\uff09");
                       if (subEnd > ppos) { sub = rest.substring(ppos + 1, subEnd).trim(); }
                     }
-                    payOptions.push({ label: label, sub: sub, payValue: val });
+                    payOptions.push({ label: label, sub: sub, payValue: val, children: [] });
+                    lastMain = payOptions.length - 1;
                   }
                 }
                 console.log("[payment] tool_result parsed", payOptions.length, "options");
@@ -302,9 +328,34 @@ Page({
                 var optionsText = pparts[1] || "";
                 var payOptions = [];
                 var optLines = optionsText.split("\n");
+                var lastMain = -1;
                 for (var oi = 0; oi < optLines.length; oi++) {
                   var optLine = optLines[oi].trim();
                   if (!optLine) continue;
+                  // 子行（待激活课程包的展开项）：以 "-" 或 "·" 开头
+                  if (optLine.indexOf("-") === 0 || optLine.indexOf("\u00b7") === 0) {
+                    if (lastMain < 0) continue;
+                    var restSub = optLine.substring(1).trim();
+                    var childPay = "";
+                    var pm2 = restSub.match(/\[pkg=(\d+)\]/);
+                    if (pm2) {
+                      childPay = "pkg=" + pm2[1];
+                      restSub = restSub.replace(/\[pkg=\d+\]/, "").trim();
+                    }
+                    var labelSub = restSub;
+                    var subSub = "";
+                    var cpp1 = restSub.indexOf("(");
+                    var cpp2 = restSub.indexOf("\uff08");
+                    var cppos = (cpp1 >= 0 && (cpp2 < 0 || cpp1 < cpp2)) ? cpp1 : cpp2;
+                    if (cppos >= 0) {
+                      labelSub = restSub.substring(0, cppos).trim();
+                      var csubEnd = restSub.lastIndexOf(")") >= 0 ? restSub.lastIndexOf(")") : restSub.lastIndexOf("\uff09");
+                      if (csubEnd > cppos) { subSub = restSub.substring(cppos + 1, csubEnd).trim(); }
+                    }
+                    if (!payOptions[lastMain].children) payOptions[lastMain].children = [];
+                    payOptions[lastMain].children.push({ label: labelSub, sub: subSub, payValue: childPay });
+                    continue;
+                  }
                   var dotPos = optLine.indexOf(".");
                   if (dotPos > 0 && dotPos < 3) {
                     var val = optLine.substring(0, dotPos).trim();
@@ -319,7 +370,8 @@ Page({
                       var subEnd = rest.lastIndexOf(")") >= 0 ? rest.lastIndexOf(")") : rest.lastIndexOf("\uff09");
                       if (subEnd > ppos) { sub = rest.substring(ppos + 1, subEnd).trim(); }
                     }
-                    payOptions.push({ label: label, sub: sub, payValue: val });
+                    payOptions.push({ label: label, sub: sub, payValue: val, children: [] });
+                    lastMain = payOptions.length - 1;
                   }
                 }
                 console.log("[payment] parsed", payOptions.length, "options");
@@ -425,7 +477,23 @@ Page({
 
   onPaymentSelect: function(e) {
     var pay = e.currentTarget.dataset.pay;
+    var msgIdx = e.currentTarget.dataset.msg;
+    var optIdx = e.currentTarget.dataset.opt;
+    var isChild = e.currentTarget.dataset.child;
     if (!pay) return;
+    var msgs = this.data.messages;
+    if (!isChild) {
+      var opt = null;
+      if (msgIdx !== undefined && msgIdx !== "" && msgs[msgIdx] && msgs[msgIdx].paymentOptions && optIdx !== undefined && optIdx !== "") {
+        opt = msgs[msgIdx].paymentOptions[optIdx];
+      }
+      if (opt && opt.children && opt.children.length > 0) {
+        // 展开/收起“待激活课程包”
+        msgs[msgIdx].paymentExpanded = (msgs[msgIdx].paymentExpanded === optIdx) ? -1 : optIdx;
+        this.setData({ messages: msgs });
+        return;
+      }
+    }
     this.setData({ inputText: pay });
     this.onSend();
   },

@@ -76,9 +76,10 @@
   </view>
 
   <!-- 6. 优惠课程包 -->
-  <view class="section" wx:if="{{packages.length>0}}">
+  <view class="section">
     <view class="section-header"><text class="section-title">优惠课程包</text><text class="section-more" bindtap="goPackages">更多 ></text></view>
-    <scroll-view class="package-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{packages.length===0}}" class="empty-state"><text>暂无优惠课程包，请前往课程包页面选购</text></view>
+    <scroll-view wx:else class="package-scroll" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="package-card" wx:for="{{packages}}" wx:key="id" data-id="{{item.id}}" bindtap="buyPackage">
         <text class="package-name">{{item.name}}</text>
         <text class="package-sessions">{{item.sessions}}节课</text>
@@ -109,6 +110,27 @@
       <view class="popup-desc">首次预约可免费体验任意团课一次，快来试试吧！</view>
       <button class="popup-btn" bindtap="goExperienceBooking">去预约</button>
       <view class="popup-close" bindtap="closeExperiencePopup">稍后再说</view>
+    </view>
+  </view>
+
+  <!-- 9. 课程包购买弹窗 -->
+  <view wx:if="{{showPayModal}}" class="pay-overlay" catchtap="closePayModal">
+    <view class="pay-modal" catchtap="">
+      <text class="pay-title">确认购买</text>
+      <view class="pay-detail">
+        <text>{{payPkg.name}}</text>
+        <text>{{payPkg.sessions}}节课 · 有效期{{payPkg.validDays}}天</text>
+      </view>
+      <view class="pay-amount">
+        <text wx:if="{{payDiscount>0}}" class="pay-original">原价 ¥{{payOriginalPrice}}</text>
+        <text class="pay-final">实付 ¥{{payFinalPrice}}</text>
+        <text wx:if="{{payDiscount>0}}" class="pay-saved">已享{{payLevelName}}{{payDiscount}}%折扣</text>
+        <text wx:else class="pay-saved">普通会员无折扣</text>
+      </view>
+      <view class="pay-btns">
+        <view class="pay-cancel" bindtap="closePayModal">取消</view>
+        <view class="pay-confirm" bindtap="confirmBuy">立即购买</view>
+      </view>
     </view>
   </view>
 </view>

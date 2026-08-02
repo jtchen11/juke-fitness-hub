@@ -14,6 +14,7 @@ import com.gym.service.MemberLevelService;
 import com.gym.service.PrivatePackageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/private-packages")
 @CrossOrigin(originPatterns = "*", allowCredentials = "true")
@@ -114,14 +116,25 @@ public class PrivatePackageController {
     @GetMapping("/mine")
     public List<MemberPrivatePackage> getMyPackages(@RequestParam Long memberId) {
         LambdaQueryWrapper<MemberPrivatePackage> wrapper = new LambdaQueryWrapper<>();
+        // 课程包：已激活且有效，或未激活但未过激活截止日期（未激活未过期的也返回，前端显示“点击激活”）
         wrapper.eq(MemberPrivatePackage::getMemberId, memberId)
-                .eq(MemberPrivatePackage::getStatus, "active")
+                .ne(MemberPrivatePackage::getStatus, "refunded")
                 .gt(MemberPrivatePackage::getRemainingSessions, 0)   // 新增
-                .and(w -> w.isNull(MemberPrivatePackage::getEndDate)
-                        .or()
-                        .ge(MemberPrivatePackage::getEndDate, LocalDate.now())
+                .and(w -> w.and(x -> x.isNotNull(MemberPrivatePackage::getStartDate)
+                                .and(y -> y.isNull(MemberPrivatePackage::getEndDate)
+                                        .or()
+                                        .ge(MemberPrivatePackage::getEndDate, LocalDate.now())))
+                        .or(z -> z.isNull(MemberPrivatePackage::getStartDate)
+                                .and(y -> y.isNull(MemberPrivatePackage::getActivationDeadline)
+                                        .or()
+                                        .ge(MemberPrivatePackage::getActivationDeadline, LocalDate.now())))
                 );
-        return packageMapper.selectList(wrapper);
+        log.info("[课程包/mine] memberId={}", memberId);
+        log.info("[课程包/mine] SQL: {}", wrapper.getSqlSegment());
+        log.info("[课程包/mine] 参数: {}", wrapper.getParamNameValuePairs());
+        java.util.List<MemberPrivatePackage> list = packageMapper.selectList(wrapper);
+        log.info("[课程包/mine] memberId={}, 返回数量={}", memberId, list != null ? list.size() : 0);
+        return list;
     }
     /**
      * 私教包退款（按已用比例计算）

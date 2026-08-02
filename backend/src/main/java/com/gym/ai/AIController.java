@@ -657,16 +657,7 @@ public class AIController {
                 boolean useFree1 = "free".equals(pending.paymentMethod);
                 Long pkgId1 = null;
                 if ("package".equals(pending.paymentMethod)) {
-                    com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.gym.entity.MemberPrivatePackage> pw1 =
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-                    pw1.eq(com.gym.entity.MemberPrivatePackage::getMemberId, pending.memberId)
-                       .eq(com.gym.entity.MemberPrivatePackage::getStatus, "active")
-                       .gt(com.gym.entity.MemberPrivatePackage::getRemainingSessions, 0)
-                       .and(w -> w.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
-                            .or()
-                            .ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
-                       .orderByDesc(com.gym.entity.MemberPrivatePackage::getEndDate).last("LIMIT 1");
-                    try { com.gym.entity.MemberPrivatePackage pkg1 = memberPrivatePackageMapper.selectOne(pw1); if (pkg1 != null) pkgId1 = pkg1.getId(); } catch (Exception e) { log.warn("查询课程包失败", e); }
+                    pkgId1 = resolvePackageId(pending);
                 }
                 log.info("[预约执行] 打算执行私教预约：memberId={}, trainerId={}, time={}, paymentMethod={}, useFree={}, pkgId={}", pending.memberId, pending.trainerId, apptTime, pending.paymentMethod, useFree1, pkgId1);
                 String result1 = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId1, useFree1);
@@ -786,16 +777,7 @@ public class AIController {
                 boolean useFree2 = "free".equals(pending.paymentMethod);
                 Long pkgId2 = null;
                 if ("package".equals(pending.paymentMethod)) {
-                    com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.gym.entity.MemberPrivatePackage> pw2 =
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-                    pw2.eq(com.gym.entity.MemberPrivatePackage::getMemberId, pending.memberId)
-                       .eq(com.gym.entity.MemberPrivatePackage::getStatus, "active")
-                       .gt(com.gym.entity.MemberPrivatePackage::getRemainingSessions, 0)
-                       .and(w -> w.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
-                            .or()
-                            .ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
-                       .last("LIMIT 1");
-                    try { com.gym.entity.MemberPrivatePackage pkg2 = memberPrivatePackageMapper.selectOne(pw2); if (pkg2 != null) pkgId2 = pkg2.getId(); } catch (Exception e) { log.warn("查询课程包失败", e); }
+                    pkgId2 = resolvePackageId(pending);
                 }
                     log.info("[预约执行] 打算执行私教预约：memberId={}, trainerId={}, time={}, paymentMethod={}, useFree={}, pkgId={}", pending.memberId, pending.trainerId, apptTime, pending.paymentMethod, useFree2, pkgId2);
                 String result2 = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId2, useFree2);
@@ -865,17 +847,7 @@ public class AIController {
                 boolean useFree = "free".equals(pending.paymentMethod);
                 Long pkgId = null;
                 if ("package".equals(pending.paymentMethod)) {
-                    LambdaQueryWrapper<MemberPrivatePackage> pw = new LambdaQueryWrapper<>();
-                    pw.eq(MemberPrivatePackage::getMemberId, pending.memberId)
-                       .eq(MemberPrivatePackage::getStatus, "active")
-                       .gt(MemberPrivatePackage::getRemainingSessions, 0)
-                       .orderByDesc(MemberPrivatePackage::getEndDate).last("LIMIT 1");
-                    try {
-                        MemberPrivatePackage pkg = memberPrivatePackageMapper.selectOne(pw);
-                        if (pkg != null) pkgId = pkg.getId();
-                    } catch (Exception e) {
-                        log.warn("查询课程包失败", e);
-                    }
+                    pkgId = resolvePackageId(pending);
                 }
                 log.info("[预约执行] 打算执行私教预约：memberId={}, trainerId={}, time={}, paymentMethod={}, useFree={}, pkgId={}", pending.memberId, pending.trainerId, apptTime, pending.paymentMethod, useFree, pkgId);
                 String result = ptService.bookPersonalTraining(pending.memberId, pending.trainerId, apptTime, 60, pkgId, useFree);
@@ -1306,9 +1278,41 @@ public class AIController {
             return "__EXIT__";
         }
 
-        if (lower.equals("1") || lower.contains("免费")) { pending.paymentMethod = "free"; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择免费私教课，key={}", pendingKey); return null; }
-        if (lower.equals("2") || lower.contains("课程包")) { pending.paymentMethod = "package"; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择课程包，key={}", pendingKey); return null; }
-        if (lower.equals("3") || lower.contains("单次")) { pending.paymentMethod = "pay"; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择单次付费，key={}", pendingKey); return null; }
+        // 解析支付选择：免费(1/免费) → 课程包(动态序号映射或“课程包”文字) → 单次付费
+        if (lower.equals("1") || lower.contains("免费")) { pending.paymentMethod = "free"; pending.packageId = null; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择免费私教课，key={}", pendingKey); return null; }
+        if (lower.matches("\\d+")) {
+            int optNum = Integer.parseInt(lower);
+            Long mappedPkgId = (pending.paymentPkgMap != null) ? pending.paymentPkgMap.get(optNum) : null;
+            if (mappedPkgId != null) {
+                pending.paymentMethod = "package";
+                pending.packageId = mappedPkgId;
+                pendingBookings.put(pendingKey, pending);
+                log.info("[支付选择] 私教预约选择课程包(序号{}): pkgId={}, key={}", optNum, mappedPkgId, pendingKey);
+                return null;
+            }
+            if (optNum == pending.singlePayOptionNo) {
+                pending.paymentMethod = "pay";
+                pending.packageId = null;
+                pendingBookings.put(pendingKey, pending);
+                log.info("[支付选择] 私教预约选择单次付费（序号{}），key={}", optNum, pendingKey);
+                return null;
+            }
+        }
+        // 未激活课程包：前端点击“点击激活”后回传 pkg=ID，这里解析并交给服务层自动激活使用
+        if (lower.startsWith("pkg=")) {
+            try {
+                Long pkgId = Long.parseLong(lower.substring(4).trim());
+                pending.paymentMethod = "package";
+                pending.packageId = pkgId;
+                pendingBookings.put(pendingKey, pending);
+                log.info("[支付选择] 私教预约选择待激活课程包: pkgId={}, key={}", pkgId, pendingKey);
+                return null;
+            } catch (NumberFormatException nfe) {
+                log.warn("[支付选择] 无效的课程包ID: {}", lower);
+            }
+        }
+        if (lower.contains("课程包")) { pending.paymentMethod = "package"; pending.packageId = null; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择课程包(默认第一个可用包)，key={}", pendingKey); return null; }
+        if (lower.contains("单次")) { pending.paymentMethod = "pay"; pending.packageId = null; pendingBookings.put(pendingKey, pending); log.info("[支付选择] 私教预约选择单次付费，key={}", pendingKey); return null; }
         try {
             // ====== 诊断：打印会员课程包原始数据 ======
             if (pending.memberId != null && pending.memberId > 0) {
@@ -1326,34 +1330,69 @@ public class AIController {
             }
             StringBuilder sb = new StringBuilder();
             sb.append("请选择支付方式：\n\n---\n**PAYMENT**\n");
+            int optNo = 1;
             if (pending.memberId != null && pending.memberId > 0) {
                 Member member = memberMapper.selectById(pending.memberId);
+                int freeLeft = 0;
                 if (member != null) {
                     // 计算免费私教剩余
                     int used = member.getFreePtUsedMonth() != null ? member.getFreePtUsedMonth() : 0;
                     String levelName = member.getLevel() != null ? member.getLevel() : "普通会员";
                     com.gym.enums.MemberLevel ml = com.gym.enums.MemberLevel.fromDisplayName(levelName);
                     int freeTotal = ml.getFreePersonalTrainingsPerMonth();
-                    int freeLeft = Math.max(0, freeTotal - used);
+                    freeLeft = Math.max(0, freeTotal - used);
                     if (freeLeft > 0) sb.append("1. 免费私教课（剩余").append(freeLeft).append("次）\n");
                 }
+                // 课程包：已激活且有效（全部列出，含有效期），或未激活但未过激活截止日期（收拢为“待激活”）
                 com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.gym.entity.MemberPrivatePackage> pw =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
                 pw.eq(com.gym.entity.MemberPrivatePackage::getMemberId, pending.memberId)
-                   .eq(com.gym.entity.MemberPrivatePackage::getStatus, "active")
+                   .ne(com.gym.entity.MemberPrivatePackage::getStatus, "refunded")
                    .gt(com.gym.entity.MemberPrivatePackage::getRemainingSessions, 0)
-                   .and(w -> w.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
-                        .or()
-                        .ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
-                   .orderByDesc(com.gym.entity.MemberPrivatePackage::getEndDate).last("LIMIT 3");
+                   .and(w -> w.and(x -> x.isNotNull(com.gym.entity.MemberPrivatePackage::getStartDate)
+                            .and(y -> y.isNull(com.gym.entity.MemberPrivatePackage::getEndDate)
+                                 .or().ge(com.gym.entity.MemberPrivatePackage::getEndDate, java.time.LocalDate.now())))
+                        .or(z -> z.isNull(com.gym.entity.MemberPrivatePackage::getStartDate)
+                            .and(y -> y.isNull(com.gym.entity.MemberPrivatePackage::getActivationDeadline)
+                                 .or().ge(com.gym.entity.MemberPrivatePackage::getActivationDeadline, java.time.LocalDate.now()))))
+                   .orderByDesc(com.gym.entity.MemberPrivatePackage::getStartDate);
                 java.util.List<com.gym.entity.MemberPrivatePackage> pkgs = memberPrivatePackageMapper.selectList(pw);
+                if (pending.paymentPkgMap == null) pending.paymentPkgMap = new java.util.HashMap<>();
+                pending.paymentPkgMap.clear();
+                optNo = freeLeft > 0 ? 2 : 1;
+                int pendingPkgCount = 0;
+                int activePkgCount = 0;
                 if (pkgs != null) {
+                    log.info("[支付选项] 会员{} 课程包查询: 总数={}", pending.memberId, pkgs.size());
                     for (com.gym.entity.MemberPrivatePackage p : pkgs) {
-                        sb.append("2. 课程包（").append(p.getPackageName() != null ? p.getPackageName() : "私教包").append("）剩余").append(p.getRemainingSessions()).append("节\n");
+                        log.info("[支付选项]   id={}, name={}, remaining={}, status={}, startDate={}, endDate={}, activationDeadline={}",
+                            p.getId(), p.getPackageName(), p.getRemainingSessions(), p.getStatus(), p.getStartDate(), p.getEndDate(), p.getActivationDeadline());
                     }
+                    // 第一轮：已激活且有效的课程包全部列出
+                    for (com.gym.entity.MemberPrivatePackage p : pkgs) {
+                        if (p.getStartDate() == null) { pendingPkgCount++; continue; }
+                        activePkgCount++;
+                        String pkgName = p.getPackageName() != null ? p.getPackageName() : "私教包";
+                        String endDateText = p.getEndDate() != null ? p.getEndDate().toString() : "长期";
+                        sb.append(optNo).append(". 课程包：").append(pkgName).append("（剩余").append(p.getRemainingSessions()).append("节，有效期至").append(endDateText).append("）\n");
+                        pending.paymentPkgMap.put(optNo, p.getId());
+                        optNo++;
+                    }
+                    // 第二轮：未激活但未过期的收拢为一条，子项携带包ID
+                    if (pendingPkgCount > 0) {
+                        sb.append(optNo).append(". ▶ 待激活课程包（").append(pendingPkgCount).append("个）\n");
+                        for (com.gym.entity.MemberPrivatePackage p : pkgs) {
+                            if (p.getStartDate() != null) continue;
+                            String pkgName = p.getPackageName() != null ? p.getPackageName() : "私教包";
+                            sb.append("   - 课程包：").append(pkgName).append("（点击激活，剩余").append(p.getRemainingSessions()).append("节）[pkg=").append(p.getId()).append("]\n");
+                        }
+                        optNo++;
+                    }
+                    log.info("[支付选项] 课程包分类: 已激活={}, 待激活={}", activePkgCount, pendingPkgCount);
                 }
             }
-            sb.append("3. 单次付费\n\n请回复数字或点击按钮选择");
+            pending.singlePayOptionNo = optNo;
+            sb.append(optNo).append(". 单次付费\n\n请回复数字或点击按钮选择");
             log.info("[支付选择] 返回支付选项给用户，key={}, 选项文本长度={}", pendingKey, sb.length());
             return sb.toString();
         } catch (Exception e) {
@@ -1364,6 +1403,31 @@ public class AIController {
         }
     }
 
+    // 解析用户选中的课程包ID：优先使用用户选择的包（含未激活包，点击“点击激活”后服务层自动激活并扣减），否则取第一个可用包
+    private Long resolvePackageId(PendingBooking pending) {
+        if (pending.packageId != null) {
+            log.info("[预约执行] 使用用户选择的课程包: pkgId={}", pending.packageId);
+            return pending.packageId;
+        }
+        LambdaQueryWrapper<MemberPrivatePackage> pw = new LambdaQueryWrapper<>();
+        pw.eq(MemberPrivatePackage::getMemberId, pending.memberId)
+           .ne(MemberPrivatePackage::getStatus, "refunded")
+           .gt(MemberPrivatePackage::getRemainingSessions, 0)
+           .and(w -> w.and(x -> x.isNotNull(MemberPrivatePackage::getStartDate)
+                    .and(y -> y.isNull(MemberPrivatePackage::getEndDate)
+                         .or().ge(MemberPrivatePackage::getEndDate, java.time.LocalDate.now())))
+                .or(z -> z.isNull(MemberPrivatePackage::getStartDate)
+                    .and(y -> y.isNull(MemberPrivatePackage::getActivationDeadline)
+                         .or().ge(MemberPrivatePackage::getActivationDeadline, java.time.LocalDate.now()))))
+           .last("LIMIT 1");
+        try {
+            MemberPrivatePackage pkg = memberPrivatePackageMapper.selectOne(pw);
+            if (pkg != null) return pkg.getId();
+        } catch (Exception e) {
+            log.warn("查询课程包失败", e);
+        }
+        return null;
+    }
 
     private String handleBooking(String userMessage, Long memberId) {
         long t0 = System.currentTimeMillis();
@@ -1483,20 +1547,7 @@ public class AIController {
         boolean useFree = "free".equals(pending.paymentMethod);
         Long pkgId = null;
         if ("package".equals(pending.paymentMethod)) {
-            LambdaQueryWrapper<MemberPrivatePackage> pw = new LambdaQueryWrapper<>();
-            pw.eq(MemberPrivatePackage::getMemberId, pending.memberId)
-               .eq(MemberPrivatePackage::getStatus, "active")
-               .gt(MemberPrivatePackage::getRemainingSessions, 0)
-               .and(w -> w.isNull(MemberPrivatePackage::getEndDate)
-                    .or()
-                    .ge(MemberPrivatePackage::getEndDate, java.time.LocalDate.now()))
-               .last("LIMIT 1");
-            try {
-                MemberPrivatePackage pkg = memberPrivatePackageMapper.selectOne(pw);
-                if (pkg != null) pkgId = pkg.getId();
-            } catch (Exception e) {
-                log.warn("查询课程包失败", e);
-            }
+            pkgId = resolvePackageId(pending);
         }
 
         log.info("[预约执行] 打算执行私教预约：memberId={}, trainerId={}, time={}, paymentMethod={}, useFree={}, pkgId={}", memberId, trainerId, appointmentTime, null, useFree, pkgId);
@@ -1848,7 +1899,8 @@ public class AIController {
 
         LambdaQueryWrapper<MemberPrivatePackage> pkgWrapper = new LambdaQueryWrapper<>();
         pkgWrapper.eq(MemberPrivatePackage::getMemberId, memberId)
-                .eq(MemberPrivatePackage::getStatus, "active")
+                .ne(MemberPrivatePackage::getStatus, "refunded")
+                .isNotNull(MemberPrivatePackage::getStartDate)
                 .gt(MemberPrivatePackage::getRemainingSessions, 0)
                 .and(w -> w.isNull(MemberPrivatePackage::getEndDate)
                         .or()
@@ -2324,6 +2376,9 @@ private String nullToEmpty(Object obj) {
         String timeStr;
         int retryCount;
         String paymentMethod;
+        Long packageId;               // 用户选择的课程包ID（未激活包点击激活后使用）
+        Map<Integer, Long> paymentPkgMap;  // 支付选项序号 → 课程包ID
+        int singlePayOptionNo;        // 单次付费选项的序号
 
         PendingBooking(Long memberId, Long trainerId, String trainerName, boolean hasDate, boolean hasTime, String dateStr) {
             this.memberId = memberId;
@@ -2339,6 +2394,9 @@ private String nullToEmpty(Object obj) {
             this.timeStr = null;
             this.retryCount = 0;
             this.paymentMethod = null;
+            this.packageId = null;
+            this.paymentPkgMap = new HashMap<>();
+            this.singlePayOptionNo = 3;
         }
 
         PendingBooking(Long memberId, String courseName, Long groupClassId, boolean hasDate, boolean hasTime, String dateStr, String userType) {
@@ -2355,6 +2413,9 @@ private String nullToEmpty(Object obj) {
             this.timeStr = null;
             this.retryCount = 0;
             this.paymentMethod = null;
+            this.packageId = null;
+            this.paymentPkgMap = new HashMap<>();
+            this.singlePayOptionNo = 3;
         }
     }
 

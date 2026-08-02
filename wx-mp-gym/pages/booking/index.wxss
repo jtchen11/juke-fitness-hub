@@ -53,10 +53,19 @@
 
 /* Pay Modal */
 .pay-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center}
-.pay-modal{background:#FFF;border-radius:16px;width:600rpx;padding:40rpx;box-sizing:border-box}
-.pay-modal-title{font-size:36rpx;font-weight:700;color:#1A1A2E;text-align:center;display:block;margin-bottom:30rpx}
-.pay-modal-body{margin-bottom:30rpx}
-.pay-info-row{display:flex;justify-content:space-between;padding:16rpx 0;border-bottom:1rpx solid #E8E8E8}
-.pay-label{font-size:28rpx;color:#8A8AA0}
-.pay-value{font-size:28rpx;color:#1A1A2E;font-weight:600}
-.pay-value.price{color:#4A6CF7;font-size:32rpx}
+.pay-modal{background:#FFF;border-radius:16px;width:620rpx;overflow:hidden}
+.pay-modal-header{background:#4A6CF7;padding:36rpx 40rpx 28rpx;text-align:center;flex-shrink:0}
+.pay-modal-title{font-size:36rpx;font-weight:700;color:#FFF;display:block}
+.pay-modal-sub{font-size:24rpx;color:rgba(255,255,255,0.85);display:block;margin-top:8rpx}
+.pay-modal-body{padding:8rpx 40rpx 0}
+.pay-info-row{display:flex;justify-content:space-between;align-items:center;padding:24rpx 0;border-bottom:1rpx solid #F0F0F4}
+.pay-label{font-size:28rpx;color:#8A8AA0;flex-shrink:0}
+.pay-value{font-size:28rpx;color:#1A1A2E;font-weight:600;text-align:right;flex:1;margin-left:32rpx;word-break:break-all}
+.pay-value.pay-discount{color:#FF5252}
+.pay-divider{height:2rpx;background:#E8E8E8;margin:8rpx 0 0}
+.pay-total-row{border-bottom:none;padding-top:28rpx;padding-bottom:28rpx}
+.pay-total-label{font-size:30rpx;font-weight:600;color:#1A1A2E}
+.pay-total{color:#4A6CF7;font-size:42rpx;font-weight:700}
+.pay-modal-footer{display:flex;gap:24rpx;padding:8rpx 40rpx 40rpx}
+.pay-btn-cancel{flex:1;height:88rpx;line-height:84rpx;font-size:30rpx;margin:0}
+.pay-btn-confirm{flex:1;height:88rpx;line-height:88rpx;font-size:30rpx;margin:0}
