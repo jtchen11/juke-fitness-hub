@@ -1,0 +1,14 @@
+.page-my-comps{min-height:100vh;background:#F5F6FA;padding-bottom:70px}
+.nav-bar{display:flex;align-items:center;padding:calc(20rpx + env(safe-area-inset-top)) 20rpx 12rpx;background:#FFF}
+.nav-back{display:flex;align-items:center}
+.back-icon{font-size:48rpx;color:#4A6CF7;line-height:1}
+.nav-title{flex:1;text-align:center;font-size:32rpx;font-weight:600;color:#1A1A2E}
+.nav-placeholder{width:80rpx}
+.comp-card{background:#FFF;border-radius:16rpx;box-shadow:0 4rpx 16rpx rgba(0,0,0,.06);margin:24rpx 32rpx 0;padding:32rpx}
+.name-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12rpx}
+.comp-name{font-size:32rpx;font-weight:600;color:#1A1A2E;flex:1;margin-right:12rpx;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comp-tag{font-size:22rpx;padding:4rpx 14rpx;border-radius:20rpx;flex-shrink:0}
+.st-open{background:#E8F5E9;color:#00C853}
+.st-ended{background:#F0F0F0;color:#9E9E9E}
+.comp-time{font-size:26rpx;color:#4A6CF7;display:block}
+.empty{text-align:center;padding:60rpx 0;color:#8A8AA0;font-size:26rpx}

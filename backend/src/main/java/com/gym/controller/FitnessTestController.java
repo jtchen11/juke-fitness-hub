@@ -9,6 +9,11 @@ import com.gym.mapper.FitnessTestMapper;
 import com.gym.assessment.model.dto.AssessmentReportDTO;
 import com.gym.assessment.engine.GymAssessmentScoringEngine;
 import com.gym.mapper.MemberMapper;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.output.Response;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +26,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/fitness-tests")
 public class FitnessTestController {
@@ -33,6 +39,9 @@ public class FitnessTestController {
 
     @Autowired
     private GymAssessmentScoringEngine scoringEngine;
+
+    @Autowired
+    private ChatLanguageModel chatLanguageModel;
 
     /**
      * 分页查询体测记录（支持筛选）
@@ -251,14 +260,67 @@ public class FitnessTestController {
         }
         result.put("memberName", test.getMemberName());
         result.put("testDate", test.getTestDate() != null ? test.getTestDate().toString() : "");
-        result.put("height", 170);
+        double heightCm = 170;
+        Member member = test.getMemberId() != null ? memberMapper.selectById(test.getMemberId()) : null;
+        if (member != null && member.getHeight() != null && member.getHeight().doubleValue() > 0) {
+            heightCm = member.getHeight().doubleValue();
+        }
+        result.put("height", heightCm);
         result.put("weight", test.getWeightKg());
 
         double weightVal = test.getWeightKg() != null ? test.getWeightKg().doubleValue() : 65;
-        double heightM = 1.7;
+        double heightM = heightCm / 100;
         double bmi = heightM > 0 ? Math.round(weightVal / (heightM * heightM) * 10) / 10.0 : 0;
         result.put("bmi", bmi);
 
+        // 优先调用 AI 生成个性化建议，失败时降级为规则报告
+        String reportText = null;
+        try {
+            reportText = generateAIReport(member, heightCm, weightVal, bmi, test);
+        } catch (Exception e) {
+            log.warn("AI体测建议生成失败，降级为规则报告: {}", e.getMessage());
+        }
+        if (reportText == null || reportText.trim().isEmpty()) {
+            reportText = buildRuleReport(bmi, test);
+        }
+        result.put("report", reportText);
+        return result;
+    }
+
+    /**
+     * 调用 ChatLanguageModel 生成个性化体测建议
+     */
+    private String generateAIReport(Member member, double heightCm, double weightVal, double bmi, FitnessTest test) {
+        String genderText = "未知";
+        if (member != null && member.getGender() != null) {
+            String g = member.getGender().trim();
+            if (g.contains("男") || "male".equalsIgnoreCase(g) || "M".equalsIgnoreCase(g)) {
+                genderText = "男";
+            } else if (g.contains("女") || "female".equalsIgnoreCase(g) || "F".equalsIgnoreCase(g)) {
+                genderText = "女";
+            }
+        }
+        String bfText = test.getBodyFatPercent() != null ? test.getBodyFatPercent() + "%" : "未知";
+        String mmText = test.getMuscleMassKg() != null ? test.getMuscleMassKg() + "kg" : "未知";
+        String prompt = "你是一名专业的健身教练和健康顾问。请根据以下会员的体测数据，输出100-150字的个性化健康分析建议，"
+                + "包含：1）总体评价；2）亮点与问题；3）具体的训练和饮食建议。直接输出纯文本，不要使用markdown格式。\n"
+                + "性别：" + genderText + "\n"
+                + "身高：" + (int) heightCm + "cm\n"
+                + "体重：" + weightVal + "kg\n"
+                + "BMI：" + bmi + "\n"
+                + "体脂率：" + bfText + "\n"
+                + "肌肉量：" + mmText;
+        Response<AiMessage> resp = chatLanguageModel.generate(java.util.List.of(new UserMessage(prompt)));
+        if (resp != null && resp.content() != null && resp.content().text() != null) {
+            return resp.content().text().trim();
+        }
+        return null;
+    }
+
+    /**
+     * 规则报告（AI 失败时的降级方案）
+     */
+    private String buildRuleReport(double bmi, FitnessTest test) {
         StringBuilder report = new StringBuilder();
         report.append("【健康评估报告】\n\n");
         report.append("基于本次体测数据，会员体质评估如下：\n");
@@ -296,8 +358,89 @@ public class FitnessTestController {
         report.append("\n【训练建议】\n");
         report.append("建议每周进行3-5次训练，包含有氧和力量训练，配合合理饮食。\n");
         report.append("建议每隔2-4周复测一次，跟踪体质变化。\n");
+        return report.toString();
+    }
 
-        result.put("report", report.toString());
+    /**
+     * 体测评分：BMI/ 体脂率/肌肉量 三维度综合评分
+     */
+    @GetMapping("/{id}/score")
+    public Map<String, Object> getScore(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        FitnessTest test = testMapper.selectById(id);
+        if (test == null) {
+            result.put("error", "体测记录不存在");
+            return result;
+        }
+        Member member = test.getMemberId() != null ? memberMapper.selectById(test.getMemberId()) : null;
+        boolean female = isFemale(member);
+        double heightCm = (member != null && member.getHeight() != null && member.getHeight().doubleValue() > 0)
+                ? member.getHeight().doubleValue() : 170;
+        double weightVal = test.getWeightKg() != null ? test.getWeightKg().doubleValue() : 0;
+        double bmi = heightCm > 0 ? Math.round(weightVal / Math.pow(heightCm / 100, 2) * 10) / 10.0 : 0;
+
+        // BMI 30分
+        int bmiScore;
+        String bmiDesc;
+        if (bmi >= 18.5 && bmi <= 24) { bmiScore = 30; bmiDesc = "正常范围"; }
+        else if ((bmi >= 17 && bmi < 18.5) || (bmi > 24 && bmi <= 28)) { bmiScore = 20; bmiDesc = "轻微偏离"; }
+        else { bmiScore = 10; bmiDesc = "明显偏离"; }
+
+        // 体脂率 40分（分性别）
+        int fatScore;
+        String fatDesc;
+        Double bf = test.getBodyFatPercent() != null ? test.getBodyFatPercent().doubleValue() : null;
+        if (bf == null) { fatScore = 0; fatDesc = "数据缺失"; }
+        else if (female) {
+            if (bf >= 18 && bf <= 28) { fatScore = 40; fatDesc = "达标"; }
+            else if ((bf >= 15 && bf < 18) || (bf > 28 && bf <= 33)) { fatScore = 25; fatDesc = "轻微偏离"; }
+            else { fatScore = 10; fatDesc = "严重偏离"; }
+        } else {
+            if (bf >= 10 && bf <= 20) { fatScore = 40; fatDesc = "达标"; }
+            else if ((bf >= 8 && bf < 10) || (bf > 20 && bf <= 25)) { fatScore = 25; fatDesc = "轻微偏离"; }
+            else { fatScore = 10; fatDesc = "严重偏离"; }
+        }
+
+        // 肌肉量 30分（分性别，标准值=体重×40%/女35%）
+        int muscleScore;
+        String muscleDesc;
+        Double mm = test.getMuscleMassKg() != null ? test.getMuscleMassKg().doubleValue() : null;
+        double standard = weightVal * (female ? 0.35 : 0.40);
+        if (mm == null) { muscleScore = 0; muscleDesc = "数据缺失"; }
+        else if (mm >= standard) { muscleScore = 30; muscleDesc = "达标"; }
+        else if (mm >= standard * 0.9) { muscleScore = 20; muscleDesc = "接近标准"; }
+        else { muscleScore = 10; muscleDesc = "低于标准"; }
+
+        int total = bmiScore + fatScore + muscleScore;
+        String level;
+        String levelText;
+        String levelIcon;
+        if (total >= 85) { level = "excellent"; levelText = "优秀"; levelIcon = "🌟"; }
+        else if (total >= 70) { level = "good"; levelText = "良好"; levelIcon = "💪"; }
+        else { level = "needs_improvement"; levelText = "待改善"; levelIcon = "📈"; }
+
+        result.put("totalScore", total);
+        result.put("level", level);
+        result.put("levelText", levelText);
+        result.put("levelIcon", levelIcon);
+        result.put("bmi", scoreItem(bmiScore, 30, bmi, bmiDesc));
+        result.put("bodyFat", scoreItem(fatScore, 40, bf, fatDesc));
+        result.put("muscle", scoreItem(muscleScore, 30, mm, muscleDesc));
         return result;
+    }
+
+    private boolean isFemale(Member member) {
+        if (member == null || member.getGender() == null) return false;
+        String g = member.getGender().trim();
+        return g.contains("女") || "female".equalsIgnoreCase(g) || "F".equalsIgnoreCase(g);
+    }
+
+    private Map<String, Object> scoreItem(int score, int full, Double value, String desc) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("score", score);
+        item.put("full", full);
+        item.put("value", value != null ? value : "未知");
+        item.put("desc", desc);
+        return item;
     }
 }

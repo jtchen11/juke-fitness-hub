@@ -83,10 +83,20 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="380" align="center" fixed="right">
+        <el-table-column label="奖励状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.rewardGranted ? 'success' : 'info'" size="small">
+              {{ row.rewardGranted ? '已发放' : '未发放' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="520" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="success" plain @click="showRegistrationList(row)">
               📋 报名名单
+            </el-button>
+            <el-button size="small" type="warning" plain :disabled="row.rewardGranted" @click="showRewardDialog(row)">
+              🎁 发放奖励
             </el-button>
             <el-button size="small" type="primary" plain @click="handleEdit(row)">编辑</el-button>
             <el-button size="small" :type="row.isActive ? 'warning' : 'success'" plain @click="toggleActive(row)">
@@ -119,6 +129,9 @@
         <el-form-item label="比赛介绍" prop="description">
           <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="请输入比赛介绍" />
         </el-form-item>
+        <el-form-item label="赛制说明">
+          <el-input v-model="formData.rules" type="textarea" :rows="3" placeholder="请输入赛制说明（规则、分组等，可留空）" />
+        </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="开始时间" prop="startTime">
@@ -150,6 +163,31 @@
             <el-option label="已取消" value="cancelled" />
           </el-select>
         </el-form-item>
+        <el-divider content-position="left">奖励积分设置</el-divider>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="冠军积分">
+              <el-input-number v-model="formData.championPoints" :min="0" :max="100000" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="亚军积分">
+              <el-input-number v-model="formData.runnerUpPoints" :min="0" :max="100000" style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="季军积分">
+              <el-input-number v-model="formData.thirdPlacePoints" :min="0" :max="100000" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="参与积分">
+              <el-input-number v-model="formData.participationPoints" :min="0" :max="100000" style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -183,6 +221,29 @@
         <el-button @click="registrationDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+    <!-- ====== 发放奖励弹窗 ====== -->
+    <el-dialog v-model="rewardDialogVisible" :title="`🎁 ${rewardTarget?.name || ''} - 发放奖励`" width="680px" destroy-on-close>
+      <el-alert type="info" :closable="false" show-icon style="margin-bottom:12px"
+        :title="`奖励规则：冠军 ${rewardTarget?.championPoints || 0} / 亚军 ${rewardTarget?.runnerUpPoints || 0} / 季军 ${rewardTarget?.thirdPlacePoints || 0} 积分；未选择名次的参赛者自动获得参与奖 ${rewardTarget?.participationPoints || 0} 积分`" />
+      <el-table :data="rewardList" border v-loading="registrationLoading" max-height="400">
+        <el-table-column prop="memberName" label="会员姓名" width="120" />
+        <el-table-column prop="memberPhone" label="手机号" width="140" />
+        <el-table-column label="名次" width="240">
+          <template #default="{ row }">
+            <el-radio-group v-model="row.rank" size="small">
+              <el-radio-button :value="1">冠军</el-radio-button>
+              <el-radio-button :value="2">亚军</el-radio-button>
+              <el-radio-button :value="3">季军</el-radio-button>
+            </el-radio-group>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-if="!registrationLoading && rewardList.length === 0" style="text-align:center;padding:30px 0;color:#999;">📭 暂无会员报名</div>
+      <template #footer>
+        <el-button @click="rewardDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="rewarding" @click="confirmGrantRewards">确认发放</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -203,6 +264,11 @@ const registrationDialogVisible = ref(false)
 const registrationLoading = ref(false)
 const registrationTarget = ref(null)
 const registrationList = ref([])
+// ============ 发放奖励弹窗 ============
+const rewardDialogVisible = ref(false)
+const rewardTarget = ref(null)
+const rewardList = ref([])
+const rewarding = ref(false)
 
 // 显示报名名单
 const showRegistrationList = (row) => {
@@ -225,6 +291,56 @@ const loadRegistrationList = async () => {
     registrationLoading.value = false
   }
 }
+
+// 显示发放奖励弹窗
+const showRewardDialog = (row) => {
+  rewardTarget.value = row
+  rewardList.value = []
+  rewardDialogVisible.value = true
+  loadRewardList()
+}
+
+// 加载可发放名单（带名次初始值）
+const loadRewardList = async () => {
+  if (!rewardTarget.value) return
+  registrationLoading.value = true
+  try {
+    const res = await axios.get(`/api/competition-registrations/competition/${rewardTarget.value.id}`)
+    rewardList.value = (res.data || []).map(p => ({ ...p, rank: 0 }))
+  } catch (error) {
+    console.error('加载报名名单失败', error)
+    ElMessage.error('加载报名名单失败')
+  } finally {
+    registrationLoading.value = false
+  }
+}
+
+// 确认发放积分
+const confirmGrantRewards = async () => {
+  if (!rewardTarget.value) return
+  const winners = rewardList.value
+      .filter(p => p.rank === 1 || p.rank === 2 || p.rank === 3)
+      .map(p => ({ memberId: p.memberId, rank: p.rank }))
+  if (winners.length === 0) {
+    ElMessage.warning('请至少选择一名获奖参赛者（冠军/亚军/季军）')
+    return
+  }
+  rewarding.value = true
+  try {
+    const res = await axios.post(`/api/competitions/${rewardTarget.value.id}/grant-rewards`, { winners })
+    if (res.data && res.data.success) {
+      ElMessage.success(res.data.message || '奖励发放成功')
+      rewardDialogVisible.value = false
+      loadData()
+    } else {
+      ElMessage.error((res.data && res.data.message) || '发放失败')
+    }
+  } catch (error) {
+    ElMessage.error('发放失败')
+  } finally {
+    rewarding.value = false
+  }
+}
 const stats = ref([
   { title: '总比赛', value: 0, icon: Trophy, color: '#409EFF' },
   { title: '报名中', value: 0, icon: Clock, color: '#67C23A' },
@@ -242,12 +358,17 @@ const formData = ref({
   id: null,
   name: '',
   description: '',
+  rules: '',
   startTime: '',
   endTime: '',
   deadline: '',
   maxParticipants: 50,
   status: 'open',
-  isActive: true
+  isActive: true,
+  championPoints: 0,
+  runnerUpPoints: 0,
+  thirdPlacePoints: 0,
+  participationPoints: 0
 })
 
 const formRules = {
@@ -299,7 +420,7 @@ const updateStats = (data) => {
 const handleAdd = () => {
   isEdit.value = false
   dialogTitle.value = '添加比赛'
-  formData.value = { id: null, name: '', description: '', startTime: '', endTime: '', deadline: '', maxParticipants: 50, status: 'open', isActive: true }
+  formData.value = { id: null, name: '', description: '', rules: '', startTime: '', endTime: '', deadline: '', maxParticipants: 50, status: 'open', isActive: true, championPoints: 0, runnerUpPoints: 0, thirdPlacePoints: 0, participationPoints: 0 }
   dialogVisible.value = true
 }
 

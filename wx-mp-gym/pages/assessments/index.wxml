@@ -1,1 +1,66 @@
-<view class="page-assessments"><view class="header"><text class="header-title">体测记录</text><text class="header-desc">查看每次体测的详细报告</text></view><view class="list"><view class="record-card" wx:for="{{records}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail"><view class="record-top"><text class="record-date">{{item.testDate}}</text><view class="record-score {{scoreGrade(item.totalScore)}}">{{item.totalScore || '-'}}分</view></view><view class="record-metrics"><text class="metric">BMI: {{item.bmi || '-'}}</text><text class="metric">体脂: {{item.bodyFatPercent || '-'}}%</text><text class="metric">肌肉: {{item.muscleMassKg || '-'}}kg</text></view></view></view><view wx:if="{{records.length===0}}" class="empty"><text>暂无体测记录</text></view></view>
+<view class="page-assessments">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
+    <text class="nav-title">体测趋势</text>
+  </view>
+
+  <view class="profile-card">
+    <view class="profile-item">
+      <text class="profile-label">身高</text>
+      <text class="profile-value">{{height || '-'}}<text class="profile-unit">cm</text></text>
+    </view>
+    <view class="profile-item">
+      <text class="profile-label">体重</text>
+      <text class="profile-value">{{latest.weight}}<text class="profile-unit">kg</text></text>
+    </view>
+    <view class="profile-item">
+      <text class="profile-label">BMI</text>
+      <text class="profile-value">{{latest.bmi}}</text>
+    </view>
+  </view>
+
+  <view class="metric-row">
+    <view class="metric-card">
+      <text class="metric-label">体脂率</text>
+      <view class="metric-value-wrap"><text class="metric-value">{{latest.bodyFat}}</text><text class="metric-unit">%</text></view>
+      <text class="metric-delta {{deltas.bodyFat.cls}}">{{deltas.bodyFat.text}}</text>
+    </view>
+    <view class="metric-card">
+      <text class="metric-label">肌肉量</text>
+      <view class="metric-value-wrap"><text class="metric-value">{{latest.muscle}}</text><text class="metric-unit">kg</text></view>
+      <text class="metric-delta {{deltas.muscle.cls}}">{{deltas.muscle.text}}</text>
+    </view>
+  </view>
+
+  <view class="chart-card">
+    <view class="chart-header">
+      <text class="chart-title">指标趋势</text>
+      <view class="legend">
+        <view class="legend-item"><view class="legend-dot dot-weight"></view><text>体重</text></view>
+        <view class="legend-item"><view class="legend-dot dot-fat"></view><text>体脂</text></view>
+        <view class="legend-item"><view class="legend-dot dot-muscle"></view><text>肌肉</text></view>
+      </view>
+    </view>
+    <canvas type="2d" id="trendChart" class="trend-canvas"></canvas>
+    <view wx:if="{{chartEmpty}}" class="chart-empty">暂无足够数据绘制趋势图</view>
+  </view>
+
+  <view class="history-section">
+    <text class="section-title">历史记录</text>
+    <block wx:if="{{records.length > 0}}">
+      <view class="record-card" wx:for="{{records}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+        <view class="record-left">
+          <text class="record-date">{{item.testDate}}</text>
+          <text class="record-remark">{{item.remarks || '体测记录'}}</text>
+        </view>
+        <view class="record-right">
+          <view class="record-metric"><text class="rm-label">体重</text><text class="rm-value">{{item.weightKg != null ? item.weightKg : '-'}}kg</text></view>
+          <view class="record-metric"><text class="rm-label">体脂</text><text class="rm-value">{{item.bodyFatPercent != null ? item.bodyFatPercent : '-'}}%</text></view>
+          <view class="record-metric"><text class="rm-label">肌肉</text><text class="rm-value">{{item.muscleMassKg != null ? item.muscleMassKg : '-'}}kg</text></view>
+        </view>
+      </view>
+    </block>
+    <view wx:if="{{records.length === 0 && !loading && !loadFailed}}" class="empty">暂无体测记录</view>
+    <view wx:if="{{loadFailed}}" class="empty retry" bindtap="retryLoad">加载失败，点击重试</view>
+  </view>
+</view>

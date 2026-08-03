@@ -30,7 +30,7 @@
       </view>
       <view class="asset-card" bindtap="goCompetitions">
         <text class="asset-num">{{isLoggedIn ? stats.competitions : '-'}}</text>
-        <text class="asset-label">近期比赛</text>
+        <text class="asset-label">我的比赛</text>
       </view>
       <view class="asset-card" bindtap="onRequireLogin">
         <text class="asset-num">{{isLoggedIn ? stats.checkInMonth : '-'}}</text>

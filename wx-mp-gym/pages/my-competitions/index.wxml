@@ -1,0 +1,17 @@
+<view class="page-my-comps">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
+    <text class="nav-title">我的报名</text>
+    <view class="nav-placeholder"></view>
+  </view>
+
+  <view class="comp-card" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+    <view class="name-row">
+      <text class="comp-name">{{item.name}}</text>
+      <text class="comp-tag {{item.statusClass}}">{{item.statusText}}</text>
+    </view>
+    <text class="comp-time">{{item.timeText}}</text>
+  </view>
+  <view wx:if="{{loading}}" class="empty">加载中...</view>
+  <view wx:if="{{!loading && list.length === 0}}" class="empty">暂无报名记录</view>
+</view>

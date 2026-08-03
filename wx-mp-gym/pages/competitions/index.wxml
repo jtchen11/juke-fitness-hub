@@ -2,31 +2,54 @@
   <view class="nav-bar">
     <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
     <text class="nav-title">健身比赛</text>
-    <view class="nav-placeholder"></view>
+    <view class="nav-action" bindtap="goMyCompetitions">我的报名</view>
   </view>
 
   <view class="section">
-    <text class="section-title">进行中的比赛</text>
-    <view class="comp-card" wx:for="{{activeList}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
-      <view class="comp-info">
-        <text class="comp-name">{{item.name}}</text>
-        <text class="comp-time">{{item.startDate}} ~ {{item.endDate}}</text>
-        <text class="comp-desc">{{item.description}}</text>
-      </view>
-      <view class="comp-status {{item.status}}">{{item.status === 'open' ? '招募中' : '进行中'}}</view>
+    <view class="section-header">
+      <text class="section-title">进行中</text>
+      <text class="section-count">{{activeList.length}} 场</text>
     </view>
-    <view wx:if="{{activeList.length === 0}}" class="empty"><text>暂无比赛</text></view>
+    <view class="comp-card" wx:for="{{activeList}}" wx:key="id">
+      <view class="card-main" data-id="{{item.id}}" bindtap="goDetail">
+        <view class="card-info">
+          <view class="name-row">
+            <text class="comp-name">{{item.name}}</text>
+            <text class="comp-tag {{item.tagClass}}">{{item.tagText}}</text>
+          </view>
+          <text class="comp-time">{{item.timeText}}</text>
+          <text class="comp-desc">{{item.description}}</text>
+          <view class="comp-meta">
+            <text class="comp-meta-text">{{item.metaText}}</text>
+          </view>
+        </view>
+      </view>
+      <button class="comp-btn {{item.btnClass}}" data-item="{{item}}" bindtap="register" disabled="{{!item.canRegister}}">{{item.btnText}}</button>
+    </view>
+    <view wx:if="{{activeList.length === 0}}" class="empty">暂无进行中的比赛</view>
   </view>
 
   <view class="section">
-    <text class="section-title">历史比赛</text>
-    <view class="comp-card history" wx:for="{{historyList}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
-      <view class="comp-info">
-        <text class="comp-name">{{item.name}}</text>
-        <text class="comp-time">{{item.startDate}} ~ {{item.endDate}}</text>
-      </view>
-      <view class="comp-status ended">已结束</view>
+    <view class="section-header">
+      <text class="section-title">已结束</text>
+      <text class="section-count">{{endedList.length}} 场</text>
     </view>
-    <view wx:if="{{historyList.length === 0}}" class="empty"><text>暂无历史比赛</text></view>
+    <view class="comp-card ended" wx:for="{{endedList}}" wx:key="id">
+      <view class="card-main" data-id="{{item.id}}" bindtap="goDetail">
+        <view class="card-info">
+          <view class="name-row">
+            <text class="comp-name">{{item.name}}</text>
+            <text class="comp-tag {{item.tagClass}}">{{item.tagText}}</text>
+          </view>
+          <text class="comp-time">{{item.timeText}}</text>
+          <text class="comp-desc">{{item.description}}</text>
+          <view class="comp-meta">
+            <text class="comp-meta-text">{{item.metaText}}</text>
+          </view>
+        </view>
+      </view>
+      <button class="comp-btn {{item.btnClass}}" data-item="{{item}}" bindtap="register" disabled="{{!item.canRegister}}">{{item.btnText}}</button>
+    </view>
+    <view wx:if="{{endedList.length === 0}}" class="empty">暂无已结束的比赛</view>
   </view>
 </view>

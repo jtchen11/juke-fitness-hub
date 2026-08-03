@@ -13,7 +13,7 @@ public interface CheckInMapper extends BaseMapper<CheckIn> {
     /**
      * 统计会员本月签到次数
      */
-    @Select("SELECT COUNT(*) FROM check_in WHERE member_id = #{memberId} AND check_in_time >= #{startOfMonth}")
+    @Select("SELECT COUNT(*) FROM check_in WHERE member_id = #{memberId} AND check_in_time >= #{startOfMonth} AND (check_in_type IN ('class','normal') OR (check_in_type = 'pt' AND remark = 'end'))")
     int countThisMonth(Long memberId, LocalDateTime startOfMonth);
 
     /**

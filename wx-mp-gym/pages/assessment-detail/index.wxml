@@ -1,1 +1,66 @@
-<view class="page-assessment-detail"><view class="score-section"><text class="total-score">{{record.totalScore || '-'}}</text><text class="score-label">综合评分</text><view class="score-bar"><view class="bar-fill" style="width:{{record.totalScore||0}}%"></view></view><text class="score-grade {{gradeClass}}">{{gradeText}}</text></view><view class="metrics-grid"><view class="metric-card"><text class="metric-value">{{record.bmi || '-'}}</text><text class="metric-label">BMI</text><text class="metric-score">{{record.bmiScore || 0}}/50</text></view><view class="metric-card"><text class="metric-value">{{record.bodyFatPercent || '-'}}%</text><text class="metric-label">体脂率</text><text class="metric-score">{{record.fatScore || 0}}/50</text></view><view class="metric-card"><text class="metric-value">{{record.muscleMassKg || '-'}}kg</text><text class="metric-label">肌肉量</text><text class="metric-score">-</text></view><view class="metric-card"><text class="metric-value">{{record.weightKg || '-'}}kg</text><text class="metric-label">体重</text><text class="metric-score">{{record.testDate}}</text></view></view><view class="suggestion-card" wx:if="{{report.aiSuggestion}}"><text class="suggestion-title">AI 健康建议</text><text class="suggestion-content">{{report.aiSuggestion}}</text></view></view>
+<view class="page-assessment-detail">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
+    <text class="nav-title">体测报告</text>
+  </view>
+
+  <view class="header-card">
+    <view class="header-left">
+      <text class="header-date">{{record.testDate || '-'}}</text>
+      <text class="header-desc">体测数据报告</text>
+    </view>
+    <view class="status-badge" wx:if="{{score}}">{{score.levelIcon}} {{score.levelText}}</view>
+    <view class="status-badge" wx:else>待评估</view>
+  </view>
+
+  <view class="score-card" wx:if="{{score}}">
+    <view class="score-top">
+      <text class="score-icon">{{score.levelIcon}}</text>
+      <view class="score-num-wrap"><text class="score-num">{{score.totalScore}}</text><text class="score-unit">分</text></view>
+      <text class="score-grade grade-{{score.level}}">{{score.levelText}}</text>
+    </view>
+    <view class="score-dims">
+      <view class="dim-row"><text class="dim-name">BMI</text><view class="dim-bar"><view class="dim-fill fill-bmi" style="width:{{score.bmi.score / score.bmi.full * 100}}%"></view></view><text class="dim-score">{{score.bmi.score}}/{{score.bmi.full}}</text></view>
+      <view class="dim-row"><text class="dim-name">体脂率</text><view class="dim-bar"><view class="dim-fill fill-fat" style="width:{{score.bodyFat.score / score.bodyFat.full * 100}}%"></view></view><text class="dim-score">{{score.bodyFat.score}}/{{score.bodyFat.full}}</text></view>
+      <view class="dim-row"><text class="dim-name">肌肉量</text><view class="dim-bar"><view class="dim-fill fill-muscle" style="width:{{score.muscle.score / score.muscle.full * 100}}%"></view></view><text class="dim-score">{{score.muscle.score}}/{{score.muscle.full}}</text></view>
+    </view>
+  </view>
+
+  <view class="metrics-grid">
+    <view class="metric-card">
+      <text class="metric-label">体重</text>
+      <view class="metric-value-row"><text class="metric-value">{{record.weightKg != null ? record.weightKg : '-'}}</text><text class="metric-unit">kg</text></view>
+      <text class="metric-delta {{compare.weight.cls}}">{{compare.weight.text || '—'}}</text>
+    </view>
+    <view class="metric-card">
+      <text class="metric-label">体脂率</text>
+      <view class="metric-value-row"><text class="metric-value">{{record.bodyFatPercent != null ? record.bodyFatPercent : '-'}}</text><text class="metric-unit">%</text></view>
+      <text class="metric-delta {{compare.bodyFat.cls}}">{{compare.bodyFat.text || '—'}}</text>
+    </view>
+    <view class="metric-card">
+      <text class="metric-label">肌肉量</text>
+      <view class="metric-value-row"><text class="metric-value">{{record.muscleMassKg != null ? record.muscleMassKg : '-'}}</text><text class="metric-unit">kg</text></view>
+      <text class="metric-delta {{compare.muscle.cls}}">{{compare.muscle.text || '—'}}</text>
+    </view>
+    <view class="metric-card">
+      <text class="metric-label">BMI</text>
+      <view class="metric-value-row"><text class="metric-value">{{bmi}}</text></view>
+      <text class="metric-delta flat">{{bmi != '-' ? '按身高体重计算' : '待补充身高'}}</text>
+    </view>
+  </view>
+
+  <view class="compare-card" wx:if="{{compare.prevDate}}">
+    <text class="compare-title">与上次对比</text>
+    <text class="compare-sub">上次测试：{{compare.prevDate}}</text>
+    <view class="compare-grid">
+      <view class="compare-item"><text class="ci-label">体重</text><text class="ci-value {{compare.weight.cls}}">{{compare.weight.text || '—'}}</text></view>
+      <view class="compare-item"><text class="ci-label">体脂率</text><text class="ci-value {{compare.bodyFat.cls}}">{{compare.bodyFat.text || '—'}}</text></view>
+      <view class="compare-item"><text class="ci-label">肌肉量</text><text class="ci-value {{compare.muscle.cls}}">{{compare.muscle.text || '—'}}</text></view>
+    </view>
+  </view>
+
+  <view class="suggestion-card" wx:if="{{report.report}}">
+    <text class="suggestion-title">AI 分析建议</text>
+    <text class="suggestion-content">{{report.report}}</text>
+  </view>
+</view>

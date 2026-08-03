@@ -1,1 +1,34 @@
-<view class="page-comp-detail"><view class="header"><text class="comp-name">{{comp.name}}</text><text class="comp-status {{comp.status}}">{{statusText}}</text></view><view class="info-card"><view class="info-row"><text class="info-label">比赛时间</text><text class="info-value">{{comp.startDate}} ~ {{comp.endDate}}</text></view><view class="info-row"><text class="info-label">报名费</text><text class="info-value">{{comp.fee ? '¥'+comp.fee : '免费'}}</text></view></view><view class="desc-card"><text class="desc-title">比赛介绍</text><text class="desc-content">{{comp.description || '暂无介绍'}}</text></view><button class="btn-register" wx:if="{{comp.status==='open'}}" bindtap="onRegister" disabled="{{registered}}">{{registered ? '已报名' : '立即报名'}}</button></view>
+<view class="page-comp-detail">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
+    <text class="nav-title">比赛详情</text>
+    <view class="nav-placeholder"></view>
+  </view>
+  <view class="content">
+    <view class="header">
+      <text class="comp-name">{{comp.name}}</text>
+      <text class="comp-status {{comp.status}}">{{statusText}}</text>
+    </view>
+    <view class="info-card">
+      <view class="info-row"><text class="info-label">比赛时间</text><text class="info-value">{{comp.startDate}} ~ {{comp.endDate}}</text></view>
+      <view class="info-row"><text class="info-label">报名费</text><text class="info-value">{{comp.fee ? '¥'+comp.fee : '免费'}}</text></view>
+      <view class="info-row"><text class="info-label">已报名</text><text class="info-value">{{comp.enrolledText}}</text></view>
+    </view>
+    <view class="prize-card" wx:if="{{comp.hasPrize}}">
+      <text class="desc-title">🏆 比赛奖品</text>
+      <view class="prize-row"><text class="prize-label">冠军</text><text class="prize-value">{{comp.championPoints || 0}} 积分</text></view>
+      <view class="prize-row"><text class="prize-label">亚军</text><text class="prize-value">{{comp.runnerUpPoints || 0}} 积分</text></view>
+      <view class="prize-row"><text class="prize-label">季军</text><text class="prize-value">{{comp.thirdPlacePoints || 0}} 积分</text></view>
+      <view class="prize-row"><text class="prize-label">参与</text><text class="prize-value">{{comp.participationPoints || 0}} 积分</text></view>
+    </view>
+    <view class="desc-card" wx:if="{{comp.rules}}">
+      <text class="desc-title">📌 赛制说明</text>
+      <text class="desc-content">{{comp.rules}}</text>
+    </view>
+    <view class="desc-card">
+      <text class="desc-title">📋 比赛介绍</text>
+      <text class="desc-content">{{comp.description || '暂无介绍'}}</text>
+    </view>
+    <button class="btn-register" wx:if="{{comp.status==='open'}}" bindtap="onRegister" disabled="{{registered}}">{{registered ? '已报名' : '立即报名'}}</button>
+  </view>
+</view>

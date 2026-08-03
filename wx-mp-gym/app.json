@@ -17,6 +17,7 @@
     "pages/competitions/index",
     "pages/diet-record/index",
     "pages/competition-detail/index",
+    "pages/my-competitions/index",
     "pages/assessments/index",
     "pages/assessment-detail/index",
     "pages/coach-students/detail/index",

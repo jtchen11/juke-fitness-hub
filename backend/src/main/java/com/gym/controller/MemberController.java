@@ -283,17 +283,33 @@ public class MemberController {
             return result;
         }
         Member member = memberMapper.selectById(memberId);
-        // 预约数：团课 + 私教
-        int classBookings = classBookingMapper.selectCount(new LambdaQueryWrapper<ClassBooking>().eq(ClassBooking::getMemberId, memberId).ne(ClassBooking::getStatus, "cancelled")).intValue();
-        int ptBookings = personalTrainingMapper.selectCount(new LambdaQueryWrapper<PersonalTraining>().eq(PersonalTraining::getMemberId, memberId).ne(PersonalTraining::getStatus, "cancelled")).intValue();
-        // 剩余课时
+        // 预约数（待上课）：团课 booked + 私教 scheduled
+        int classBookings = classBookingMapper.selectCount(new LambdaQueryWrapper<ClassBooking>().eq(ClassBooking::getMemberId, memberId).eq(ClassBooking::getStatus, "booked")).intValue();
+        int ptBookings = personalTrainingMapper.selectCount(new LambdaQueryWrapper<PersonalTraining>().eq(PersonalTraining::getMemberId, memberId).eq(PersonalTraining::getStatus, "scheduled")).intValue();
+        // 剩余课时：可用课程包剩余课时 + 本月免费私教剩余次数
         int ptRemaining = 0;
         if (member != null) {
-            // ptRemaining 暂通过 SQL 查询，后面对接 MemberPrivatePackageMapper
+            LambdaQueryWrapper<MemberPrivatePackage> pw = new LambdaQueryWrapper<>();
+            pw.eq(MemberPrivatePackage::getMemberId, memberId)
+              .ne(MemberPrivatePackage::getStatus, "refunded")
+              .gt(MemberPrivatePackage::getRemainingSessions, 0)
+              .and(w -> w.and(x -> x.isNotNull(MemberPrivatePackage::getStartDate)
+                      .and(y -> y.isNull(MemberPrivatePackage::getEndDate).or().ge(MemberPrivatePackage::getEndDate, LocalDate.now())))
+                      .or(z -> z.isNull(MemberPrivatePackage::getStartDate)
+                              .and(y -> y.isNull(MemberPrivatePackage::getActivationDeadline).or().ge(MemberPrivatePackage::getActivationDeadline, LocalDate.now()))));
+            List<MemberPrivatePackage> pkgList = memberPrivatePackageMapper.selectList(pw);
+            for (MemberPrivatePackage pkg : pkgList) {
+                ptRemaining += pkg.getRemainingSessions() != null ? pkg.getRemainingSessions() : 0;
+            }
+            String levelName = member.getLevel();
+            if (levelName == null || levelName.trim().isEmpty()) levelName = "普通会员";
+            MemberLevel level = MemberLevel.fromDisplayName(levelName.trim());
+            int freeUsed = member.getFreePtUsedMonth() != null ? member.getFreePtUsedMonth() : 0;
+            ptRemaining += Math.max(0, level.getFreePersonalTrainingsPerMonth() - freeUsed);
         }
-        // 比赛报名数
-        int competitions = competitionRegistrationMapper.selectCount(new LambdaQueryWrapper<CompetitionRegistration>().eq(CompetitionRegistration::getMemberId, memberId)).intValue();
-        // 本月签到
+        // 比赛报名数：仅已报名（registered）
+        int competitions = competitionRegistrationMapper.selectCount(new LambdaQueryWrapper<CompetitionRegistration>().eq(CompetitionRegistration::getMemberId, memberId).eq(CompetitionRegistration::getStatus, "registered")).intValue();
+        // 本月打卡：团课/自主训练各1次，私教按下训（remark='end'）计1次
         LocalDateTime startOfMonth = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0);
         int checkInMonth = checkInMapper.countThisMonth(memberId, startOfMonth);
         // 积分

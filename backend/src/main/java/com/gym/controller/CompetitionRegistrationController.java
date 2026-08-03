@@ -41,11 +41,29 @@ public class CompetitionRegistrationController {
 
         Map<String, Object> result = new HashMap<>();
 
+        if (competitionId == null || memberId == null) {
+            result.put("success", false);
+            result.put("message", "缺少比赛或用户信息");
+            return result;
+        }
+
         // 检查比赛是否存在
         Competition competition = competitionService.getById(competitionId);
         if (competition == null) {
             result.put("success", false);
             result.put("message", "比赛不存在");
+            return result;
+        }
+        if (competition.getIsActive() != null && !competition.getIsActive()) {
+            result.put("success", false);
+            result.put("message", "该比赛未开放报名");
+            return result;
+        }
+
+        // 检查报名截止时间
+        if (competition.getDeadline() != null && competition.getDeadline().isBefore(LocalDateTime.now())) {
+            result.put("success", false);
+            result.put("message", "报名已截止");
             return result;
         }
 
@@ -61,7 +79,8 @@ public class CompetitionRegistrationController {
         }
 
         // 检查是否已满
-        if (competition.getEnrolled() >= competition.getMaxParticipants()) {
+        int enrolled = competition.getEnrolled() == null ? 0 : competition.getEnrolled();
+        if (competition.getMaxParticipants() != null && enrolled >= competition.getMaxParticipants()) {
             result.put("success", false);
             result.put("message", "比赛名额已满");
             return result;
@@ -130,6 +149,38 @@ public class CompetitionRegistrationController {
         return registrationMapper.selectList(wrapper);
     }
     /**
+     * 查询会员已报名的比赛（含比赛信息，会员端“我的报名”）
+     */
+    @GetMapping("/member/{memberId}/competitions")
+    public List<Map<String, Object>> getMyCompetitions(@PathVariable Long memberId) {
+        LambdaQueryWrapper<CompetitionRegistration> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(CompetitionRegistration::getMemberId, memberId)
+                .eq(CompetitionRegistration::getStatus, "registered")
+                .orderByDesc(CompetitionRegistration::getRegistrationTime);
+        List<CompetitionRegistration> regs = registrationMapper.selectList(wrapper);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (CompetitionRegistration reg : regs) {
+            Competition competition = competitionService.getById(reg.getCompetitionId());
+            if (competition == null) {
+                continue;
+            }
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", competition.getId());
+            item.put("name", competition.getName());
+            item.put("startTime", competition.getStartTime());
+            item.put("endTime", competition.getEndTime());
+            item.put("deadline", competition.getDeadline());
+            item.put("status", competition.getStatus());
+            item.put("enrolled", competition.getEnrolled());
+            item.put("maxParticipants", competition.getMaxParticipants());
+            item.put("rewardGranted", competition.getRewardGranted());
+            item.put("registrationTime", reg.getRegistrationTime());
+            result.add(item);
+        }
+        return result;
+    }
+
+    /**
      * 获取某场比赛的报名名单（管理员用）
      */
     @GetMapping("/competition/{competitionId}")
@@ -146,6 +197,7 @@ public class CompetitionRegistrationController {
         for (CompetitionRegistration reg : registrations) {
             Member member = memberMapper.selectById(reg.getMemberId());
             Map<String, Object> item = new HashMap<>();
+            item.put("memberId", reg.getMemberId());
             item.put("memberName", member != null ? member.getName() : "未知会员");
             item.put("memberPhone", member != null ? member.getPhone() : "");
             item.put("registrationTime", reg.getRegistrationTime());
