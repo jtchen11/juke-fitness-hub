@@ -28,7 +28,7 @@
         <text class="asset-num">{{isLoggedIn ? stats.ptRemaining : '-'}}</text>
         <text class="asset-label">剩余课时</text>
       </view>
-      <view class="asset-card" bindtap="goCompetitions">
+      <view class="asset-card" bindtap="goMyCompetitions">
         <text class="asset-num">{{isLoggedIn ? stats.competitions : '-'}}</text>
         <text class="asset-label">我的比赛</text>
       </view>

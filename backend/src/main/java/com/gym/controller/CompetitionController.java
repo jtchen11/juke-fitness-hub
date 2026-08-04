@@ -4,10 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.gym.entity.Competition;
 import com.gym.entity.CompetitionRegistration;
-import com.gym.entity.Member;
 import com.gym.mapper.CompetitionRegistrationMapper;
-import com.gym.mapper.MemberMapper;
 import com.gym.service.CompetitionService;
+import com.gym.service.PointsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +30,7 @@ public class CompetitionController {
     private CompetitionRegistrationMapper registrationMapper;
 
     @Autowired
-    private MemberMapper memberMapper;
+    private PointsService pointsService;
 
     /**
      * 管理员端：分页查询
@@ -161,11 +160,15 @@ public class CompetitionController {
         int participation = competition.getParticipationPoints() == null ? 0 : competition.getParticipationPoints();
         for (Map.Entry<Long, Integer> entry : winnerRanks.entrySet()) {
             int points = entry.getValue() == 1 ? champion : (entry.getValue() == 2 ? runnerUp : third);
-            addPoints(entry.getKey(), points);
+            if (points <= 0) continue;
+            String rankName = entry.getValue() == 1 ? "冠军" : (entry.getValue() == 2 ? "亚军" : "季军");
+            pointsService.addPoints(entry.getKey(), points, "competition_reward", id,
+                    "比赛奖励-" + rankName + ": " + competition.getName());
         }
         for (CompetitionRegistration reg : regs) {
-            if (!winnerRanks.containsKey(reg.getMemberId())) {
-                addPoints(reg.getMemberId(), participation);
+            if (!winnerRanks.containsKey(reg.getMemberId()) && participation > 0) {
+                pointsService.addPoints(reg.getMemberId(), participation, "competition_reward", id,
+                        "比赛参与奖: " + competition.getName());
             }
         }
 
@@ -177,18 +180,6 @@ public class CompetitionController {
         result.put("message", "奖励发放成功");
         result.put("grantedCount", winnerRanks.size());
         return result;
-    }
-
-    private void addPoints(Long memberId, int points) {
-        if (points <= 0) {
-            return;
-        }
-        Member member = memberMapper.selectById(memberId);
-        if (member == null) {
-            return;
-        }
-        member.setPoints((member.getPoints() == null ? 0 : member.getPoints()) + points);
-        memberMapper.updateById(member);
     }
 
     @DeleteMapping("/{id}")

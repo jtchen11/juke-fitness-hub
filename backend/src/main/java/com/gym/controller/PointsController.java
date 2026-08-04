@@ -38,7 +38,7 @@ public class PointsController {
         Long memberId = LoginContext.getUserId();
         Map<String, Object> r = new HashMap<>();
         if (memberId == null) { r.put("list", java.util.Collections.emptyList()); r.put("total", 0); return r; }
-        List<PointsHistory> list = pointsService.getHistory(memberId, page, size);
+        List<Map<String, Object>> list = pointsService.getHistory(memberId, page, size);
         r.put("list", list);
         r.put("total", list.size());
         return r;
@@ -73,9 +73,22 @@ public class PointsController {
     @GetMapping("/redemptions")
     public Map<String, Object> getRedemptions() {
         Long memberId = LoginContext.getUserId();
-        List<PointsRedemption> list = pointsService.getRedemptions(memberId);
+        List<Map<String, Object>> list = pointsService.getRedemptions(memberId);
         Map<String, Object> r = new HashMap<>();
         r.put("list", list);
+        return r;
+    }
+
+    /** 管理员：兑换记录列表（按状态筛选） */
+    @GetMapping("/admin/list")
+    public Map<String, Object> adminList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(required = false) String status) {
+        var p = pointsService.listRedemptions(page, size, status);
+        Map<String, Object> r = new HashMap<>();
+        r.put("list", p.getRecords());
+        r.put("total", p.getTotal());
         return r;
     }
 
@@ -99,7 +112,7 @@ public class PointsController {
         boolean ok = pointsService.approveRedemption(id, adminId, remark);
         Map<String, Object> r = new HashMap<>();
         r.put("success", ok);
-        r.put("message", ok ? "已通过" : "操作失败");
+        r.put("message", ok ? "已通过" : "该兑换已处理，请勿重复操作");
         return r;
     }
 
@@ -111,7 +124,7 @@ public class PointsController {
         boolean ok = pointsService.rejectRedemption(id, adminId, remark);
         Map<String, Object> r = new HashMap<>();
         r.put("success", ok);
-        r.put("message", ok ? "已驳回" : "操作失败");
+        r.put("message", ok ? "已驳回" : "该兑换已处理，请勿重复操作");
         return r;
     }
 }

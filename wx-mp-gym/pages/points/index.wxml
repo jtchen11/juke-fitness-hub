@@ -1,38 +1,50 @@
 <view class="page-points">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
+    <text class="nav-title">积分商城</text>
+    <view class="nav-right" bindtap="goMyRedemptions"><text>我的兑换</text></view>
+  </view>
+
   <view class="points-header">
     <text class="points-num">{{points}}</text>
     <text class="points-label">当前积分</text>
   </view>
 
-  <view class="section" wx:if="{{rewards.length>0}}">
-    <text class="section-title">积分商城</text>
-    <view class="redeem-card {{points >= item.pointsRequired ? '' : 'disabled'}}" wx:for="{{rewards}}" wx:key="id" data-id="{{item.id}}" data-cost="{{item.pointsRequired}}" data-name="{{item.name}}" bindtap="onRedeem">
-      <view class="redeem-info">
-        <text class="redeem-name">{{item.name}}</text>
-        <text class="redeem-desc">{{item.description}}</text>
-      </view>
-      <view class="redeem-cost">
-        <text class="cost-num">{{item.pointsRequired}}</text>
-        <text class="cost-label">积分</text>
-        <text class="stock-label" wx:if="{{item.stock !== null && item.stock <= 5 && item.stock > 0}}">仅剩{{item.stock}}</text>
-        <text class="stock-label sold-out" wx:if="{{item.stock !== null && item.stock === 0}}">已售罄</text>
+  <view class="section" wx:if="{{rewards.length > 0}}">
+    <text class="section-title">积分商品</text>
+    <view class="reward-card {{points < item.pointsRequired || item.stock === 0 ? 'disabled' : ''}}" wx:for="{{rewards}}" wx:key="id">
+      <image class="reward-img" wx:if="{{item.imageUrl}}" src="{{item.imageUrl}}" mode="aspectFill"></image>
+      <view class="reward-main">
+        <text class="reward-name">{{item.name}}</text>
+        <text class="reward-desc">{{item.description}}</text>
+        <view class="reward-bottom">
+          <view class="reward-price">
+            <text class="price-num">{{item.pointsRequired}}</text>
+            <text class="price-label">积分</text>
+            <text class="stock-label" wx:if="{{item.stock === 0}}">已售罄</text>
+            <text class="stock-label" wx:elif="{{item.stock !== null && item.stock > 0 && item.stock <= 5}}">仅剩{{item.stock}}</text>
+          </view>
+          <view class="redeem-btn {{points < item.pointsRequired || item.stock === 0 ? 'btn-disabled' : ''}}" data-id="{{item.id}}" data-cost="{{item.pointsRequired}}" data-name="{{item.name}}" bindtap="onRedeem">
+            <text>{{item.stock === 0 ? '已售罄' : '兑换'}}</text>
+          </view>
+        </view>
       </view>
     </view>
+  </view>
+
+  <view class="section" wx:if="{{rewards.length === 0 && !loading}}">
+    <view class="empty"><text>暂无可兑换商品</text></view>
   </view>
 
   <view class="section">
     <text class="section-title">积分明细</text>
     <view class="history-item" wx:for="{{history}}" wx:key="id">
       <view class="history-left">
-        <text class="history-type">{{item.remark || item.changeType}}</text>
+        <text class="history-type">{{item.description || item.changeType}}</text>
         <text class="history-time">{{item.createdAt}}</text>
       </view>
-      <text class="history-points {{item.pointsChange > 0 ? 'add' : 'sub'}}">{{item.pointsChange > 0 ? '+' : ''}}{{item.pointsChange}}</text>
+      <text class="history-points {{item.points > 0 ? 'add' : 'sub'}}">{{item.points > 0 ? '+' : ''}}{{item.points}}</text>
     </view>
     <view wx:if="{{history.length === 0}}" class="empty"><text>暂无积分记录</text></view>
-  </view>
-
-  <view class="section" wx:if="{{rewards.length===0 && !loading}}">
-    <text class="empty" style="text-align:center;display:block;padding:40px 0">暂无可兑换商品</text>
   </view>
 </view>

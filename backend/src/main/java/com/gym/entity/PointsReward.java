@@ -13,6 +13,8 @@ public class PointsReward {
     private String imageUrl;
     private Boolean isActive;
     private Integer sortOrder;
+    private String approvalType;   // auto=自动审批 manual=人工审批
+    private Integer sessions;      // 私教课课时数
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -36,6 +38,10 @@ public class PointsReward {
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
     public Integer getSortOrder() { return sortOrder; }
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public String getApprovalType() { return approvalType; }
+    public void setApprovalType(String approvalType) { this.approvalType = approvalType; }
+    public Integer getSessions() { return sessions; }
+    public void setSessions(Integer sessions) { this.sessions = sessions; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

@@ -1,10 +1,19 @@
 var app = getApp();
 var request = require('../../utils/request.js');
+
 Page({
-  data: { points: 0, history: [], rewards: [] },
+  data: {
+    points: 0,
+    rewards: [],
+    history: [],
+    loading: true
+  },
+
   onShow() { this.loadData(); },
+
   loadData() {
     var _this = this;
+    this.setData({ loading: true });
     request.get('/api/points', {}, function(r) {
       if (r && r.points !== undefined) _this.setData({ points: r.points });
     });
@@ -13,8 +22,16 @@ Page({
     });
     request.get('/api/points/history', { page: 1, size: 50 }, function(r) {
       if (r && r.list) _this.setData({ history: r.list });
+      _this.setData({ loading: false });
     });
   },
+
+  goBack() { wx.navigateBack(); },
+
+  goMyRedemptions() {
+    wx.navigateTo({ url: '/pages/redemptions/index' });
+  },
+
   onRedeem(e) {
     var id = e.currentTarget.dataset.id;
     var cost = parseInt(e.currentTarget.dataset.cost);
@@ -34,7 +51,7 @@ Page({
               wx.showToast({ title: '兑换成功', icon: 'success' });
               _this.loadData();
             } else {
-              wx.showToast({ title: r.message || '兑换失败', icon: 'none' });
+              wx.showToast({ title: (r && r.message) || '兑换失败', icon: 'none' });
             }
           });
         }

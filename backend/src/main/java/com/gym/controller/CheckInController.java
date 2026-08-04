@@ -136,6 +136,15 @@ public class CheckInController {
      */
     @PostMapping("/class/{classId}")
     public Map<String, Object> checkInClass(@RequestParam Long memberId, @PathVariable Long classId) {
+        // 防重复：同一会员同一课程只记一次签到，避免重复发放积分
+        LambdaQueryWrapper<CheckIn> dupW = new LambdaQueryWrapper<>();
+        dupW.eq(CheckIn::getMemberId, memberId)
+                .eq(CheckIn::getClassId, classId)
+                .eq(CheckIn::getCheckInType, "class");
+        if (checkInMapper.selectCount(dupW) > 0) {
+            return errorResponse("您已签到过该课程，请勿重复签到");
+        }
+
         CheckIn checkIn = new CheckIn();
         checkIn.setMemberId(memberId);
         checkIn.setCheckInTime(LocalDateTime.now());
@@ -146,8 +155,7 @@ public class CheckInController {
         // 团课签到 +1 积分
         try {
             GroupClass gc = groupClassMapper.selectById(classId);
-            int points = 1;
-            if (gc != null && "paid".equals(gc.getType())) points += 10;
+            int points = gc != null && "paid".equals(gc.getType()) ? 10 : 1;
             pointsService.addPoints(memberId, points, "CLASS_CHECKIN", classId, "团课签到");
         } catch (Exception ignored) {}
         return successResponse("团课签到成功");
@@ -337,9 +345,9 @@ public class CheckInController {
         if ("end".equals(action)) {
             pt.setStatus("completed");
             personalTrainingMapper.updateById(pt);
-            // 私教完成 +1 积分
+            // 私教完成 +10 积分（规则 R060：私教完成得10分）
             try {
-                pointsService.addPoints(memberId, 1, "PT_COMPLETED", ptId, "私教签到");
+                pointsService.addPoints(memberId, 10, "PT_COMPLETED", ptId, "私教完成");
             } catch (Exception ignored) {}
         } else {
             // 上课打卡：可记录上课时间，但暂不改变状态
@@ -509,8 +517,7 @@ public class CheckInController {
         checkInMapper.insert(ci);
         // 团课签到积分
         try {
-            int pts = 1;
-            if (gc.getType() != null && "paid".equals(gc.getType())) pts += 10;
+            int pts = gc.getType() != null && "paid".equals(gc.getType()) ? 10 : 1;
             pointsService.addPoints(memberId, pts, "CLASS_CHECKIN", classId, "团课签到码签到");
         } catch (Exception ignored) {}
         return successResponse("签到成功");

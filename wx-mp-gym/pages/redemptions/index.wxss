@@ -1,0 +1,19 @@
+.page-redemptions{min-height:100vh;background:#F5F6FA;padding:calc(24rpx + env(safe-area-inset-top)) 32rpx 70rpx;box-sizing:border-box}
+.nav-bar{display:flex;align-items:center;height:80rpx;margin-bottom:20rpx;position:relative}
+.nav-back{width:64rpx;height:64rpx;display:flex;align-items:center;justify-content:center;background:#FFF;border-radius:50%;box-shadow:0 2rpx 12rpx rgba(0,0,0,.06)}
+.back-icon{font-size:40rpx;color:#1A1A2E;line-height:1;font-weight:700;margin-top:-4rpx}
+.nav-title{font-size:34rpx;font-weight:700;color:#1A1A2E;margin-left:16rpx}
+.redemption-item{background:#FFF;border-radius:20rpx;padding:24rpx;margin-bottom:16rpx;box-shadow:0 4rpx 16rpx rgba(0,0,0,.04)}
+.item-top{display:flex;align-items:center;justify-content:space-between}
+.item-name{font-size:30rpx;font-weight:600;color:#1A1A2E}
+.item-status{font-size:22rpx;font-weight:600;padding:6rpx 16rpx;border-radius:20rpx}
+.st-pending{color:#FF9500;background:#FFF4E5}
+.st-approved{color:#4A6CF7;background:#EEF0FF}
+.st-completed{color:#4A6CF7;background:#EEF0FF}
+.st-rejected{color:#FF4757;background:#FFEEF0}
+.item-meta{display:flex;align-items:center;justify-content:space-between;margin-top:12rpx}
+.item-type{font-size:24rpx;color:#8A8AA0}
+.item-cost{font-size:26rpx;font-weight:700;color:#FF4757}
+.item-time{display:block;font-size:22rpx;color:#B0B3C0;margin-top:8rpx}
+.item-remark{display:block;font-size:22rpx;color:#8A8AA0;margin-top:4rpx}
+.empty{font-size:24rpx;color:#8A8AA0;text-align:center;padding:80rpx 0}

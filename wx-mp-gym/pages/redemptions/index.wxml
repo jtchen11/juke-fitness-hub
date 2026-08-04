@@ -1,0 +1,21 @@
+<view class="page-redemptions">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="back-icon">‹</text></view>
+    <text class="nav-title">我的兑换</text>
+  </view>
+
+  <view class="redemption-item" wx:for="{{list}}" wx:key="id">
+    <view class="item-top">
+      <text class="item-name">{{item.rewardName}}</text>
+      <text class="item-status {{item.statusCls}}">{{item.statusText}}</text>
+    </view>
+    <view class="item-meta">
+      <text class="item-type">{{item.typeText}}</text>
+      <text class="item-cost">-{{item.pointsSpent}} 积分</text>
+    </view>
+    <text class="item-time">{{item.timeText}}</text>
+    <text class="item-remark" wx:if="{{item.adminRemark}}">备注：{{item.adminRemark}}</text>
+  </view>
+
+  <view wx:if="{{list.length === 0 && !loading}}" class="empty"><text>暂无兑换记录</text></view>
+</view>

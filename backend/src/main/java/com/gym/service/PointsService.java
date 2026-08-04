@@ -18,11 +18,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class PointsService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PointsService.class);
 
     @Autowired private MemberMapper memberMapper;
     @Autowired private PointsHistoryMapper historyMapper;
@@ -35,12 +39,48 @@ public class PointsService {
         return m != null && m.getPoints() != null ? m.getPoints() : 0;
     }
 
-    public List<PointsHistory> getHistory(Long memberId, int page, int size) {
+    public List<Map<String, Object>> getHistory(Long memberId, int page, int size) {
         LambdaQueryWrapper<PointsHistory> w = new LambdaQueryWrapper<>();
         w.eq(PointsHistory::getMemberId, memberId)
                 .orderByDesc(PointsHistory::getCreatedAt);
         IPage<PointsHistory> p = historyMapper.selectPage(new Page<>(page, size), w);
-        return p.getRecords();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (PointsHistory h : p.getRecords()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", String.valueOf(h.getId()));
+            m.put("memberId", h.getMemberId());
+            m.put("points", h.getPoints());
+            m.put("balance", h.getBalance());
+            m.put("changeType", h.getChangeType());
+            m.put("sourceId", h.getSourceId());
+            m.put("description", h.getDescription());
+            m.put("createdAt", h.getCreatedAt());
+            if (h.getSourceId() != null
+                    && ("redemption".equals(h.getChangeType()) || "redemption_refund".equals(h.getChangeType()))) {
+                String rewardName = null;
+                try {
+                    PointsReward reward = rewardMapper.selectById(Long.valueOf(h.getSourceId()));
+                    if (reward != null) rewardName = reward.getName();
+                } catch (Exception ignored) {}
+                if (rewardName == null) {
+                    // 兼容旧数据：source_id 为兑换记录 ID 时，先查 points_redemption 取得商品 ID
+                    try {
+                        PointsRedemption red = redemptionMapper.selectById(Long.valueOf(h.getSourceId()));
+                        if (red != null && red.getRewardId() != null) {
+                            PointsReward reward = rewardMapper.selectById(red.getRewardId());
+                            if (reward != null) rewardName = reward.getName();
+                        }
+                    } catch (Exception ignored) {}
+                }
+                if (rewardName != null) {
+                    m.put("description", "redemption".equals(h.getChangeType())
+                            ? "兑换：" + rewardName
+                            : "兑换驳回退回：" + rewardName);
+                }
+            }
+            result.add(m);
+        }
+        return result;
     }
 
     /**
@@ -51,16 +91,20 @@ public class PointsService {
         Member m = memberMapper.selectById(memberId);
         if (m == null) return false;
         int current = m.getPoints() != null ? m.getPoints() : 0;
-        m.setPoints(current + points);
+        int newBalance = current + points;
+        m.setPoints(newBalance);
         memberMapper.updateById(m);
 
         PointsHistory h = new PointsHistory();
         h.setMemberId(memberId);
-        h.setPointsChange(points);
+        h.setPoints(points);
+        h.setBalance(newBalance);
         h.setChangeType(changeType);
-        h.setReferenceId(referenceId);
-        h.setRemark(remark);
+        h.setSourceId(referenceId != null ? String.valueOf(referenceId) : null);
+        h.setDescription(remark);
         h.setCreatedAt(LocalDateTime.now());
+        log.info("[积分流水-addPoints] 插入 points_history: memberId={}, points={}, balance={}, changeType={}, sourceId={}, description={}, createdAt={}",
+                h.getMemberId(), h.getPoints(), h.getBalance(), h.getChangeType(), h.getSourceId(), h.getDescription(), h.getCreatedAt());
         historyMapper.insert(h);
         return true;
     }
@@ -74,16 +118,20 @@ public class PointsService {
         if (m == null) return false;
         int current = m.getPoints() != null ? m.getPoints() : 0;
         if (current < points) return false;
-        m.setPoints(current - points);
+        int newBalance = current - points;
+        m.setPoints(newBalance);
         memberMapper.updateById(m);
 
         PointsHistory h = new PointsHistory();
         h.setMemberId(memberId);
-        h.setPointsChange(-points);
+        h.setPoints(-points);
+        h.setBalance(newBalance);
         h.setChangeType(changeType);
-        h.setReferenceId(referenceId);
-        h.setRemark(remark);
+        h.setSourceId(referenceId != null ? String.valueOf(referenceId) : null);
+        h.setDescription(remark);
         h.setCreatedAt(LocalDateTime.now());
+        log.info("[积分流水-deductPoints] 插入 points_history: memberId={}, points={}, balance={}, changeType={}, sourceId={}, description={}, createdAt={}",
+                h.getMemberId(), h.getPoints(), h.getBalance(), h.getChangeType(), h.getSourceId(), h.getDescription(), h.getCreatedAt());
         historyMapper.insert(h);
         return true;
     }
@@ -114,6 +162,7 @@ public class PointsService {
     @Transactional
     public Map<String, Object> redeemReward(Long memberId, Long rewardId, String remark) {
         Map<String, Object> result = new java.util.HashMap<>();
+        log.info("[兑换] 开始兑换 rewardId={}, memberId={}, remark={}", rewardId, memberId, remark);
         // 1. 查商品
         PointsReward reward = rewardMapper.selectById(rewardId);
         if (reward == null || !Boolean.TRUE.equals(reward.getIsActive())) {
@@ -130,31 +179,37 @@ public class PointsService {
         // 3. 校验并扣减积分
         Member m = memberMapper.selectById(memberId);
         int balance = m != null && m.getPoints() != null ? m.getPoints() : 0;
+        log.info("[兑换] 会员当前积分 balance={}, 需扣减={}", balance, reward.getPointsRequired());
         if (balance < reward.getPointsRequired()) {
             result.put("success", false);
             result.put("message", "积分不足，需要" + reward.getPointsRequired() + "分");
             return result;
         }
         deductPoints(memberId, reward.getPointsRequired(), "redemption", rewardId, remark);
+        Member after = memberMapper.selectById(memberId);
+        log.info("[兑换] 扣减后积分 balance={}", after != null && after.getPoints() != null ? after.getPoints() : 0);
 
-        // 4. 创建兑换记录（状态直接完成，不需要审批）
+        // 4. 创建兑换记录（R062：实物类人工审批，其余自动完成）
+        boolean needApproval = "manual".equals(reward.getApprovalType())
+                || (reward.getApprovalType() == null && "physical".equals(reward.getRewardType()));
         PointsRedemption r = new PointsRedemption();
         r.setMemberId(memberId);
         r.setRewardId(rewardId);
         r.setPointsSpent(reward.getPointsRequired());
         r.setRedemptionType(reward.getRewardType());
-        r.setStatus("completed");
+        r.setStatus(needApproval ? "pending" : "completed");
         r.setCreatedAt(LocalDateTime.now());
-        r.setProcessedAt(LocalDateTime.now());
+        if (!needApproval) {
+            r.setProcessedAt(LocalDateTime.now());
+        }
         redemptionMapper.insert(r);
 
-        // 5. 根据类型执行兑换动作
-        if ("pt_session".equals(reward.getRewardType())) {
-            int sessions = 1;
-            try { sessions = Integer.parseInt(reward.getRewardValue()); } catch (Exception ignored) {}
+        // 5. 根据类型执行兑换动作（实物类等人工审批通过后线下发放）
+        if (!needApproval && "pt_session".equals(reward.getRewardType())) {
+            int sessions = reward.getSessions() != null && reward.getSessions() > 0 ? reward.getSessions() : 1;
             MemberPrivatePackage pkg = new MemberPrivatePackage();
             pkg.setMemberId(memberId);
-            pkg.setPackageId(null);
+            pkg.setPackageId(0);
             pkg.setPackageName(reward.getName());
             pkg.setCoachId(null);
             pkg.setTotalSessions(sessions);
@@ -183,6 +238,7 @@ public class PointsService {
     @Transactional
     public boolean approveRedemption(Long id, Long adminId, String remark) {
         PointsRedemption r = redemptionMapper.selectById(id);
+        log.info("[审批] 通过操作 redemptionId={}, adminId={}, currentStatus={}", id, adminId, r == null ? "null" : r.getStatus());
         if (r == null || !"pending".equals(r.getStatus())) return false;
         r.setStatus("approved");
         r.setAdminId(adminId);
@@ -195,9 +251,18 @@ public class PointsService {
     @Transactional
     public boolean rejectRedemption(Long id, Long adminId, String remark) {
         PointsRedemption r = redemptionMapper.selectById(id);
+        log.info("[审批] 驳回操作 redemptionId={}, adminId={}, currentStatus={}", id, adminId, r == null ? "null" : r.getStatus());
         if (r == null || !"pending".equals(r.getStatus())) return false;
-        // 退还积分
-        addPoints(r.getMemberId(), r.getPointsSpent(), "redemption_refund", id, remark);
+        // 退还积分（source_id 保持为商品ID，与正常兑换一致）
+        addPoints(r.getMemberId(), r.getPointsSpent(), "redemption_refund", r.getRewardId(), remark);
+        // 归还库存（实物类在申请时已预留库存）
+        if (r.getRewardId() != null) {
+            PointsReward reward = rewardMapper.selectById(r.getRewardId());
+            if (reward != null && reward.getStock() != null && reward.getStock() != -1) {
+                reward.setStock(reward.getStock() + 1);
+                rewardMapper.updateById(reward);
+            }
+        }
         r.setStatus("rejected");
         r.setAdminId(adminId);
         r.setAdminRemark(remark);
@@ -206,17 +271,85 @@ public class PointsService {
         return true;
     }
 
-    public List<PointsRedemption> getRedemptions(Long memberId) {
+    public List<Map<String, Object>> getRedemptions(Long memberId) {
         LambdaQueryWrapper<PointsRedemption> w = new LambdaQueryWrapper<>();
         w.eq(PointsRedemption::getMemberId, memberId)
                 .orderByDesc(PointsRedemption::getCreatedAt);
-        return redemptionMapper.selectList(w);
+        List<PointsRedemption> list = redemptionMapper.selectList(w);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (PointsRedemption r : list) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", String.valueOf(r.getId()));
+            m.put("memberId", r.getMemberId());
+            m.put("pointsSpent", r.getPointsSpent());
+            m.put("rewardId", r.getRewardId() != null ? String.valueOf(r.getRewardId()) : null);
+            m.put("redemptionType", r.getRedemptionType());
+            m.put("status", r.getStatus());
+            m.put("adminRemark", r.getAdminRemark());
+            m.put("createdAt", r.getCreatedAt());
+            m.put("processedAt", r.getProcessedAt());
+            PointsReward reward = r.getRewardId() != null ? rewardMapper.selectById(r.getRewardId()) : null;
+            m.put("rewardName", reward != null ? reward.getName() : "积分商品");
+            result.add(m);
+        }
+        return result;
     }
 
-    public IPage<PointsRedemption> getPendingRedemptions(int page, int size) {
+    public IPage<Map<String, Object>> getPendingRedemptions(int page, int size) {
         LambdaQueryWrapper<PointsRedemption> w = new LambdaQueryWrapper<>();
         w.eq(PointsRedemption::getStatus, "pending")
                 .orderByDesc(PointsRedemption::getCreatedAt);
-        return redemptionMapper.selectPage(new Page<>(page, size), w);
+        IPage<PointsRedemption> p = redemptionMapper.selectPage(new Page<>(page, size), w);
+        IPage<Map<String, Object>> result = new Page<>(page, size, p.getTotal());
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (PointsRedemption r : p.getRecords()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", String.valueOf(r.getId()));
+            m.put("memberId", r.getMemberId());
+            m.put("pointsSpent", r.getPointsSpent());
+            m.put("rewardId", r.getRewardId() != null ? String.valueOf(r.getRewardId()) : null);
+            m.put("redemptionType", r.getRedemptionType());
+            m.put("status", r.getStatus());
+            m.put("adminRemark", r.getAdminRemark());
+            m.put("createdAt", r.getCreatedAt());
+            m.put("processedAt", r.getProcessedAt());
+            records.add(m);
+        }
+        result.setRecords(records);
+        return result;
+    }
+
+    public IPage<Map<String, Object>> listRedemptions(int page, int size, String status) {
+        LambdaQueryWrapper<PointsRedemption> w = new LambdaQueryWrapper<>();
+        if (status != null && !status.trim().isEmpty()) {
+            List<String> statuses = new ArrayList<>();
+            for (String part : status.split(",")) {
+                if (!part.trim().isEmpty()) statuses.add(part.trim());
+            }
+            if (statuses.size() == 1) {
+                w.eq(PointsRedemption::getStatus, statuses.get(0));
+            } else if (statuses.size() > 1) {
+                w.in(PointsRedemption::getStatus, statuses);
+            }
+        }
+        w.orderByDesc(PointsRedemption::getCreatedAt);
+        IPage<PointsRedemption> p = redemptionMapper.selectPage(new Page<>(page, size), w);
+        IPage<Map<String, Object>> result = new Page<>(page, size, p.getTotal());
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (PointsRedemption r : p.getRecords()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", String.valueOf(r.getId()));
+            m.put("memberId", r.getMemberId());
+            m.put("pointsSpent", r.getPointsSpent());
+            m.put("rewardId", r.getRewardId() != null ? String.valueOf(r.getRewardId()) : null);
+            m.put("redemptionType", r.getRedemptionType());
+            m.put("status", r.getStatus());
+            m.put("adminRemark", r.getAdminRemark());
+            m.put("createdAt", r.getCreatedAt());
+            m.put("processedAt", r.getProcessedAt());
+            records.add(m);
+        }
+        result.setRecords(records);
+        return result;
     }
 }

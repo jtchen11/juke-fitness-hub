@@ -25,7 +25,6 @@
           <el-menu-item index="/admin/fitness-tests"><el-icon><TrendCharts /></el-icon><span>体测记录</span></el-menu-item>
           <el-menu-item index="/admin/check-in-records"><el-icon><Checked /></el-icon><span>打卡记录</span></el-menu-item>
           <el-menu-item index="/admin/diet-record"><el-icon><Food /></el-icon><span>饮食记录</span></el-menu-item>
-          <el-menu-item index="/admin/points-rewards"><el-icon><Goods /></el-icon><span>积分商品</span></el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="/admin/packages">
           <template #title>
@@ -49,11 +48,15 @@
             <el-icon><Setting /></el-icon>
             <span>系统设置</span>
           </template>
-                  <el-menu-item index="/admin/points">
-          <el-icon><Coin /></el-icon>
-          <span>积分管理</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/settings/system"><el-icon><Tools /></el-icon><span>功能配置</span></el-menu-item>
+          <el-sub-menu index="/admin/points-group">
+            <template #title>
+              <el-icon><Coin /></el-icon>
+              <span>积分管理</span>
+            </template>
+            <el-menu-item index="/admin/points"><el-icon><Checked /></el-icon><span>兑换审批</span></el-menu-item>
+            <el-menu-item index="/admin/points-rewards"><el-icon><Goods /></el-icon><span>积分商品管理</span></el-menu-item>
+          </el-sub-menu>
+          <el-menu-item index="/admin/settings/system"><el-icon><Tools /></el-icon><span>功能配置</span></el-menu-item>
         </el-sub-menu>
       </el-menu>
     </el-aside>

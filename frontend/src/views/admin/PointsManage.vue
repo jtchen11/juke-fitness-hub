@@ -56,8 +56,8 @@ const loadingDone = ref(false)
 const pendingList = ref([])
 const doneList = ref([])
 
-const typeLabel = (t) => ({ pt_session: '私教课', coupon: '优惠券', physical_goods: '实物商品' }[t] || t)
-const typeTag = (t) => ({ pt_session: '', coupon: 'warning', physical_goods: 'danger' }[t] || '')
+const typeLabel = (t) => ({ pt_session: '私教课', coupon: '优惠券', physical: '实物商品', physical_goods: '实物商品', course: '课程' }[t] || t)
+const typeTag = (t) => ({ pt_session: '', coupon: 'warning', physical: 'danger', physical_goods: 'danger', course: '' }[t] || '')
 
 onMounted(() => { loadPending(); loadDone() })
 
@@ -71,8 +71,8 @@ const loadPending = async () => {
 const loadDone = async () => {
   loadingDone.value = true
   try {
-    const r = await axios.get('/api/points/admin/pending?page=1&size=100')
-    doneList.value = (r.data.list || []).filter(i => i.status !== 'pending')
+    const r = await axios.get('/api/points/admin/list', { params: { page: 1, size: 100, status: 'approved,rejected' } })
+    doneList.value = r.data.list || []
   } catch (e) {}
   finally { loadingDone.value = false }
 }
@@ -80,18 +80,26 @@ const loadDone = async () => {
 const approve = async (row) => {
   try {
     await ElMessageBox.confirm('确认通过该兑换申请？', '提示')
-    await axios.post('/api/points/admin/approve/' + row.id, { remark: '' })
-    ElMessage.success('已通过')
-    loadPending(); loadDone()
+    const r = await axios.post('/api/points/admin/approve/' + row.id, { remark: '' })
+    if (r.data && r.data.success) {
+      ElMessage.success('已通过')
+      loadPending(); loadDone()
+    } else {
+      ElMessage.warning((r.data && r.data.message) || '操作失败')
+    }
   } catch (e) { if (e !== 'cancel') ElMessage.error('操作失败') }
 }
 
 const reject = async (row) => {
   try {
     const { value } = await ElMessageBox.prompt('请输入驳回原因', '驳回', { inputType: 'textarea' })
-    await axios.post('/api/points/admin/reject/' + row.id, { remark: value })
-    ElMessage.success('已驳回')
-    loadPending(); loadDone()
+    const r = await axios.post('/api/points/admin/reject/' + row.id, { remark: value })
+    if (r.data && r.data.success) {
+      ElMessage.success('已驳回')
+      loadPending(); loadDone()
+    } else {
+      ElMessage.warning((r.data && r.data.message) || '操作失败')
+    }
   } catch (e) { if (e !== 'cancel') ElMessage.error('操作失败') }
 }
 </script>
