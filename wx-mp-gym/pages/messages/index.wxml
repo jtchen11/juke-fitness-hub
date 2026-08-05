@@ -1,0 +1,25 @@
+<view class="page-messages">
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack"><text class="nav-back-icon">←</text><text class="nav-title">消息通知</text></view>
+    <view class="nav-action" bindtap="markAllRead">全部已读</view>
+  </view>
+
+  <view class="msg-list" wx:if="{{messages.length > 0}}">
+    <view class="msg-item {{item.isRead ? 'read' : ''}}" wx:for="{{messages}}" wx:key="id" bindtap="markRead" data-id="{{item.id}}">
+      <view class="msg-head">
+        <view class="msg-title-wrap">
+          <view wx:if="{{!item.isRead}}" class="msg-unread-dot"></view>
+          <text class="msg-title">{{item.title}}</text>
+        </view>
+        <text class="msg-time">{{item.timeText}}</text>
+      </view>
+      <text class="msg-content">{{item.content}}</text>
+      <view class="msg-status">{{item.isRead ? '已读' : '未读'}}</view>
+    </view>
+  </view>
+
+  <view class="empty-wrap" wx:else>
+    <text class="empty-icon">📭</text>
+    <text class="empty-text">暂无消息</text>
+  </view>
+</view>

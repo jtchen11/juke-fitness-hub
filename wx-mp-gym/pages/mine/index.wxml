@@ -50,7 +50,7 @@
     <!-- 服务项目网格 -->
     <view class="section-title-bar"><text class="section-title-text">服务项目</text></view>
     <view class="service-grid">
-      <view class="service-item" bindtap="goMessage"><text class="service-icon">💬</text><text class="service-text">留言咨询</text></view>
+      <view class="service-item" bindtap="goMessage"><text class="service-icon">💬</text><text class="service-text">消息通知</text><view wx:if="{{unreadCount > 0}}" class="msg-badge">{{unreadCount > 99 ? '99+' : unreadCount}}</view></view>
       <view class="service-item" bindtap="goFaceCheckin"><text class="service-icon">🗣️</text><text class="service-text">人脸签到</text></view>
       <view class="service-item" bindtap="goDiet">
         <text class="service-icon">🍎</text>

@@ -9,6 +9,7 @@ import com.gym.mapper.PersonalTrainingMapper;
 import com.gym.mapper.TrainerLeaveMapper;
 import com.gym.mapper.TrainerMapper;
 import com.gym.entity.TrainerLeave;
+import com.gym.auth.LoginContext;
 import com.gym.mapper.UserMessageMapper;
 import com.gym.mapper.MemberMapper;
 import com.gym.mapper.GroupClassMapper;
@@ -29,6 +30,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -229,6 +231,7 @@ public class TrainerController {
                                         @RequestBody Map<String, Object> params) {
         String leaveDate = (String) params.get("leaveDate");
         String reason = (String) params.get("reason");
+        String period = (String) params.getOrDefault("period", "full_day");
         Map<String, Object> result = new HashMap<>();
 
         // 1. 校验教练是否存在
@@ -238,8 +241,17 @@ public class TrainerController {
             result.put("message", "教练不存在");
             return result;
         }
-
+        if (leaveDate == null || leaveDate.isEmpty()) {
+            result.put("success", false);
+            result.put("message", "请选择请假日期");
+            return result;
+        }
         LocalDate date = LocalDate.parse(leaveDate);
+        if (!isValidPeriod(period)) {
+            result.put("success", false);
+            result.put("message", "请假时段不合法");
+            return result;
+        }
 
         // 2. 检查是否已存在请假记录（避免重复）
         LambdaQueryWrapper<TrainerLeave> existWrapper = new LambdaQueryWrapper<>();
@@ -251,53 +263,17 @@ public class TrainerController {
             return result;
         }
 
-        // 3. 保存请假记录
+        // 3. 保存请假记录（pending，等待管理员审批）
         TrainerLeave leave = new TrainerLeave();
         leave.setTrainerId(trainerId);
         leave.setLeaveDate(date);
         leave.setReason(reason);
+        leave.setPeriod(period);
+        leave.setStatus("pending");
         trainerLeaveMapper.insert(leave);
 
-        // 4. 自动取消该教练当天的所有待上课预约
-        LambdaQueryWrapper<PersonalTraining> ptWrapper = new LambdaQueryWrapper<>();
-        ptWrapper.eq(PersonalTraining::getTrainerId, trainerId)
-                .eq(PersonalTraining::getStatus, "scheduled")
-                .apply("DATE(appointment_time) = {0}", date);
-        List<PersonalTraining> affected = personalTrainingMapper.selectList(ptWrapper);
-
-        int cancelCount = 0;
-        if (!affected.isEmpty()) {
-            for (PersonalTraining pt : affected) {
-                pt.setStatus("cancelled_by_trainer");
-                pt.setCancelReason("教练请假：" + (reason != null ? reason : "临时请假"));
-                personalTrainingMapper.updateById(pt);
-            }
-            cancelCount = affected.size();
-        }
-
-        // ====== 5. 新增：发送站内信给受影响的会员 ======
-        if (!affected.isEmpty()) {
-            // 获取所有受影响的会员ID（去重）
-            List<Long> memberIds = affected.stream()
-                    .map(PersonalTraining::getMemberId)
-                    .distinct()
-                    .collect(Collectors.toList());
-
-            String messageContent = "教练 " + trainer.getName() + " 于 " + leaveDate + " 请假，您的私教课已自动取消，请重新预约。";
-            for (Long memberId : memberIds) {
-                UserMessage msg = new UserMessage();
-                msg.setMemberId(memberId);
-                msg.setContent(messageContent);
-                msg.setIsRead(false);
-                userMessageMapper.insert(msg);
-            }
-        }
-
-        // 6. 返回结果
         result.put("success", true);
-        result.put("message", "请假设置成功");
-        result.put("cancelCount", cancelCount);
-        result.put("affectedMembers", affected.stream().map(pt -> pt.getMemberId()).distinct().count());
+        result.put("message", "请假申请已提交，等待管理员审批");
         return result;
     }
 
@@ -377,6 +353,7 @@ public class TrainerController {
         // 查询今日团课
         LambdaQueryWrapper<GroupClass> gw = new LambdaQueryWrapper<>();
         gw.eq(GroupClass::getTrainerId, trainerId)
+                .eq(GroupClass::getStatus, "scheduled")
                 .apply("DATE(start_time) = {0}", today)
                 .orderByAsc(GroupClass::getStartTime);
         List<GroupClass> classes = groupClassMapper.selectList(gw);
@@ -395,6 +372,7 @@ public class TrainerController {
         // 查询今日私教课
         LambdaQueryWrapper<PersonalTraining> pw = new LambdaQueryWrapper<>();
         pw.eq(PersonalTraining::getTrainerId, trainerId)
+                .in(PersonalTraining::getStatus, "scheduled", "ongoing")
                 .apply("DATE(appointment_time) = {0}", today)
                 .orderByAsc(PersonalTraining::getAppointmentTime);
         List<PersonalTraining> pts = personalTrainingMapper.selectList(pw);
@@ -547,16 +525,20 @@ public class TrainerController {
                 new LambdaQueryWrapper<Trainer>().eq(Trainer::getStatus, "active")
         );
 
-        // 2. 查询当天请假的教练ID
+        // 2. 查询当天请假记录（排除已拒绝）
         LambdaQueryWrapper<TrainerLeave> leaveWrapper = new LambdaQueryWrapper<>();
-        leaveWrapper.eq(TrainerLeave::getLeaveDate, targetDate);
-        List<Long> leaveTrainerIds = trainerLeaveMapper.selectList(leaveWrapper)
-                .stream().map(TrainerLeave::getTrainerId)
-                .collect(Collectors.toList());
+        leaveWrapper.eq(TrainerLeave::getLeaveDate, targetDate)
+                .ne(TrainerLeave::getStatus, "rejected");
+        List<TrainerLeave> leaves = trainerLeaveMapper.selectList(leaveWrapper);
+        // 仅全天请假（full_day）的教练完全不可约；上午/下午请假仍可预约其他时段
+        Set<Long> fullDayLeaveTrainerIds = leaves.stream()
+                .filter(l -> l.getPeriod() == null || "full_day".equals(l.getPeriod()))
+                .map(TrainerLeave::getTrainerId)
+                .collect(Collectors.toSet());
 
-        // 3. 过滤掉请假的教练
+        // 3. 过滤掉全天请假的教练
         return allTrainers.stream()
-                .filter(t -> !leaveTrainerIds.contains(t.getId()))
+                .filter(t -> !fullDayLeaveTrainerIds.contains(t.getId()))
                 .collect(Collectors.toList());
     }
 
@@ -584,7 +566,15 @@ public class TrainerController {
                 .stream().map(PersonalTraining::getAppointmentTime)
                 .collect(Collectors.toList());
 
-        // 3. 过滤已预约时段 + 已过去的时段
+        // 2.5 查询该教练当天请假时段（排除已拒绝）
+        List<TrainerLeave> leaves = trainerLeaveMapper.selectList(
+                new LambdaQueryWrapper<TrainerLeave>()
+                        .eq(TrainerLeave::getTrainerId, trainerId)
+                        .eq(TrainerLeave::getLeaveDate, targetDate)
+                        .ne(TrainerLeave::getStatus, "rejected"));
+        String leavePeriod = leaves.isEmpty() ? null : leaves.get(0).getPeriod();
+
+        // 3. 过滤已预约时段 + 已过去的时段 + 请假时段
         return allSlots.stream()
                 .filter(slot -> {
                     LocalDateTime slotTime = LocalDateTime.of(targetDate, LocalTime.parse(slot));
@@ -592,21 +582,31 @@ public class TrainerController {
                     if (slotTime.isBefore(now) && targetDate.equals(LocalDate.now())) {
                         return false;
                     }
-                    return !bookedTimes.contains(slotTime);
+                    if (bookedTimes.contains(slotTime)) {
+                        return false;
+                    }
+                    if (leavePeriod != null && isInLeavePeriod(slotTime, leavePeriod)) {
+                        return false;
+                    }
+                    return true;
                 })
                 .collect(Collectors.toList());
     }
     @GetMapping("/leaves/pending")
-    public List<Map<String, Object>> getPendingLeaves() {
-        List<TrainerLeave> leaves = trainerLeaveMapper.selectList(
-            new LambdaQueryWrapper<TrainerLeave>().orderByDesc(TrainerLeave::getCreatedAt)
-        );
+    public List<Map<String, Object>> getPendingLeaves(@RequestParam(required = false) String status) {
+        LambdaQueryWrapper<TrainerLeave> q = new LambdaQueryWrapper<>();
+        if (status != null && !status.trim().isEmpty()) {
+            q.eq(TrainerLeave::getStatus, status.trim());
+        }
+        q.orderByDesc(TrainerLeave::getCreatedAt);
+        List<TrainerLeave> leaves = trainerLeaveMapper.selectList(q);
         List<Map<String, Object>> result = new ArrayList<>();
         for (TrainerLeave l : leaves) {
             Map<String, Object> item = new HashMap<>();
             item.put("id", l.getId());
             item.put("trainerId", l.getTrainerId());
             item.put("leaveDate", l.getLeaveDate() != null ? l.getLeaveDate().toString() : "");
+            item.put("period", l.getPeriod() != null ? l.getPeriod() : "full_day");
             item.put("reason", l.getReason());
             item.put("createdAt", l.getCreatedAt() != null ? l.getCreatedAt().toString() : "");
             item.put("status", l.getStatus() != null ? l.getStatus() : "pending");
@@ -619,17 +619,107 @@ public class TrainerController {
     }
 
     @PutMapping("/leaves/{id}/approve")
+    @Transactional
     public Map<String, Object> approveLeave(@PathVariable Long id, @RequestParam String status) {
-        TrainerLeave leave = trainerLeaveMapper.selectById(id);
         Map<String, Object> result = new HashMap<>();
+        TrainerLeave leave = trainerLeaveMapper.selectById(id);
         if (leave == null) {
             result.put("success", false);
             result.put("message", "请假记录不存在");
             return result;
         }
+        if (!"pending".equals(leave.getStatus())) {
+            result.put("success", false);
+            result.put("message", "该请假已处理，请勿重复操作");
+            return result;
+        }
+        if (!"approved".equals(status) && !"rejected".equals(status)) {
+            result.put("success", false);
+            result.put("message", "审批状态不合法");
+            return result;
+        }
+
+        Long adminId = LoginContext.getUserId();
         leave.setStatus(status);
+        leave.setApprovedAt(LocalDateTime.now());
+        if (adminId != null) {
+            leave.setApprovedBy(adminId);
+        }
         trainerLeaveMapper.updateById(leave);
+
+        int cancelCount = 0;
+        if ("approved".equals(status)) {
+            // 通过：取消日内时段未开始的预约 + 归还免费次数 + 发送站内信
+            cancelCount = cancelSessionsOnLeave(leave);
+            result.put("cancelCount", cancelCount);
+            result.put("message", "已通过，自动取消 " + cancelCount + " 条预约");
+        } else {
+            result.put("message", "已拒绝");
+        }
         result.put("success", true);
         return result;
+    }
+
+    /** 取消教练请假时段内未开始的私教预约（R054/R055/R056/R058） */
+    private int cancelSessionsOnLeave(TrainerLeave leave) {
+        LocalDate date = leave.getLeaveDate();
+        LocalDateTime now = LocalDateTime.now();
+        String period = leave.getPeriod() != null ? leave.getPeriod() : "full_day";
+        String reason = leave.getReason() != null ? leave.getReason() : "临时请假";
+        Trainer trainer = trainerMapper.selectById(leave.getTrainerId());
+
+        LambdaQueryWrapper<PersonalTraining> ptWrapper = new LambdaQueryWrapper<>();
+        ptWrapper.eq(PersonalTraining::getTrainerId, leave.getTrainerId())
+                .eq(PersonalTraining::getStatus, "scheduled")
+                .apply("DATE(appointment_time) = {0}", date)
+                .ge(PersonalTraining::getAppointmentTime, now);
+        List<PersonalTraining> affected = personalTrainingMapper.selectList(ptWrapper).stream()
+                .filter(pt -> isInLeavePeriod(pt.getAppointmentTime(), period))
+                .collect(Collectors.toList());
+
+        int cancelCount = 0;
+        if (!affected.isEmpty()) {
+            for (PersonalTraining pt : affected) {
+                pt.setStatus("cancelled_by_trainer");
+                pt.setCancelReason("教练请假：" + reason);
+                personalTrainingMapper.updateById(pt);
+                // R055：免费预约归还免费次数；R058：课程包次数不归还
+                if (Boolean.TRUE.equals(pt.getIsFree())) {
+                    Member member = memberMapper.selectById(pt.getMemberId());
+                    if (member != null) {
+                        int used = member.getFreePtUsedMonth() != null ? member.getFreePtUsedMonth() : 0;
+                        if (used > 0) {
+                            member.setFreePtUsedMonth(used - 1);
+                            memberMapper.updateById(member);
+                        }
+                    }
+                }
+                cancelCount++;
+            }
+            // R056：给受影响会员发送站内信（去重）
+            String content = "教练 " + (trainer != null ? trainer.getName() : "")
+                    + " 于 " + date + " 请假，您的私教课已自动取消，请重新预约。";
+            for (Long memberId : affected.stream().map(PersonalTraining::getMemberId).distinct().collect(Collectors.toList())) {
+                UserMessage msg = new UserMessage();
+                msg.setMemberId(memberId);
+                msg.setContent(content);
+                msg.setIsRead(false);
+                userMessageMapper.insert(msg);
+            }
+        }
+        return cancelCount;
+    }
+
+    /** 判断时间是否落在请假时段内（07:00-21:00） */
+    private boolean isInLeavePeriod(LocalDateTime time, String period) {
+        if (time == null) return false;
+        int hour = time.getHour();
+        if ("morning".equals(period)) return hour >= 7 && hour < 12;
+        if ("afternoon".equals(period)) return hour >= 12 && hour <= 21;
+        return hour >= 7 && hour <= 21; // full_day / 空
+    }
+
+    private boolean isValidPeriod(String period) {
+        return "full_day".equals(period) || "morning".equals(period) || "afternoon".equals(period);
     }
 }

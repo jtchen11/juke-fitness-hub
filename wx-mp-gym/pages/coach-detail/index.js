@@ -154,11 +154,8 @@ Page({
       priceText = '单次付费 ¥' + discounted.toFixed(2) + '（已享' + (benefits.levelName || '') + discountPct + '%折扣，原价¥' + pricePerHour.toFixed(2) + '）';
     }
 
-    console.log('[coach-detail] activePkgs=', activePkgs.length, 'pendingPkgs=', pendingPkgs.length, 'freeText=', freeText);
-    if (!freeText && activePkgs.length === 0 && pendingPkgs.length === 0) {
-      wx.showToast({ title: '没有可用的支付方式', icon: 'none' });
-      return;
-    }
+    // 单次付费始终作为兕底选项，即使没有免费次数/课程包也要显示
+    console.log('[coach-detail] activePkgs=', activePkgs.length, 'pendingPkgs=', pendingPkgs.length, 'freeText=', freeText, 'singleText=', priceText);
 
     _this.setData({
       showPayModal: true,

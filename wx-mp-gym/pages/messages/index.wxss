@@ -1,0 +1,20 @@
+.page-messages{min-height:100vh;background:#F5F6FA;padding-bottom:40rpx}
+.nav-bar{display:flex;align-items:center;justify-content:space-between;padding:20rpx 32rpx;background:#FFF;position:sticky;top:0;z-index:10}
+.nav-back{display:flex;align-items:center}
+.nav-back-icon{font-size:36rpx;color:#1A1A2E;margin-right:12rpx}
+.nav-title{font-size:32rpx;font-weight:600;color:#1A1A2E}
+.nav-action{font-size:26rpx;color:#4A6CF7}
+.msg-list{margin:24rpx 32rpx}
+.msg-item{background:#FFF;border-radius:16rpx;padding:28rpx;margin-bottom:20rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.msg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12rpx}
+.msg-title-wrap{display:flex;align-items:center;flex:1}
+.msg-unread-dot{width:14rpx;height:14rpx;border-radius:50%;background:#4A6CF7;margin-right:12rpx}
+.msg-title{font-size:28rpx;font-weight:600;color:#1A1A2E}
+.msg-item.read .msg-title{color:#8A8AA0;font-weight:400}
+.msg-time{font-size:22rpx;color:#8A8AA0;margin-left:16rpx}
+.msg-content{font-size:26rpx;color:#3A3A4E;line-height:1.6;display:block}
+.msg-status{font-size:22rpx;color:#8A8AA0;margin-top:12rpx}
+.msg-item.read .msg-content{color:#A0A0B0}
+.empty-wrap{display:flex;flex-direction:column;align-items:center;padding-top:200rpx}
+.empty-icon{font-size:80rpx;margin-bottom:20rpx}
+.empty-text{font-size:26rpx;color:#8A8AA0}

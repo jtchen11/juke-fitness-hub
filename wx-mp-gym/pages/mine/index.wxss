@@ -17,6 +17,8 @@
 /* 服务项目网格 */
 .service-grid{display:grid;grid-template-columns:1fr 1fr;gap:16rpx;margin:0 32rpx 24rpx}
 .service-item{display:flex;flex-direction:column;align-items:center;background:#FFF;border-radius:12px;padding:28rpx 16rpx;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.service-item{position:relative}
+.msg-badge{position:absolute;top:14rpx;right:36rpx;min-width:32rpx;height:32rpx;padding:0 8rpx;border-radius:16rpx;background:#FF4D4F;color:#FFF;font-size:20rpx;line-height:32rpx;text-align:center}
 .service-icon{font-size:40rpx;margin-bottom:8rpx}
 .service-text{font-size:24rpx;color:#1A1A2E}
 /* 个人数据 */

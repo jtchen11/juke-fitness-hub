@@ -15,9 +15,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class PersonalTrainingServiceImpl implements PersonalTrainingService {
+
+    /** 判断时间是否落在请假时段内（07:00-21:00） */
+    private boolean isInLeavePeriod(LocalDateTime time, String period) {
+        if (time == null) return false;
+        int hour = time.getHour();
+        if ("morning".equals(period)) return hour >= 7 && hour < 12;
+        if ("afternoon".equals(period)) return hour >= 12 && hour < 21;
+        return hour >= 7 && hour < 21; // full_day / 空
+    }
 
     @Autowired
     private MemberMapper memberMapper;
@@ -55,9 +65,14 @@ public class PersonalTrainingServiceImpl implements PersonalTrainingService {
         LocalDate appointmentDate = appointmentTime.toLocalDate();
         LambdaQueryWrapper<TrainerLeave> leaveWrapper = new LambdaQueryWrapper<>();
         leaveWrapper.eq(TrainerLeave::getTrainerId, trainerId)
-                .eq(TrainerLeave::getLeaveDate, appointmentDate);
-        if (trainerLeaveMapper.selectCount(leaveWrapper) > 0) {
-            return "教练当日请假，不可预约";
+                .eq(TrainerLeave::getLeaveDate, appointmentDate)
+                .ne(TrainerLeave::getStatus, "rejected");
+        List<TrainerLeave> leaves = trainerLeaveMapper.selectList(leaveWrapper);
+        for (TrainerLeave lv : leaves) {
+            String period = lv.getPeriod() != null ? lv.getPeriod() : "full_day";
+            if (isInLeavePeriod(appointmentTime, period)) {
+                return "教练当日该时段请假，不可预约";
+            }
         }
 
         // 4. 检查该时段是否已被预约

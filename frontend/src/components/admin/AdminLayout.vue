@@ -34,6 +34,7 @@
           <el-menu-item index="/admin/trainers"><el-icon><Notebook /></el-icon><span>教练管理</span></el-menu-item>
           <el-menu-item index="/admin/packages"><el-icon><Goods /></el-icon><span>私教套餐</span></el-menu-item>
           <el-menu-item index="/admin/bookings"><el-icon><Notebook /></el-icon><span>私教预约</span></el-menu-item>
+          <el-menu-item index="/admin/trainer-leaves"><el-icon><Calendar /></el-icon><span>请假审批</span></el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="/admin/classes">
           <template #title>

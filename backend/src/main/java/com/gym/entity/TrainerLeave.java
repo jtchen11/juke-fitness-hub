@@ -18,6 +18,9 @@ public class TrainerLeave {
     private LocalDate leaveDate;
     private String reason;
     private String status;  // pending, approved, rejected
+    private String period;    // full_day, morning, afternoon
+    private LocalDateTime approvedAt;
+    private Long approvedBy;
     private LocalDateTime createdAt;
 
     @TableField(exist = false)

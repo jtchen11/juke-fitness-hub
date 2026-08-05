@@ -79,6 +79,7 @@ const routes = [
             { path: 'trainers', name: 'AdminTrainerManage', component: () => import('@/views/admin/TrainerManage.vue'), meta: { title: '教练管理' } },
             { path: 'classes', name: 'AdminClassManage', component: () => import('@/views/admin/ClassManage.vue'), meta: { title: '团课管理' } },
             { path: 'bookings', name: 'AdminBookingManage', component: () => import('@/views/admin/BookingManage.vue'), meta: { title: '私教预约' } },
+            { path: 'trainer-leaves', name: 'AdminTrainerLeaves', component: () => import('@/views/admin/TrainerLeaveManage.vue'), meta: { title: '请假审批' } },
             { path: 'fitness-tests', name: 'AdminFitnessTest', component: () => import('@/views/admin/FitnessTest.vue'), meta: { title: '体测记录' } },
             { path: 'check-in-records', name: 'AdminCheckInRecord', component: () => import('@/views/admin/CheckInRecord.vue'), meta: { title: '签到记录' } },
             { path: 'diet-record', name: 'AdminDietRecord', component: () => import('@/views/admin/DietRecord.vue'), meta: { title: '饮食记录' } },
