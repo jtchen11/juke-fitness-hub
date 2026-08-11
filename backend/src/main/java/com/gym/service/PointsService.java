@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class PointsService {
@@ -55,32 +56,103 @@ public class PointsService {
             m.put("sourceId", h.getSourceId());
             m.put("description", h.getDescription());
             m.put("createdAt", h.getCreatedAt());
-            if (h.getSourceId() != null
-                    && ("redemption".equals(h.getChangeType()) || "redemption_refund".equals(h.getChangeType()))) {
-                String rewardName = null;
-                try {
-                    PointsReward reward = rewardMapper.selectById(Long.valueOf(h.getSourceId()));
-                    if (reward != null) rewardName = reward.getName();
-                } catch (Exception ignored) {}
-                if (rewardName == null) {
-                    // 兼容旧数据：source_id 为兑换记录 ID 时，先查 points_redemption 取得商品 ID
-                    try {
-                        PointsRedemption red = redemptionMapper.selectById(Long.valueOf(h.getSourceId()));
-                        if (red != null && red.getRewardId() != null) {
-                            PointsReward reward = rewardMapper.selectById(red.getRewardId());
-                            if (reward != null) rewardName = reward.getName();
-                        }
-                    } catch (Exception ignored) {}
-                }
-                if (rewardName != null) {
-                    m.put("description", "redemption".equals(h.getChangeType())
-                            ? "兑换：" + rewardName
-                            : "兑换驳回退回：" + rewardName);
-                }
-            }
+            enrichRedemptionDesc(m, h);
             result.add(m);
         }
         return result;
+    }
+
+    /**
+     * 管理端：积分流水（会员搜索 / 变动类型 / 日期范围筛选）
+     */
+    public Map<String, Object> adminHistory(int page, int size, String keyword,
+                                            String changeTypes, String category,
+                                            String startDate, String endDate) {
+        LambdaQueryWrapper<PointsHistory> w = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            List<Member> members = memberMapper.selectList(new LambdaQueryWrapper<Member>()
+                    .like(Member::getName, keyword.trim()).or().like(Member::getPhone, keyword.trim()));
+            List<Long> ids = members.stream().map(Member::getId).collect(Collectors.toList());
+            if (ids.isEmpty()) {
+                Map<String, Object> empty = new HashMap<>();
+                empty.put("list", new ArrayList<>());
+                empty.put("total", 0);
+                return empty;
+            }
+            w.in(PointsHistory::getMemberId, ids);
+        }
+        if (changeTypes != null && !changeTypes.trim().isEmpty()) {
+            List<String> ts = java.util.Arrays.stream(changeTypes.split(","))
+                    .map(String::trim).filter(x -> !x.isEmpty()).collect(Collectors.toList());
+            if (!ts.isEmpty()) {
+                w.in(PointsHistory::getChangeType, ts);
+            }
+        }
+        if ("makeup".equals(category)) {
+            w.like(PointsHistory::getDescription, "补签");
+        }
+        if (startDate != null && !startDate.isEmpty()) {
+            w.ge(PointsHistory::getCreatedAt, startDate + " 00:00:00");
+        }
+        if (endDate != null && !endDate.isEmpty()) {
+            w.le(PointsHistory::getCreatedAt, endDate + " 23:59:59");
+        }
+        w.orderByDesc(PointsHistory::getCreatedAt);
+        IPage<PointsHistory> p = historyMapper.selectPage(new Page<>(page, size), w);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (PointsHistory h : p.getRecords()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", h.getId());
+            m.put("memberId", h.getMemberId());
+            m.put("points", h.getPoints());
+            m.put("balance", h.getBalance());
+            m.put("changeType", h.getChangeType());
+            m.put("description", h.getDescription());
+            m.put("createdAt", h.getCreatedAt());
+            if (h.getMemberId() != null) {
+                Member member = memberMapper.selectById(h.getMemberId());
+                m.put("memberName", member != null ? member.getName() : "未知");
+                m.put("memberPhone", member != null ? member.getPhone() : "");
+            } else {
+                m.put("memberName", "未知");
+                m.put("memberPhone", "");
+            }
+            enrichRedemptionDesc(m, h);
+            result.add(m);
+        }
+        Map<String, Object> r = new HashMap<>();
+        r.put("list", result);
+        r.put("total", p.getTotal());
+        return r;
+    }
+
+    /**
+     * 兑换类流水补充商品名称描述
+     */
+    private void enrichRedemptionDesc(Map<String, Object> m, PointsHistory h) {
+        if (h.getSourceId() == null
+                || (!"redemption".equals(h.getChangeType()) && !"redemption_refund".equals(h.getChangeType()))) {
+            return;
+        }
+        String rewardName = null;
+        try {
+            PointsReward reward = rewardMapper.selectById(Long.valueOf(h.getSourceId()));
+            if (reward != null) rewardName = reward.getName();
+        } catch (Exception ignored) {}
+        if (rewardName == null) {
+            try {
+                PointsRedemption red = redemptionMapper.selectById(Long.valueOf(h.getSourceId()));
+                if (red != null && red.getRewardId() != null) {
+                    PointsReward reward = rewardMapper.selectById(red.getRewardId());
+                    if (reward != null) rewardName = reward.getName();
+                }
+            } catch (Exception ignored) {}
+        }
+        if (rewardName != null) {
+            m.put("description", "redemption".equals(h.getChangeType())
+                    ? "兑换：" + rewardName
+                    : "兑换驳回退回：" + rewardName);
+        }
     }
 
     /**
@@ -287,6 +359,7 @@ public class PointsService {
             m.put("status", r.getStatus());
             m.put("adminRemark", r.getAdminRemark());
             m.put("createdAt", r.getCreatedAt());
+            enrichRedemption(m, r);
             m.put("processedAt", r.getProcessedAt());
             PointsReward reward = r.getRewardId() != null ? rewardMapper.selectById(r.getRewardId()) : null;
             m.put("rewardName", reward != null ? reward.getName() : "积分商品");
@@ -312,6 +385,7 @@ public class PointsService {
             m.put("status", r.getStatus());
             m.put("adminRemark", r.getAdminRemark());
             m.put("createdAt", r.getCreatedAt());
+            enrichRedemption(m, r);
             m.put("processedAt", r.getProcessedAt());
             records.add(m);
         }
@@ -351,5 +425,22 @@ public class PointsService {
         }
         result.setRecords(records);
         return result;
+    }
+
+    /** ????????????????? */
+    private void enrichRedemption(Map<String, Object> m, PointsRedemption r) {
+        try {
+            if (r.getMemberId() != null) {
+                Member member = memberMapper.selectById(r.getMemberId());
+                if (member != null) {
+                    m.put("memberName", member.getName());
+                    m.put("memberPhone", member.getPhone());
+                }
+            }
+            if (r.getRewardId() != null) {
+                PointsReward reward = rewardMapper.selectById(r.getRewardId());
+                m.put("rewardName", reward != null ? reward.getName() : null);
+            }
+        } catch (Exception ignored) {}
     }
 }

@@ -39,6 +39,9 @@ public class ClassBookingController {
     private GroupClassMapper groupClassMapper;
     @Autowired
     private MemberMapper memberMapper;
+
+    @Autowired
+    private com.gym.mapper.CheckInMapper checkInMapper;
     /**
      * 查询当前会员的团课预约列表（支持日期范围筛选）
      */
@@ -90,6 +93,48 @@ public class ClassBookingController {
         Map<String, Object> result = new HashMap<>();
         result.put("list", pageResult.getRecords());
         result.put("total", pageResult.getTotal());
+        return result;
+    }
+
+    /**
+     * 补签选项：查询该会员在某日期（课程开始日）已预约且未取消的团课
+     * 不限制课程开始时间（可补过去），仅排除已取消的预约
+     */
+    @GetMapping("/member/{memberId}/makeup-options")
+    public List<Map<String, Object>> makeupOptions(@PathVariable Long memberId,
+                                                   @RequestParam String date) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        LocalDate target;
+        try {
+            target = LocalDate.parse(date);
+        } catch (Exception e) {
+            return result;
+        }
+        LambdaQueryWrapper<ClassBooking> w = new LambdaQueryWrapper<>();
+        w.eq(ClassBooking::getMemberId, memberId)
+                .in(ClassBooking::getStatus, "booked", "checked_in");
+        List<ClassBooking> bookings = classBookingMapper.selectList(w);
+        for (ClassBooking b : bookings) {
+            if (b.getClassId() == null) continue;
+            GroupClass gc = groupClassMapper.selectById(b.getClassId());
+            if (gc == null || "cancelled".equals(gc.getStatus())) continue;
+            if (gc.getStartTime() == null) continue;
+            // 课程开始日期与所选补签日期匹配
+            if (!gc.getStartTime().toLocalDate().equals(target)) continue;
+            // 已签到过的课程不再展示（避免重复补签）
+            long signed = checkInMapper.selectCount(new LambdaQueryWrapper<com.gym.entity.CheckIn>()
+                    .eq(com.gym.entity.CheckIn::getMemberId, memberId)
+                    .eq(com.gym.entity.CheckIn::getClassId, gc.getId())
+                    .eq(com.gym.entity.CheckIn::getCheckInType, "class"));
+            if (signed > 0) continue;
+            Map<String, Object> item = new HashMap<>();
+            item.put("classId", gc.getId());
+            item.put("className", gc.getName() != null ? gc.getName() : ("课程" + gc.getId()));
+            item.put("startTime", gc.getStartTime().toString());
+            item.put("type", gc.getType());
+            item.put("bookingStatus", b.getStatus());
+            result.add(item);
+        }
         return result;
     }
 

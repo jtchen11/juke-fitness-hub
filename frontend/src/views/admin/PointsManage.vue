@@ -5,7 +5,15 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="待审批" name="pending">
           <el-table :data="pendingList" stripe v-loading="loading">
-            <el-table-column prop="memberId" label="会员ID" width="80" />
+            <el-table-column label="会员" min-width="140">
+              <template #default="{ row }">
+                <div>{{ row.memberName || ('会员ID:' + row.memberId) }}</div>
+                <div style="font-size:12px;color:#999">{{ row.memberPhone || '' }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="rewardName" label="兑换商品" min-width="150">
+              <template #default="{ row }">{{ row.rewardName || '-' }}</template>
+            </el-table-column>
             <el-table-column prop="redemptionType" label="兑换类型" width="120">
               <template #default="{ row }">
                 <el-tag :type="typeTag(row.redemptionType)" size="small">{{ typeLabel(row.redemptionType) }}</el-tag>
@@ -24,7 +32,15 @@
         </el-tab-pane>
         <el-tab-pane label="已处理" name="done">
           <el-table :data="doneList" stripe v-loading="loadingDone">
-            <el-table-column prop="memberId" label="会员ID" width="80" />
+            <el-table-column label="会员" min-width="140">
+              <template #default="{ row }">
+                <div>{{ row.memberName || ('会员ID:' + row.memberId) }}</div>
+                <div style="font-size:12px;color:#999">{{ row.memberPhone || '' }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="rewardName" label="兑换商品" min-width="150">
+              <template #default="{ row }">{{ row.rewardName || '-' }}</template>
+            </el-table-column>
             <el-table-column prop="redemptionType" label="兑换类型" width="120">
               <template #default="{ row }">
                 <el-tag :type="typeTag(row.redemptionType)" size="small">{{ typeLabel(row.redemptionType) }}</el-tag>

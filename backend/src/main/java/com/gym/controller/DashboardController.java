@@ -1,17 +1,22 @@
 package com.gym.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.gym.entity.ClassBooking;
 import com.gym.entity.GroupClass;
 import com.gym.entity.PersonalTraining;
 import com.gym.entity.Trainer;
 import com.gym.entity.CheckIn;
+import com.gym.entity.TrainerLeave;
+import com.gym.entity.PointsRedemption;
 import com.gym.mapper.ClassBookingMapper;
 import com.gym.mapper.GroupClassMapper;
 import com.gym.mapper.MemberMapper;
 import com.gym.mapper.CheckInMapper;
 import com.gym.mapper.PersonalTrainingMapper;
 import com.gym.mapper.TrainerMapper;
+import com.gym.mapper.TrainerLeaveMapper;
+import com.gym.mapper.PointsRedemptionMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.math.BigDecimal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,6 +46,116 @@ public class DashboardController {
 
     @Autowired
     private GroupClassMapper groupClassMapper;
+
+    @Autowired
+    private TrainerLeaveMapper trainerLeaveMapper;
+
+    @Autowired
+    private PointsRedemptionMapper pointsRedemptionMapper;
+
+
+    /** 仪表盘总览：6 张统计卡片 + 教练工作量 */
+    @GetMapping("/overview")
+    public Map<String, Object> getOverview() {
+        Map<String, Object> result = new HashMap<>();
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime dayStart = today.atStartOfDay();
+        LocalDateTime dayEnd = today.plusDays(1).atStartOfDay();
+        LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime nextMonthStart = today.plusMonths(1).withDayOfMonth(1).atStartOfDay();
+        LocalDateTime d30 = now.minusDays(30);
+
+        // 1. ???????? booked + ?? scheduled?
+        long todayGroup = bookingMapper.selectCount(new LambdaQueryWrapper<ClassBooking>()
+                .ge(ClassBooking::getBookingTime, dayStart).lt(ClassBooking::getBookingTime, dayEnd)
+                .eq(ClassBooking::getStatus, "booked"));
+        long todayPt = ptMapper.selectCount(new LambdaQueryWrapper<PersonalTraining>()
+                .ge(PersonalTraining::getAppointmentTime, dayStart).lt(PersonalTraining::getAppointmentTime, dayEnd)
+                .eq(PersonalTraining::getStatus, "scheduled"));
+        result.put("todayBookings", todayGroup + todayPt);
+
+        // 2. 本月营收：团课实收（checked_in/completed）+ 私教按教练单价（completed）
+        BigDecimal revenue = BigDecimal.ZERO;
+        List<ClassBooking> monthBookings = bookingMapper.selectList(new LambdaQueryWrapper<ClassBooking>()
+                .ge(ClassBooking::getPayTime, monthStart).lt(ClassBooking::getPayTime, nextMonthStart)
+                .in(ClassBooking::getStatus, "checked_in", "completed"));
+        for (ClassBooking b : monthBookings) {
+            if (b.getPaidAmount() != null) revenue = revenue.add(b.getPaidAmount());
+        }
+        result.put("groupRevenue", revenue);
+        List<PersonalTraining> monthCompletedPts = ptMapper.selectList(new LambdaQueryWrapper<PersonalTraining>()
+                .ge(PersonalTraining::getAppointmentTime, monthStart)
+                .lt(PersonalTraining::getAppointmentTime, nextMonthStart)
+                .eq(PersonalTraining::getStatus, "completed"));
+        BigDecimal ptRevenue = BigDecimal.ZERO;
+        int ptRevenueCount = 0;
+        for (PersonalTraining pt : monthCompletedPts) {
+            if (pt.getTrainerId() != null) {
+                Trainer trainer = trainerMapper.selectById(pt.getTrainerId());
+                if (trainer != null && trainer.getPricePerHour() != null) {
+                    ptRevenue = ptRevenue.add(trainer.getPricePerHour());
+                    ptRevenueCount++;
+                }
+            }
+        }
+        result.put("ptRevenue", ptRevenue);
+        result.put("ptRevenueCount", ptRevenueCount);
+        revenue = revenue.add(ptRevenue);
+        result.put("monthRevenue", revenue);
+        result.put("monthRevenueText", revenue.setScale(2).toPlainString());
+
+        // 3. 活跃会员：近30天有打卡或预约记录（去重）
+        Set<Long> active = new HashSet<>();
+        checkInMapper.selectList(new LambdaQueryWrapper<CheckIn>()
+                .ge(CheckIn::getCheckInTime, d30)).forEach(ci -> { if (ci.getMemberId() != null) active.add(ci.getMemberId()); });
+        bookingMapper.selectList(new LambdaQueryWrapper<ClassBooking>()
+                .ge(ClassBooking::getBookingTime, d30)).forEach(b -> { if (b.getMemberId() != null) active.add(b.getMemberId()); });
+        ptMapper.selectList(new LambdaQueryWrapper<PersonalTraining>()
+                .ge(PersonalTraining::getAppointmentTime, d30)).forEach(p -> { if (p.getMemberId() != null) active.add(p.getMemberId()); });
+        result.put("activeMembers", active.size());
+
+        // 4. 课程满员率：scheduled 课程 enrolled/max_capacity 平均值
+        List<GroupClass> scheduledClasses = groupClassMapper.selectList(
+                new LambdaQueryWrapper<GroupClass>().eq(GroupClass::getStatus, "scheduled"));
+        double fullRate = 0;
+        int validCnt = 0;
+        for (GroupClass gc : scheduledClasses) {
+            if (gc.getMaxCapacity() != null && gc.getMaxCapacity() > 0) {
+                int enrolled = gc.getEnrolled() != null ? gc.getEnrolled() : 0;
+                fullRate += enrolled * 1.0 / gc.getMaxCapacity();
+                validCnt++;
+            }
+        }
+        result.put("fullRate", validCnt > 0 ? Math.round(fullRate / validCnt * 1000) / 10.0 : 0);
+
+        // 5. 待审批请假数
+        long pendingLeaves = trainerLeaveMapper.selectCount(
+                new LambdaQueryWrapper<TrainerLeave>().eq(TrainerLeave::getStatus, "pending"));
+        result.put("pendingLeaves", pendingLeaves);
+
+        // 6. 积分兑换待处理数
+        long pendingRedemptions = pointsRedemptionMapper.selectCount(
+                new LambdaQueryWrapper<PointsRedemption>().eq(PointsRedemption::getStatus, "pending"));
+        result.put("pendingRedemptions", pendingRedemptions);
+
+        // 教练工作量：按活跃教练统计待上课/进行中的私教数
+        List<Map<String, Object>> coachWorkload = new ArrayList<>();
+        List<Trainer> activeTrainers = trainerMapper.selectList(
+                new LambdaQueryWrapper<Trainer>().eq(Trainer::getStatus, "active"));
+        for (Trainer t : activeTrainers) {
+            long workload = ptMapper.selectCount(new LambdaQueryWrapper<PersonalTraining>()
+                    .eq(PersonalTraining::getTrainerId, t.getId())
+                    .in(PersonalTraining::getStatus, "scheduled", "ongoing"));
+            Map<String, Object> item = new HashMap<>();
+            item.put("name", t.getName());
+            item.put("value", workload);
+            coachWorkload.add(item);
+        }
+        result.put("coachWorkload", coachWorkload);
+
+        return result;
+    }
 
     @GetMapping("/stats")
     public Map<String, Object> getStats(@RequestParam(defaultValue = "7") Integer days) {

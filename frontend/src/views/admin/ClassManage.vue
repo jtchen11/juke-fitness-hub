@@ -160,6 +160,25 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="难度" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getDifficultyType(row.difficulty)" size="small" effect="plain">
+              {{ row.difficulty || '-' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="教室" width="110" align="center">
+          <template #default="{ row }">
+            <span>{{ row.classroom || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="访客开关" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.allowVisitor ? 'success' : 'info'" size="small" effect="plain">
+              {{ row.allowVisitor ? '允许' : '关闭' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small" effect="dark">
@@ -450,20 +469,12 @@
         <el-table :data="checkInRecords" border style="width:100%" size="small">
           <el-table-column prop="memberName" label="会员姓名" width="100" />
           <el-table-column prop="checkInTime" label="签到时间" width="160" />
-          <el-table-column prop="checkInType" label="签到方式" width="80" align="center">
+          <el-table-column label="类型" width="100" align="center">
             <template #default="{ row }">
-              <el-tag :type="row.checkInType === 'code' ? 'success' : 'info'" size="small">
-                {{ row.checkInType === "code" ? "签到码" : "手动" }}
-              </el-tag>
+              <el-tag type="success" size="small">团课签到</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="80" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row.status === 'checked_in' ? 'success' : 'warning'" size="small">
-                {{ row.status === "checked_in" ? "已签到" : "待签到" }}
-              </el-tag>
-            </template>
-          </el-table-column>
+          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
         </el-table>
         <el-empty v-if="!checkInRecords.length && !checkInLoading" description="暂无核销记录" />
       </div>
@@ -506,6 +517,11 @@ const selectedIds = ref([])
 // 报名名单
 const enrollmentList = ref([])
 const enrollmentLoading = ref(false)
+// 核销记录
+const checkInVisible = ref(false)
+const checkInLoading = ref(false)
+const checkInRecords = ref([])
+const checkInClassData = ref(null)
 
 // 添加/编辑对话框
 const dialogVisible = ref(false)
@@ -577,6 +593,11 @@ const getProgressColor = (row) => {
   if (rate >= 90) return '#F56C6C'
   if (rate >= 70) return '#E6A23C'
   return '#67C23A'
+}
+
+const getDifficultyType = (difficulty) => {
+  const map = { '初级': 'success', '中级': 'warning', '高级': 'danger' }
+  return map[difficulty] || 'info'
 }
 
 // =============================================
@@ -654,6 +675,23 @@ const loadEnrollments = async () => {
     ElMessage.error('加载报名名单失败')
   } finally {
     enrollmentLoading.value = false
+  }
+}
+
+const showCheckIns = async (row) => {
+  checkInClassData.value = { name: row.name, classDate: (row.startTime || '').slice(0, 10) }
+  checkInVisible.value = true
+  checkInLoading.value = true
+  checkInRecords.value = []
+  try {
+    const res = await axios.get('/api/check-in', { params: { type: 'class', page: 1, size: 100 } })
+    const all = (res.data && res.data.list) || []
+    checkInRecords.value = all.filter((r) => r.classId === row.id)
+  } catch (error) {
+    console.error('加载核销记录失败', error)
+    ElMessage.error('加载核销记录失败')
+  } finally {
+    checkInLoading.value = false
   }
 }
 

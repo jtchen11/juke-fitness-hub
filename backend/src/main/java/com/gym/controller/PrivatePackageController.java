@@ -1,6 +1,8 @@
 package com.gym.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gym.dto.RefundRequest;
 import com.gym.entity.Member;
 import com.gym.entity.MemberPrivatePackage;
@@ -21,9 +23,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -113,7 +118,65 @@ public class PrivatePackageController {
     /**
      * 获取会员所有有效课程包（包含未设置有效期的）
      */
-    @GetMapping("/mine")
+        /** Admin: member package list with member info (member packages management page) */
+    @GetMapping("/admin/list")
+    public Map<String, Object> adminList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(required = false) Long memberId,
+            @RequestParam(required = false) String keyword) {
+        Map<String, Object> result = new HashMap<>();
+        LambdaQueryWrapper<MemberPrivatePackage> w = new LambdaQueryWrapper<>();
+        if (memberId != null && memberId > 0) {
+            w.eq(MemberPrivatePackage::getMemberId, memberId);
+        }
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            List<Member> members = memberMapper.selectList(new LambdaQueryWrapper<Member>()
+                    .like(Member::getName, keyword.trim()).or().like(Member::getPhone, keyword.trim()));
+            List<Long> ids = members.stream().map(Member::getId).collect(Collectors.toList());
+            if (ids.isEmpty()) {
+                result.put("list", Collections.emptyList());
+                result.put("total", 0);
+                return result;
+            }
+            w.in(MemberPrivatePackage::getMemberId, ids);
+        }
+        w.orderByDesc(MemberPrivatePackage::getCreatedAt);
+        IPage<MemberPrivatePackage> p = packageMapper.selectPage(new Page<>(page, size), w);
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (MemberPrivatePackage pkg : p.getRecords()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", pkg.getId());
+            m.put("memberId", pkg.getMemberId());
+            m.put("packageId", pkg.getPackageId());
+            m.put("packageName", pkg.getPackageName());
+            m.put("totalSessions", pkg.getTotalSessions());
+            m.put("usedSessions", pkg.getUsedSessions());
+            m.put("remainingSessions", pkg.getRemainingSessions());
+            m.put("validDays", pkg.getValidDays());
+            m.put("startDate", pkg.getStartDate() != null ? pkg.getStartDate().toString() : null);
+            m.put("endDate", pkg.getEndDate() != null ? pkg.getEndDate().toString() : null);
+            m.put("activationDeadline", pkg.getActivationDeadline() != null ? pkg.getActivationDeadline().toString() : null);
+            m.put("status", pkg.getStatus());
+            m.put("price", pkg.getPrice());
+            m.put("originalPrice", pkg.getOriginalPrice());
+            m.put("createdAt", pkg.getCreatedAt());
+            if (pkg.getMemberId() != null) {
+                Member member = memberMapper.selectById(pkg.getMemberId());
+                m.put("memberName", member != null ? member.getName() : "unknown");
+                m.put("memberPhone", member != null ? member.getPhone() : "");
+            } else {
+                m.put("memberName", "unknown");
+                m.put("memberPhone", "");
+            }
+            list.add(m);
+        }
+        result.put("list", list);
+        result.put("total", p.getTotal());
+        return result;
+    }
+
+@GetMapping("/mine")
     public List<MemberPrivatePackage> getMyPackages(@RequestParam Long memberId) {
         LambdaQueryWrapper<MemberPrivatePackage> wrapper = new LambdaQueryWrapper<>();
         // 课程包：已激活且有效，或未激活但未过激活截止日期（未激活未过期的也返回，前端显示“点击激活”）

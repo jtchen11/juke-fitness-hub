@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,8 +93,53 @@ public class MemberController {
         wrapper.orderByDesc(Member::getCreatedAt);
 
         IPage<Member> pageResult = memberMapper.selectPage(new Page<>(page, size), wrapper);
+        List<Map<String, Object>> list = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        for (Member m : pageResult.getRecords()) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", m.getId());
+            item.put("name", m.getName());
+            item.put("phone", m.getPhone());
+            item.put("gender", m.getGender());
+            item.put("birthday", m.getBirthday());
+            item.put("level", m.getLevel());
+            item.put("expireDate", m.getExpireDate());
+            item.put("height", m.getHeight());
+            item.put("weight", m.getWeight());
+            item.put("createdAt", m.getCreatedAt());
+            item.put("points", m.getPoints() != null ? m.getPoints() : 0);
+            // 免费私教剩余 = 等级额度 - 已用次数
+            MemberLevel lv = MemberLevel.fromDisplayName(m.getLevel());
+            int quota = lv.getFreePersonalTrainingsPerMonth();
+            int used = m.getFreePtUsedMonth() != null ? m.getFreePtUsedMonth() : 0;
+            item.put("freePtQuota", quota);
+            item.put("freePtRemaining", Math.max(0, quota - used));
+            // 课程包剩余课时（排除已退款）
+            List<MemberPrivatePackage> pkgs = memberPrivatePackageMapper.selectList(
+                    new LambdaQueryWrapper<MemberPrivatePackage>()
+                            .eq(MemberPrivatePackage::getMemberId, m.getId())
+                            .ne(MemberPrivatePackage::getStatus, "refunded"));
+            int pkgRemaining = 0;
+            for (MemberPrivatePackage p : pkgs) {
+                if (p.getRemainingSessions() != null) pkgRemaining += p.getRemainingSessions();
+            }
+            item.put("packageRemaining", pkgRemaining);
+            // 状态：有效 / 即将到期(7天内) / 已过期
+            String expireStatus;
+            if (m.getExpireDate() == null) {
+                expireStatus = "active";
+            } else if (m.getExpireDate().isBefore(today)) {
+                expireStatus = "expired";
+            } else if (!m.getExpireDate().isAfter(today.plusDays(7))) {
+                expireStatus = "expiring";
+            } else {
+                expireStatus = "active";
+            }
+            item.put("expireStatus", expireStatus);
+            list.add(item);
+        }
         Map<String, Object> result = new HashMap<>();
-        result.put("list", pageResult.getRecords());
+        result.put("list", list);
         result.put("total", pageResult.getTotal());
         return result;
     }

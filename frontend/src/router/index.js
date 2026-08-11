@@ -85,6 +85,7 @@ const routes = [
             { path: 'diet-record', name: 'AdminDietRecord', component: () => import('@/views/admin/DietRecord.vue'), meta: { title: '饮食记录' } },
             { path: 'points-rewards', name: 'AdminPointsRewards', component: () => import('@/views/admin/PointsRewardManage.vue'), meta: { title: '积分商品管理' } },
             { path: 'packages', name: 'AdminPackageManage', component: () => import('@/views/admin/PackageManage.vue'), meta: { title: '私教套餐管理' } },
+            { path: 'member-packages', name: 'AdminMemberPackages', component: () => import('@/views/admin/MemberPackagesManage.vue'), meta: { title: '会员课程包' } },
             {
                 path: 'competitions',
                 name: 'AdminCompetitionManage',
@@ -96,6 +97,12 @@ const routes = [
                 name: 'AdminPointsManage',
                 component: () => import('@/views/admin/PointsManage.vue'),
                 meta: { title: '积分管理' }
+            },
+            {
+                path: 'points-history',
+                name: 'AdminPointsHistory',
+                component: () => import('@/views/admin/PointsHistory.vue'),
+                meta: { title: '积分流水' }
             },
             {
                 path: 'settings/system',

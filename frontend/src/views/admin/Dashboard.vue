@@ -1,166 +1,98 @@
 <template>
   <div class="dashboard">
-    <!-- ====== 统计卡片（4个核心指标） ====== -->
-    <el-row :gutter="20">
-      <el-col :span="6" v-for="stat in stats" :key="stat.title">
-        <el-card class="stat-card" :body-style="{ padding: '20px' }" shadow="hover">
-          <div class="stat-icon" :style="{ background: stat.color }">
-            <el-icon :size="32"><component :is="stat.icon" /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stat.value }}</div>
-            <div class="stat-title">{{ stat.title }}</div>
-            <div class="stat-trend" v-if="stat.trend !== undefined">
-              <span :class="stat.trend >= 0 ? 'trend-up' : 'trend-down'">
-                {{ stat.trend >= 0 ? '↑' : '↓' }} {{ Math.abs(stat.trend) }}%
-              </span>
-              <span style="color:#999;font-size:12px;margin-left:4px">较上月</span>
+    <!-- 顶部 6 张统计卡片 -->
+    <el-row :gutter="16" class="stat-row">
+      <el-col :span="4" v-for="card in statCards" :key="card.title">
+        <el-card shadow="hover" class="stat-card" :body-style="{ padding: '20px' }">
+          <div class="stat-body">
+            <div class="stat-icon" :style="{ background: card.bg }">
+              <el-icon :size="22"><component :is="card.icon" /></el-icon>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ card.value }}</div>
+              <div class="stat-title">{{ card.title }}</div>
             </div>
           </div>
         </el-card>
       </el-col>
     </el-row>
 
-    <!-- ====== 图表区域（双栏布局） ====== -->
-    <el-row :gutter="20" style="margin-top:20px">
-      <el-col :span="14">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>📈 近7天预约趋势</span>
-              <el-radio-group v-model="trendRange" size="small" @change="loadDashboard">
-                <el-radio-button label="7">7天</el-radio-button>
-                <el-radio-button label="30">30天</el-radio-button>
-              </el-radio-group>
-            </div>
-          </template>
-          <div ref="trendChartRef" class="chart-container"></div>
-        </el-card>
-      </el-col>
-
-      <el-col :span="10">
-        <el-card shadow="hover">
-          <template #header>
-            <span>🎯 预约类型分布</span>
-          </template>
-          <div ref="pieChartRef" class="chart-container" style="height:280px"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- ====== 热门课程排行 + 快捷功能 ====== -->
-    <el-row :gutter="20" style="margin-top:20px">
+    <!-- 图表区 -->
+    <el-row :gutter="16" class="chart-row">
       <el-col :span="12">
-        <el-card shadow="hover">
-          <template #header>
-            <span>🔥 热门课程排行</span>
-          </template>
-          <el-table :data="hotClasses" border style="width:100%" size="small">
-            <el-table-column type="index" label="排名" width="60" align="center" />
-            <el-table-column prop="name" label="课程名称" />
-            <el-table-column prop="bookings" label="预约次数" align="center" />
-            <el-table-column prop="status" label="状态" align="center" width="80">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'scheduled' ? 'success' : 'info'" size="small">
-                  {{ row.status === 'scheduled' ? '进行中' : '已结束' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+        <el-card shadow="never" class="chart-card">
+          <template #header><span>近 7 天预约趋势</span></template>
+          <div ref="trendChartRef" class="chart-box"></div>
         </el-card>
       </el-col>
-
-      <el-col :span="12">
-        <el-card shadow="hover">
-          <template #header>
-            <span>📋 快捷功能</span>
-          </template>
-          <el-row :gutter="16">
-            <el-col :span="12" v-for="item in quickActions.slice(0, 2)" :key="item.name">
-              <el-button
-                  :type="item.type"
-                  plain
-                  style="width:100%;height:72px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:14px;"
-                  @click="item.action"
-              >
-                <el-icon :size="22"><component :is="item.icon" /></el-icon>
-                <span>{{ item.name }}</span>
-              </el-button>
-            </el-col>
-          </el-row>
-          <el-row :gutter="16" style="margin-top:12px">
-            <el-col :span="12" v-for="item in quickActions.slice(2, 4)" :key="item.name">
-              <el-button
-                  :type="item.type"
-                  plain
-                  style="width:100%;height:72px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:14px;"
-                  @click="item.action"
-              >
-                <el-icon :size="22"><component :is="item.icon" /></el-icon>
-                <span>{{ item.name }}</span>
-              </el-button>
-            </el-col>
-          </el-row>
+      <el-col :span="6">
+        <el-card shadow="never" class="chart-card">
+          <template #header><span>热门课程排行 TOP5</span></template>
+          <div ref="hotChartRef" class="chart-box"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="never" class="chart-card">
+          <template #header><span>教练工作量分布</span></template>
+          <div ref="coachChartRef" class="chart-box"></div>
         </el-card>
       </el-col>
     </el-row>
 
-    <!-- ====== 最近预约列表 ====== -->
-    <el-row :gutter="20" style="margin-top:20px">
-      <el-col :span="24">
-        <el-card shadow="hover">
+    <!-- 底部列表 -->
+    <el-row :gutter="16" class="list-row">
+      <el-col :span="8">
+        <el-card shadow="never" class="list-card">
           <template #header>
-            <div class="card-header">
-              <span>📋 最近预约</span>
-              <el-button size="small" type="primary" plain @click="router.push('/admin/bookings')">
-                查看全部 →
-              </el-button>
+            <div class="list-header">
+              <span>待审批请假</span>
+              <el-tag size="small" type="warning">{{ pendingLeaveTotal }} 条</el-tag>
             </div>
           </template>
-          <el-table :data="recentBookings" border style="width:100%">
-            <el-table-column prop="memberName" label="会员" width="100" />
-            <el-table-column prop="trainerName" label="教练" width="100" />
-            <el-table-column prop="appointmentTime" label="预约时间" width="180" />
-            <el-table-column prop="durationMinutes" label="时长(分钟)" width="90" align="center" />
-            <el-table-column prop="status" label="状态" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'scheduled' ? 'success' : row.status === 'completed' ? 'info' : 'danger'" size="small">
-                  {{ row.status === 'scheduled' ? '待上课' : row.status === 'completed' ? '已完成' : '已取消' }}
-                </el-tag>
-              </template>
+          <el-table :data="pendingLeaves" size="small" v-loading="leavesLoading" :show-header="true">
+            <el-table-column prop="trainerName" label="教练" width="80" />
+            <el-table-column prop="leaveDate" label="日期" width="100" />
+            <el-table-column label="时段" width="70">
+              <template #default="{ row }">{{ periodText(row.period) }}</template>
             </el-table-column>
-            <el-table-column prop="notes" label="备注" />
+            <el-table-column prop="reason" label="原因" min-width="90" show-overflow-tooltip />
           </el-table>
+          <el-empty v-if="!leavesLoading && pendingLeaves.length === 0" description="暂无待审批请假" :image-size="60" />
         </el-card>
       </el-col>
-    </el-row>
-
-    <!-- ====== 教练统计 ====== -->
-    <el-row :gutter="20" style="margin-top:20px">
-      <el-col :span="24">
-        <el-card shadow="hover">
+      <el-col :span="8">
+        <el-card shadow="never" class="list-card">
           <template #header>
-            <div class="card-header">
-              <span>👨‍🏫 教练本月统计</span>
-              <el-button size="small" type="primary" plain @click="loadCoachStats">刷新</el-button>
+            <div class="list-header">
+              <span>待处理兑换</span>
+              <el-tag size="small" type="danger">{{ pendingRedeemTotal }} 条</el-tag>
             </div>
           </template>
-          <el-table :data="coachStats" border style="width:100%" v-loading="coachLoading" size="small">
-            <el-table-column prop="name" label="教练姓名" width="120" />
-            <el-table-column prop="sessionsThisMonth" label="本月上课数" width="110" align="center" />
-            <el-table-column prop="checkInsThisMonth" label="本月核销数" width="110" align="center" />
-            <el-table-column prop="checkInRate" label="核销率" width="100" align="center">
+          <el-table :data="pendingRedemptions" size="small" v-loading="redeemLoading">
+            <el-table-column prop="memberName" label="会员" width="90" show-overflow-tooltip />
+            <el-table-column prop="rewardName" label="商品" min-width="110" show-overflow-tooltip />
+            <el-table-column prop="pointsSpent" label="积分" width="70" align="center" />
+            <el-table-column prop="createdAt" label="申请时间" width="110" />
+          </el-table>
+          <el-empty v-if="!redeemLoading && pendingRedemptions.length === 0" description="暂无待处理兑换" :image-size="60" />
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card shadow="never" class="list-card">
+          <template #header>
+            <div class="list-header"><span>近期预约</span></div>
+          </template>
+          <el-table :data="recentBookings" size="small" v-loading="bookingsLoading">
+            <el-table-column prop="memberName" label="会员" width="90" show-overflow-tooltip />
+            <el-table-column prop="trainerName" label="教练" width="80" show-overflow-tooltip />
+            <el-table-column prop="appointmentTime" label="时间" width="130" />
+            <el-table-column label="状态" width="80">
               <template #default="{ row }">
-                <el-tag :type="row.checkInRate &gt;= 0.8 ? 'success' : row.checkInRate &gt;= 0.5 ? 'warning' : 'danger'" size="small">
-                  {{ (row.checkInRate * 100).toFixed(1) }}%
-                </el-tag>
+                <el-tag size="small" :type="ptStatusType(row.status)">{{ ptStatusText(row.status) }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="totalStudents" label="学员数" width="80" align="center" />
-            <el-table-column prop="avgRating" label="平均评分" width="80" align="center">
-              <template #default="{ row }">{{ row.avgRating ? row.avgRating.toFixed(1) : '-' }}</template>
-            </el-table-column>
           </el-table>
+          <el-empty v-if="!bookingsLoading && recentBookings.length === 0" description="暂无近期预约" :image-size="60" />
         </el-card>
       </el-col>
     </el-row>
@@ -168,240 +100,192 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import * as echarts from 'echarts'
-import { User, UserFilled, Calendar, Notebook, Checked, ChatDotRound } from '@element-plus/icons-vue'
+import { Calendar, Coin, UserFilled, DataLine, Bell, Goods } from '@element-plus/icons-vue'
 
-const router = useRouter()
-
-// ============ 数据 ============
-const stats = ref([
-  { title: '会员总数', value: 0, icon: 'User', color: '#409EFF', trend: 0 },
-  { title: '教练人数', value: 0, icon: 'UserFilled', color: '#67C23A', trend: 0 },
-  { title: '本月预约', value: 0, icon: 'Calendar', color: '#E6A23C', trend: 0 },
-  { title: '私教预约', value: 0, icon: 'Notebook', color: '#F56C6C', trend: 0 }
+const statCards = ref([
+  { title: '今日预约', value: 0, icon: Calendar, bg: '#4A6CF7' },
+  { title: '本月营收', value: '¥0', icon: Coin, bg: '#67C23A' },
+  { title: '活跃会员(30天)', value: 0, icon: UserFilled, bg: '#409EFF' },
+  { title: '课程满员率', value: '0%', icon: DataLine, bg: '#E6A23C' },
+  { title: '待审批请假', value: 0, icon: Bell, bg: '#F56C6C' },
+  { title: '积分待处理', value: 0, icon: Goods, bg: '#909399' }
 ])
 
+const pendingLeaves = ref([])
+const pendingLeaveTotal = ref(0)
+const leavesLoading = ref(false)
+const pendingRedemptions = ref([])
+const pendingRedeemTotal = ref(0)
+const redeemLoading = ref(false)
 const recentBookings = ref([])
-const hotClasses = ref([])
-const coachStats = ref([])
-const coachLoading = ref(false)
-const trendRange = ref('7')
+const bookingsLoading = ref(false)
 
-// ============ ECharts 图表 ============
 const trendChartRef = ref(null)
-const pieChartRef = ref(null)
+const hotChartRef = ref(null)
+const coachChartRef = ref(null)
 let trendChart = null
-let pieChart = null
+let hotChart = null
+let coachChart = null
 
-// ============ 快捷功能（所有路径已加 /admin） ============
-const quickActions = ref([
-  { name: '会员管理', icon: 'User', type: 'primary', action: () => router.push('/admin/members') },
-  { name: '教练管理', icon: 'UserFilled', type: 'success', action: () => router.push('/admin/trainers') },
-  { name: '团课管理', icon: 'Calendar', type: 'warning', action: () => router.push('/admin/classes') },
-  { name: '打卡记录', icon: 'Checked', type: 'danger', action: () => router.push('/admin/check-in-records') }
-])
+const periodText = (p) => ({ full_day: '全天', morning: '上午', afternoon: '下午' }[p] || '全天')
+const ptStatusType = (s) => ({ scheduled: 'success', ongoing: 'warning', completed: 'info', cancelled: 'danger', cancelled_by_trainer: 'danger' }[s] || 'info')
+const ptStatusText = (s) => ({ scheduled: '待上课', ongoing: '进行中', completed: '已完成', cancelled: '已取消', cancelled_by_trainer: '已取消' }[s] || s)
 
-// ============ 加载数据 ============
-const loadDashboard = async () => {
+const loadOverview = async () => {
   try {
-    const res = await axios.get('/api/dashboard/stats', {
-      params: { days: trendRange.value }
-    })
-    const data = res.data
-    stats.value = [
-      { title: '会员总数', value: data.memberCount || 0, icon: 'User', color: '#409EFF', trend: data.memberTrend || 0 },
-      { title: '教练人数', value: data.trainerCount || 0, icon: 'UserFilled', color: '#67C23A', trend: data.trainerTrend || 0 },
-      { title: '本月预约', value: data.bookingCount || 0, icon: 'Calendar', color: '#E6A23C', trend: data.bookingTrend || 0 },
-      { title: '私教预约', value: data.ptCount || 0, icon: 'Notebook', color: '#F56C6C', trend: data.ptTrend || 0 }
-    ]
-    await nextTick()
-    renderCharts(data)
-  } catch (error) {
-    console.error('加载统计数据失败', error)
+    const res = await axios.get('/api/dashboard/overview')
+    const d = res.data || {}
+    statCards.value[0].value = d.todayBookings || 0
+    statCards.value[1].value = '¥' + (d.monthRevenueText || '0')
+    statCards.value[2].value = d.activeMembers || 0
+    statCards.value[3].value = (d.fullRate || 0) + '%'
+    statCards.value[4].value = d.pendingLeaves || 0
+    statCards.value[5].value = d.pendingRedemptions || 0
+    pendingLeaveTotal.value = d.pendingLeaves || 0
+    pendingRedeemTotal.value = d.pendingRedemptions || 0
+    renderCoachChart(d.coachWorkload || [])
+  } catch (e) {
+    console.error('加载总览失败', e)
   }
 }
 
-const loadRecentBookings = async () => {
+const loadTrend = async () => {
   try {
-    const res = await axios.get('/api/personal-trainings?page=1&size=5')
-    recentBookings.value = res.data.list || []
-  } catch (error) {}
-}
-
-const loadCoachStats = async () => {
-  coachLoading.value = true
-  try {
-    const res = await axios.get('/api/dashboard/coach-stats')
-    coachStats.value = res.data || []
-  } catch (error) {
-    console.error('加载教练统计失败', error)
-  } finally {
-    coachLoading.value = false
+    const res = await axios.get('/api/dashboard/stats', { params: { days: 7 } })
+    const d = res.data || {}
+    renderTrendChart(d.trendDates || [], d.trendData || [])
+  } catch (e) {
+    console.error('加载趋势失败', e)
   }
 }
 
 const loadHotClasses = async () => {
   try {
     const res = await axios.get('/api/dashboard/hot-classes')
-    hotClasses.value = res.data || []
-  } catch (error) {
-    console.error('加载热门课程失败', error)
+    renderHotChart(res.data || [])
+  } catch (e) {
+    console.error('加载热门课程失败', e)
   }
 }
 
-// ============ 图表渲染 ============
-const renderCharts = (data) => {
-  if (trendChartRef.value) {
-    if (!trendChart) {
-      trendChart = echarts.init(trendChartRef.value)
-    }
-    const option = {
+const loadPendingLeaves = async () => {
+  leavesLoading.value = true
+  try {
+    const res = await axios.get('/api/trainers/leaves/pending', { params: { status: 'pending' } })
+    pendingLeaves.value = ((res.data || []).filter(i => i.status === 'pending')).slice(0, 5)
+  } catch (e) {} finally { leavesLoading.value = false }
+}
+
+const loadPendingRedemptions = async () => {
+  redeemLoading.value = true
+  try {
+    const res = await axios.get('/api/points/admin/pending')
+    pendingRedemptions.value = ((res.data && res.data.list) || []).slice(0, 5)
+  } catch (e) {} finally { redeemLoading.value = false }
+}
+
+const loadRecentBookings = async () => {
+  bookingsLoading.value = true
+  try {
+    const res = await axios.get('/api/personal-trainings', { params: { page: 1, size: 10 } })
+    recentBookings.value = (res.data && res.data.list) || []
+  } catch (e) {} finally { bookingsLoading.value = false }
+}
+
+const renderTrendChart = (dates, data) => {
+  nextTick(() => {
+    if (!trendChartRef.value) return
+    if (!trendChart) trendChart = echarts.init(trendChartRef.value)
+    trendChart.setOption({
       tooltip: { trigger: 'axis' },
-      xAxis: {
-        type: 'category',
-        data: data.trendDates || ['06-18', '06-19', '06-20', '06-21', '06-22', '06-23', '06-24']
-      },
-      yAxis: { type: 'value' },
+      grid: { left: 40, right: 20, top: 30, bottom: 30 },
+      xAxis: { type: 'category', data: dates },
+      yAxis: { type: 'value', minInterval: 1 },
       series: [{
-        data: data.trendData || [3, 5, 2, 8, 6, 9, 4],
-        type: 'line',
-        smooth: true,
-        lineStyle: { color: '#409EFF', width: 3 },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
-            { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
-          ])
-        }
+        name: '预约数', type: 'line', smooth: true, data: data,
+        lineStyle: { color: '#4A6CF7', width: 3 },
+        itemStyle: { color: '#4A6CF7' },
+        areaStyle: { color: 'rgba(74,108,247,0.12)' }
       }]
-    }
-    trendChart.setOption(option)
-    trendChart.resize()
-  }
-
-  if (pieChartRef.value) {
-    if (!pieChart) {
-      pieChart = echarts.init(pieChartRef.value)
-    }
-    const option = {
-      tooltip: { trigger: 'item' },
-      legend: { orient: 'vertical', right: 10, top: 'center' },
-      series: [{
-        type: 'pie',
-        radius: ['45%', '70%'],
-        avoidLabelOverlap: false,
-        itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
-        label: { show: true, formatter: '{d}%' },
-        data: data.pieData || [
-          { value: 45, name: '团课', itemStyle: { color: '#409EFF' } },
-          { value: 35, name: '私教', itemStyle: { color: '#67C23A' } },
-          { value: 20, name: '其他', itemStyle: { color: '#E6A23C' } }
-        ]
-      }]
-    }
-    pieChart.setOption(option)
-    pieChart.resize()
-  }
+    })
+  })
 }
 
-// ============ 窗口自适应 ============
+const renderHotChart = (list) => {
+  nextTick(() => {
+    if (!hotChartRef.value) return
+    if (!hotChart) hotChart = echarts.init(hotChartRef.value)
+    const names = list.map(i => i.name)
+    const values = list.map(i => i.bookings || 0)
+    hotChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 40, right: 16, top: 20, bottom: 60 },
+      xAxis: { type: 'category', data: names, axisLabel: { rotate: 30, fontSize: 10 } },
+      yAxis: { type: 'value', minInterval: 1 },
+      series: [{
+        type: 'bar', data: values, barWidth: 18,
+        itemStyle: { color: '#E6A23C', borderRadius: [4, 4, 0, 0] }
+      }]
+    })
+  })
+}
+
+const renderCoachChart = (workload) => {
+  nextTick(() => {
+    if (!coachChartRef.value) return
+    if (!coachChart) coachChart = echarts.init(coachChartRef.value)
+    const data = workload.map(i => ({ name: i.name, value: i.value }))
+    coachChart.setOption({
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: { bottom: 0, type: 'scroll', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10 } },
+      series: [{
+        type: 'pie', radius: ['38%', '65%'], center: ['50%', '44%'],
+        data: data,
+        label: { show: false },
+        emphasis: { label: { show: true, fontSize: 12, fontWeight: 'bold' } }
+      }]
+    })
+  })
+}
+
 const handleResize = () => {
-  trendChart?.resize()
-  pieChart?.resize()
+  if (trendChart) trendChart.resize()
+  if (hotChart) hotChart.resize()
+  if (coachChart) coachChart.resize()
 }
 
-// ============ 生命周期 ============
 onMounted(() => {
-  loadDashboard()
-  loadRecentBookings()
+  loadOverview()
+  loadTrend()
   loadHotClasses()
+  loadPendingLeaves()
+  loadPendingRedemptions()
+  loadRecentBookings()
   window.addEventListener('resize', handleResize)
 })
 
-watch(trendRange, () => {
-  loadDashboard()
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  if (trendChart) { trendChart.dispose(); trendChart = null }
+  if (hotChart) { hotChart.dispose(); hotChart = null }
+  if (coachChart) { coachChart.dispose(); coachChart = null }
 })
 </script>
 
 <style scoped>
-.dashboard {
-  padding: 4px;
-}
-.stat-card {
-  height: 240px;
-  transition: transform 0.2s;
-}
-.stat-card:hover {
-  transform: translateY(-4px);
-}
-.stat-card :deep(.el-card__body) {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  box-sizing: border-box;
-}
-.stat-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 28px;
-  margin-bottom: 14px;
-  flex-shrink: 0;
-}
-.stat-icon :deep(.el-icon) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-.stat-info {
-  text-align: center;
-  width: 100%;
-}
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-  line-height: 1;
-  margin: 0;
-}
-.stat-title {
-  color: #999;
-  font-size: 14px;
-  margin-top: 6px;
-  margin-bottom: 0;
-  line-height: 1;
-}
-.stat-trend {
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 1;
-}
-.trend-up {
-  color: #67C23A;
-}
-.trend-down {
-  color: #F56C6C;
-}
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.chart-container {
-  width: 100%;
-  height: 280px;
-}
-.el-table {
-  border-radius: 8px;
-}
+.stat-row { margin-bottom: 16px; }
+.stat-card { border-radius: 12px; }
+.stat-body { display: flex; align-items: center; gap: 14px; }
+.stat-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #FFF; flex-shrink: 0; }
+.stat-value { font-size: 26px; font-weight: bold; color: #1A1A2E; line-height: 1.2; }
+.stat-title { font-size: 13px; color: #8A8AA0; margin-top: 4px; }
+.chart-row { margin-bottom: 16px; }
+.chart-card { border-radius: 12px; }
+.chart-box { height: 300px; }
+.list-row { }
+.list-card { border-radius: 12px; }
+.list-header { display: flex; align-items: center; justify-content: space-between; }
 </style>

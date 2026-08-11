@@ -17,7 +17,6 @@ public class ClassBooking {
     private Long memberId;
     private Long classId;
     private LocalDateTime bookingTime;
-    private LocalDateTime checkinTime;
     private String status;  // booked / cancelled / checked_in
 
     // ====== 支付相关字段 ======

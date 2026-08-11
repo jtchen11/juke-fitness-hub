@@ -32,52 +32,17 @@
       </el-col>
     </el-row>
 
-    <!-- ====== 教练签到统计 ====== -->
-    <el-card style="margin-bottom:20px">
-      <template #header><span>👨‍🏫 教练签到统计</span></template>
-      <el-row :gutter="16">
-        <el-col :span="6" v-for="cs in coachStats" :key="cs.trainerId">
-          <el-card shadow="hover" :body-style="{ padding: '12px' }" style="margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <el-avatar :size="36">{{ cs.trainerName?.charAt(0) }}</el-avatar>
-              <div>
-                <div style="font-weight:bold;font-size:14px">{{ cs.trainerName }}</div>
-                <div style="font-size:12px;color:#666">签到 {{ cs.total }} | 核销 {{ cs.checkIns }} | 本月 {{ cs.monthTotal }}</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </el-card>
-
     <!-- ====== 筛选条件 ====== -->
     <el-card style="margin-bottom: 20px">
       <el-row :gutter="16" align="middle">
-        <el-col :span="5">
-          <el-select
-              v-model="filterTrainerId"
-              placeholder="全部教练"
-              clearable
-              @change="loadRecords"
-              style="width:100%"
-              filterable
-          >
-            <el-option
-                v-for="t in trainerList"
-                :key="t.id"
-                :label="t.name"
-                :value="t.id"
-            />
-          </el-select>
-        </el-col>
-        <el-col :span="5">
+        <el-col :span="6">
           <el-select
               v-model="filterMemberId"
               placeholder="全部会员"
               clearable
+              filterable
               @change="loadRecords"
               style="width:100%"
-              filterable
           >
             <el-option
                 v-for="m in memberList"
@@ -85,6 +50,19 @@
                 :label="m.name + ' (' + m.phone + ')'"
                 :value="m.id"
             />
+          </el-select>
+        </el-col>
+        <el-col :span="4">
+          <el-select
+              v-model="filterType"
+              placeholder="全部类型"
+              clearable
+              @change="loadRecords"
+              style="width:100%"
+          >
+            <el-option label="自助训练" value="normal" />
+            <el-option label="团课签到" value="class" />
+            <el-option label="私教签到" value="pt" />
           </el-select>
         </el-col>
         <el-col :span="4">
@@ -107,14 +85,14 @@
               style="width:100%"
           />
         </el-col>
-        <el-col :span="4">
+        <el-col :span="6">
           <el-button type="primary" @click="loadRecords">搜索</el-button>
           <el-button @click="resetSearch">重置</el-button>
         </el-col>
       </el-row>
     </el-card>
 
-    <!-- ====== 打卡记录列表（含类型Tabs） ====== -->
+    <!-- ====== 打卡记录列表 ====== -->
     <el-card>
       <template #header>
         <div class="card-header">
@@ -130,14 +108,6 @@
         </div>
       </template>
 
-      <!-- 类型筛选 Tabs -->
-      <el-tabs v-model="activeType" @tab-change="loadRecords" style="margin-bottom: 16px;">
-        <el-tab-pane label="📚 全部" name="all" />
-        <el-tab-pane label="🏃 自助训练" name="normal" />
-        <el-tab-pane label="📅 团课签到" name="class" />
-        <el-tab-pane label="🏋️ 私教签到" name="pt" />
-      </el-tabs>
-
       <el-table
           :data="tableData"
           border
@@ -146,7 +116,7 @@
           row-key="id"
       >
         <el-table-column prop="id" label="ID" width="70" align="center" />
-        <el-table-column label="会员" width="130">
+        <el-table-column label="会员名" width="130">
           <template #default="{ row }">
             <div style="display:flex;align-items:center;gap:8px">
               <el-avatar :size="30" :style="{ backgroundColor: getAvatarColor(row.memberName) }">
@@ -157,14 +127,14 @@
           </template>
         </el-table-column>
         <el-table-column prop="checkInTime" label="打卡时间" width="180" />
-        <el-table-column label="签到类型" width="130" align="center">
+        <el-table-column label="签到类型" width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="getTypeTag(row.checkInType)" size="small" effect="dark">
               {{ getTypeLabel(row.checkInType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="关联信息" min-width="160">
+        <el-table-column label="关联信息" min-width="180">
           <template #default="{ row }">
             <span v-if="row.checkInType === 'class' && row.className" style="color:#409EFF;">
               📅 {{ row.className }}
@@ -172,12 +142,30 @@
             <span v-else-if="row.checkInType === 'pt' && row.ptInfo" style="color:#F56C6C;">
               🏋️ {{ row.ptInfo }}
             </span>
-            <span v-else style="color:#999;">-</span>
+            <span v-else style="color:#999;">—</span>
           </template>
         </el-table-column>
-        <el-table-column prop="classId" label="课程ID" width="100" align="center">
+        <el-table-column label="训练时长" width="100" align="center">
           <template #default="{ row }">
-            <span>{{ row.classId || '-' }}</span>
+            <span v-if="row.checkInType === 'normal'">
+              {{ row.durationMinutes != null ? row.durationMinutes + ' 分钟' : '—' }}
+            </span>
+            <span v-else style="color:#999;">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <span v-if="row.checkInType === 'normal'">
+              <el-tag v-if="row.durationMinutes != null && row.durationMinutes >= 40" type="success" size="small">✅ 达标</el-tag>
+              <el-tag v-else type="info" size="small">⏳ 不足</el-tag>
+            </span>
+            <span v-else style="color:#999;">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="获得积分" width="90" align="center">
+          <template #default="{ row }">
+            <span v-if="row.pointsEarned > 0" style="font-weight:bold;color:#4A6CF7">+{{ row.pointsEarned }}</span>
+            <span v-else style="color:#999;">0</span>
           </template>
         </el-table-column>
       </el-table>
@@ -207,10 +195,6 @@ import { Refresh } from '@element-plus/icons-vue'
 // 状态变量
 // =============================================
 
-// 统计数据（4个核心指标）
-const coachStats = ref([])
-const filterTrainerId = ref('')
-const trainerList = ref([])
 const stats = ref([
   { title: '总签到', value: 0, icon: 'Document', color: '#409EFF' },
   { title: '今日签到', value: 0, icon: 'Clock', color: '#67C23A' },
@@ -219,12 +203,7 @@ const stats = ref([
 ])
 
 // 今日签到明细
-const todayDetail = ref({
-  total: 0,
-  normal: 0,
-  class: 0,
-  pt: 0
-})
+const todayDetail = ref({ total: 0, normal: 0, class: 0, pt: 0 })
 
 // 列表数据
 const tableData = ref([])
@@ -233,9 +212,9 @@ const total = ref(0)
 const pageNum = ref(1)
 const pageSize = ref(10)
 const filterMemberId = ref('')
+const filterType = ref('')
 const filterStartDate = ref('')
 const filterEndDate = ref('')
-const activeType = ref('all')  // all / normal / class / pt
 const loading = ref(false)
 
 // =============================================
@@ -273,7 +252,6 @@ const loadStats = async () => {
         { title: '本周签到', value: res.data.thisWeek || 0, icon: 'Calendar', color: '#E6A23C' },
         { title: '本月签到', value: res.data.thisMonth || 0, icon: 'TrendCharts', color: '#F56C6C' }
       ]
-      // 今日明细
       todayDetail.value = {
         total: res.data.today || 0,
         normal: res.data.todayNormal || 0,
@@ -286,20 +264,6 @@ const loadStats = async () => {
   }
 }
 
-const loadCoachStats = async () => {
-  try {
-    const res = await axios.get('/api/check-in/coach-stats')
-    coachStats.value = res.data || []
-  } catch (error) {}
-}
-
-const loadTrainerList = async () => {
-  try {
-    const res = await axios.get('/api/trainers?size=200')
-    trainerList.value = res.data.list || (res.data || [])
-  } catch (error) {}
-}
-
 const loadRecords = async () => {
   loading.value = true
   try {
@@ -307,14 +271,10 @@ const loadRecords = async () => {
       page: pageNum.value,
       size: pageSize.value,
       memberId: filterMemberId.value || undefined,
+      type: filterType.value || undefined,
       startDate: filterStartDate.value || undefined,
       endDate: filterEndDate.value || undefined
     }
-    // 根据 Tab 筛选类型
-    if (activeType.value !== 'all') {
-      params.type = activeType.value
-    }
-
     const res = await axios.get('/api/check-in', { params })
     tableData.value = res.data.list || []
     total.value = res.data.total || 0
@@ -337,6 +297,7 @@ const loadMembers = async () => {
 
 const resetSearch = () => {
   filterMemberId.value = ''
+  filterType.value = ''
   filterStartDate.value = ''
   filterEndDate.value = ''
   pageNum.value = 1

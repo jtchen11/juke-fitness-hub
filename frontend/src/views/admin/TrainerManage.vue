@@ -130,14 +130,14 @@
         <!-- ====== 操作列：增加【请假】按钮 ====== -->
         <el-table-column label="操作" width="300" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button size="small" type="warning" plain @click="openLeaveDialog(row)">
-              请假
-            </el-button>
             <el-button size="small" type="info" plain @click="showDetail(row)">
               详情
             </el-button>
             <el-button size="small" type="primary" plain @click="handleEdit(row)">
               编辑
+            </el-button>
+            <el-button size="small" type="warning" plain @click="openLeaveDialog(row)">
+              请假
             </el-button>
             <el-button size="small" type="danger" plain @click="handleDelete(row)">
               删除
@@ -259,36 +259,6 @@
       </div>
     </el-drawer>
 
-    <!-- ====== 请假审批列表 ====== -->
-    <el-card style="margin-bottom:20px">
-      <template #header>
-        <div class="card-header">
-          <span>📋 请假审批 <el-tag size="small" type="warning" v-if="pendingLeaves.length">{{ pendingLeaves.length }} 待审批</el-tag></span>
-          <el-button size="small" text @click="loadPendingLeaves"><el-icon><Refresh /></el-icon> 刷新</el-button>
-        </div>
-      </template>
-      <el-table :data="pendingLeaves" border style="width:100%" v-loading="leaveLoading" size="small">
-        <el-table-column prop="trainerName" label="教练" width="100" />
-        <el-table-column prop="leaveDate" label="请假日期" width="120" align="center" />
-        <el-table-column prop="reason" label="原因" min-width="150" />
-        <el-table-column prop="createdAt" label="申请时间" width="160" />
-        <el-table-column prop="status" label="状态" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'pending' ? 'warning' : row.status === 'approved' ? 'success' : 'danger'" size="small">
-              {{ row.status === "pending" ? "待审批" : row.status === "approved" ? "已通过" : "已拒绝" }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" align="center" v-if="hasPending">
-          <template #default="{ row }">
-            <el-button size="small" type="success" plain @click="approveLeave(row, 'approved')" :disabled="row.status !== 'pending'">通过</el-button>
-            <el-button size="small" type="danger" plain @click="approveLeave(row, 'rejected')" :disabled="row.status !== 'pending'">拒绝</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-if="!pendingLeaves.length && !leaveLoading" description="暂无待审批请假" />
-    </el-card>
-
     <!-- ====== 新增：请假对话框 ====== -->
     <el-dialog
         v-model="leaveDialogVisible"
@@ -306,6 +276,13 @@
               style="width:100%"
               :disabled-date="disabledLeaveDate"
           />
+        </el-form-item>
+        <el-form-item label="请假时段" required>
+          <el-select v-model="leaveForm.period" placeholder="请选择请假时段" style="width:100%">
+            <el-option label="全天（07:00-21:00）" value="full_day" />
+            <el-option label="上午（07:00-12:00）" value="morning" />
+            <el-option label="下午（12:00-21:00）" value="afternoon" />
+          </el-select>
         </el-form-item>
         <el-form-item label="请假原因">
           <el-input
@@ -373,16 +350,57 @@ const detailVisible = ref(false)
 const detailTitle = ref('教练详情')
 const detailData = ref(null)
 
-// ============ 新增：请假相关 ============
-const pendingLeaves = ref([])
+// ============ 请假相关 ============
 const leaveDialogVisible = ref(false)
 const leaveLoading = ref(false)
-const currentLeaveTrainer = ref(null)
-const hasPending = computed(() => pendingLeaves.value.some(l => l.status === 'pending'))
 const leaveForm = ref({
+  trainerId: null,
+  trainerName: '',
   leaveDate: '',
+  period: 'full_day',
   reason: ''
 })
+
+const openLeaveDialog = (row) => {
+  leaveForm.value = {
+    trainerId: row.id,
+    trainerName: row.name,
+    leaveDate: '',
+    period: 'full_day',
+    reason: ''
+  }
+  leaveDialogVisible.value = true
+}
+
+const disabledLeaveDate = (date) => {
+  return date.getTime() < Date.now() - 86400000
+}
+
+const submitLeave = async () => {
+  if (!leaveForm.value.leaveDate) {
+    ElMessage.warning('请选择请假日期')
+    return
+  }
+  leaveLoading.value = true
+  try {
+    const res = await axios.post(`/api/trainers/${leaveForm.value.trainerId}/leave`, {
+      leaveDate: leaveForm.value.leaveDate,
+      period: leaveForm.value.period,
+      reason: leaveForm.value.reason || '教练请假'
+    })
+    if (res.data && res.data.success === false) {
+      ElMessage.error(res.data.message || '请假申请提交失败')
+      return
+    }
+    ElMessage.success('请假申请已提交，等待管理员审批')
+    leaveDialogVisible.value = false
+  } catch (error) {
+    console.error('提交请假失败', error)
+    ElMessage.error('请假申请提交失败，请重试')
+  } finally {
+    leaveLoading.value = false
+  }
+}
 
 // ============ 表单校验规则 ============
 const formRules = {
@@ -413,94 +431,6 @@ const getStatusType = (status) => {
 const getStatusText = (status) => {
   const map = { active: '在职', vacation: '休假', resigned: '离职' }
   return map[status] || '未知'
-}
-
-// ============ 新增：请假相关方法 ============
-// 打开请假对话框
-const openLeaveDialog = (row) => {
-  currentLeaveTrainer.value = row
-  leaveForm.value = {
-    leaveDate: '',
-    reason: ''
-  }
-  leaveDialogVisible.value = true
-}
-
-// 禁用今天之前的日期（只能选今天及未来）
-const disabledLeaveDate = (time) => {
-  return time.getTime() < new Date().setHours(0, 0, 0, 0)
-}
-
-// 提交请假
-const submitLeave = async () => {
-  if (!leaveForm.value.leaveDate) {
-    ElMessage.warning('请选择请假日期')
-    return
-  }
-
-  leaveLoading.value = true
-  try {
-    const res = await axios.post(
-        `/api/trainers/${currentLeaveTrainer.value.id}/leave`,
-        null,
-        {
-          params: {
-            leaveDate: leaveForm.value.leaveDate,
-            reason: leaveForm.value.reason || '临时请假'
-          }
-        }
-    )
-
-    if (res.data.success) {
-      const cancelCount = res.data.cancelCount || 0
-      ElMessage.success({
-        message: `✅ 请假设置成功！\n当日有 ${cancelCount} 个会员预约已自动取消，请提醒会员重新预约。`,
-        duration: 5000
-      })
-      leaveDialogVisible.value = false
-      loadTrainers()
-    } else {
-      ElMessage.error(res.data.message || '请假失败')
-    }
-  } catch (error) {
-    console.error('请假失败', error)
-    ElMessage.error(error.response?.data?.message || '请假失败，请重试')
-  } finally {
-    leaveLoading.value = false
-  }
-}
-
-// ====== 加载待审批请假 ======
-const loadPendingLeaves = async () => {
-  leaveLoading.value = true
-  try {
-    const res = await axios.get('/api/trainers/leaves/pending')
-    pendingLeaves.value = res.data || []
-  } catch (error) {
-    console.error('加载待审批请假失败', error)
-  } finally {
-    leaveLoading.value = false
-  }
-}
-
-// ====== 审批请假 ======
-const approveLeave = async (row, status) => {
-  const actionText = status === 'approved' ? '通过' : '拒绝'
-  try {
-    await ElMessageBox.confirm(
-      '确定' + actionText + '该请假申请吗？',
-      '审批确认',
-      { confirmButtonText: '确定' + actionText, cancelButtonText: '取消', type: 'info' }
-    )
-    await axios.put('/api/trainers/leaves/' + row.id + '/approve', null, { params: { status: status } })
-    ElMessage.success(actionText + '成功')
-    loadPendingLeaves()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('审批失败', error)
-      ElMessage.error(error.response?.data?.message || '审批失败')
-    }
-  }
 }
 
 // ============ 加载数据 ============
@@ -662,7 +592,7 @@ const exportTrainers = async () => {
 // ============ 生命周期 ============
 onMounted(() => {
   loadTrainers()
-  loadPendingLeaves()
+
 })
 </script>
 

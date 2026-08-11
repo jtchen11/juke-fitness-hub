@@ -4,7 +4,9 @@ import com.gym.entity.PointsHistory;
 import com.gym.entity.PointsRedemption;
 import com.gym.service.PointsService;
 import com.gym.mapper.PointsRewardMapper;
+import com.gym.mapper.MemberMapper;
 import com.gym.entity.PointsReward;
+import com.gym.entity.Member;
 import com.gym.auth.LoginContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +21,7 @@ public class PointsController {
 
     @Autowired private PointsService pointsService;
     @Autowired private PointsRewardMapper rewardMapper;
+    @Autowired private MemberMapper memberMapper;
 
     /** 查询当前积分 */
     @GetMapping
@@ -89,6 +92,56 @@ public class PointsController {
         Map<String, Object> r = new HashMap<>();
         r.put("list", p.getRecords());
         r.put("total", p.getTotal());
+        return r;
+    }
+
+    /** 管理员：积分流水（会员搜索 / 变动类型 / 日期范围筛选） */
+    @GetMapping("/admin/history")
+    public Map<String, Object> adminHistory(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String changeTypes,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        return pointsService.adminHistory(page, size, keyword, changeTypes, category, startDate, endDate);
+    }
+
+    /** 管理员：手动调整积分（正=加分，负=扣分） */
+    @PostMapping("/admin/adjust")
+    public Map<String, Object> adminAdjust(@RequestBody Map<String, Object> params) {
+        Map<String, Object> r = new HashMap<>();
+        Long memberId = params.get("memberId") != null ? Long.valueOf(params.get("memberId").toString()) : null;
+        Integer points = params.get("points") != null ? Integer.valueOf(params.get("points").toString()) : null;
+        String reason = (String) params.get("reason");
+        if (memberId == null || points == null) {
+            r.put("success", false);
+            r.put("message", "缺少会员或调整值");
+            return r;
+        }
+        if (points == 0) {
+            r.put("success", false);
+            r.put("message", "调整值不能为0");
+            return r;
+        }
+        if (reason == null || reason.trim().isEmpty()) {
+            r.put("success", false);
+            r.put("message", "请填写调整原因");
+            return r;
+        }
+        Member member = memberMapper.selectById(memberId);
+        if (member == null) {
+            r.put("success", false);
+            r.put("message", "会员不存在");
+            return r;
+        }
+        boolean ok = pointsService.addPoints(memberId, points, "admin_adjust", null, reason.trim());
+        r.put("success", ok);
+        r.put("message", ok ? "调整成功" : "调整失败");
+        if (ok) {
+            r.put("balance", pointsService.getPoints(memberId));
+        }
         return r;
     }
 

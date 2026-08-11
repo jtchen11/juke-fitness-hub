@@ -37,6 +37,7 @@
         </el-col>
         <el-col :span="4">
           <el-select v-model="filterLevel" placeholder="全部等级" clearable @change="loadMembers">
+            <el-option label="访客" value="访客" />
             <el-option label="普通会员" value="普通会员" />
             <el-option label="黄金会员" value="黄金会员" />
             <el-option label="铂金会员" value="铂金会员" />
@@ -88,34 +89,21 @@
           row-key="id"
       >
         <el-table-column prop="id" label="ID" width="70" align="center" />
-        <el-table-column label="会员" width="120">
+        <el-table-column prop="name" label="姓名" min-width="100">
           <template #default="{ row }">
             <div style="display:flex;align-items:center;gap:8px">
-              <el-avatar :size="36" :style="{ backgroundColor: getAvatarColor(row.name) }">
+              <el-avatar :size="32" :style="{ backgroundColor: getAvatarColor(row.name) }">
                 {{ row.name?.charAt(0) || '?' }}
               </el-avatar>
-              <div>
-                <div style="font-weight:500">{{ row.name }}</div>
-                <div style="font-size:12px;color:#999">ID: {{ row.id }}</div>
-              </div>
+              <span style="font-weight:500">{{ row.name }}</span>
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="phone" label="手机号" width="130" />
-        <el-table-column prop="gender" label="性别" width="70" align="center">
-          <template #default="{ row }">
-            <span>{{ row.gender === 'MALE' ? '👨 男' : row.gender === 'FEMALE' ? '👩 女' : '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="birthday" label="生日" width="120" align="center">
-          <template #default="{ row }">
-            <span>{{ row.birthday || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="level" label="等级" width="110" align="center">
+        <el-table-column prop="level" label="会员等级" width="110" align="center">
           <template #default="{ row }">
             <el-tag
-                :type="row.level === '铂金会员' ? 'warning' : row.level === '黄金会员' ? 'success' : 'info'"
+                :type="row.level === '铂金会员' ? 'warning' : row.level === '黄金会员' ? 'success' : row.level === '访客' ? 'info' : 'primary'"
                 effect="dark"
                 size="small"
             >
@@ -123,31 +111,41 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="expireDate" label="有效期" width="120" align="center">
+        <el-table-column prop="expireDate" label="会员有效期" width="120" align="center">
           <template #default="{ row }">
             <span :style="{ color: getExpireColor(row.expireDate) }">
               {{ row.expireDate || '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100" align="center">
+        <el-table-column prop="points" label="积分" width="90" align="center">
+          <template #default="{ row }">
+            <span style="font-weight:bold;color:#4A6CF7">{{ row.points != null ? row.points : 0 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="免费私教剩余" width="110" align="center">
+          <template #default="{ row }">
+            <span :style="{ color: row.freePtRemaining > 0 ? '#67C23A' : '#909399' }">
+              {{ row.freePtRemaining != null ? row.freePtRemaining : 0 }} 次
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="课程包剩余课时" width="110" align="center">
+          <template #default="{ row }">
+            <span style="color:#E6A23C">{{ row.packageRemaining != null ? row.packageRemaining : 0 }} 节</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="expireStatus" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.expireDate)" size="small" effect="plain">
               {{ getStatusText(row.expireDate) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="height" label="身高(cm)" width="80" align="center">
-          <template #default="{ row }">{{ row.height || '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="weight" label="体重(kg)" width="80" align="center">
-          <template #default="{ row }">{{ row.weight || '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="createdAt" label="注册时间" width="170" />
-        <!-- ====== 操作列 - 只有打卡（补签）、编辑、权益、删除，没有人脸 ====== -->
-        <el-table-column label="操作" width="320" fixed="right" align="center">
+        <!-- ====== 操作列：补签仅正式会员（level != 访客） ====== -->
+        <el-table-column label="操作" width="260" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button size="small" type="success" plain @click="handleCheckIn(row)">
+            <el-button v-if="row.level !== '访客'" size="small" type="success" plain @click="handleCheckIn(row)">
               补签
             </el-button>
             <el-button size="small" type="primary" plain @click="handleEdit(row)">
@@ -155,9 +153,6 @@
             </el-button>
             <el-button size="small" type="warning" plain @click="showBenefits(row)">
               权益
-            </el-button>
-            <el-button size="small" type="info" plain @click="goDietRecord(row)">
-              饮食记录
             </el-button>
             <el-button size="small" type="danger" plain @click="handleDelete(row)">
               删除
@@ -179,6 +174,66 @@
         />
       </div>
     </el-card>
+
+    <!-- ====== 补签弹窗 ====== -->
+    <el-dialog v-model="makeupVisible" title="📝 会员补签" width="540px" destroy-on-close>
+      <el-form :model="makeupForm" label-width="90px">
+        <el-form-item label="会员">
+          <span style="font-weight:bold">{{ makeupMember?.name }}</span>
+          <span style="color:#999;margin-left:8px">{{ makeupMember?.level }}</span>
+        </el-form-item>
+        <el-form-item label="补签日期" required>
+          <el-date-picker
+              v-model="makeupForm.date"
+              type="date"
+              placeholder="选择补签日期"
+              value-format="YYYY-MM-DD"
+              style="width:100%"
+              :disabled-date="disableFutureDate"
+              @change="onMakeupDateChange"
+          />
+        </el-form-item>
+        <el-form-item label="签到类型" required>
+          <el-radio-group v-model="makeupForm.type" @change="onMakeupTypeChange">
+            <el-radio label="normal">🏃 自助训练</el-radio>
+            <el-radio label="class">📅 团课签到</el-radio>
+            <el-radio label="pt">🏋️ 私教签到</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="makeupForm.type === 'normal'" label="训练时长">
+          <el-input-number v-model="makeupForm.durationMinutes" :min="0" :max="300" :step="5" style="width:100%" />
+          <div class="form-tip">≥40 分钟可得 1 积分（每日前 2 次有效）</div>
+        </el-form-item>
+        <el-form-item v-if="makeupForm.type === 'class'" label="选择课程" required>
+          <el-select v-model="makeupForm.classId" placeholder="请选择该日课程" style="width:100%" filterable>
+            <el-option
+                v-for="c in classOptions"
+                :key="c.classId"
+                :label="c.className + '（' + (c.type === 'free' ? '公益' : '付费') + '）' + ' ' + (c.startTime || '').slice(5, 16)"
+                :value="c.classId"
+            />
+          </el-select>
+          <div v-if="classOptions.length === 0" class="form-tip">该会员在所选日期暂无已预约课程</div>
+        </el-form-item>
+        <el-form-item v-if="makeupForm.type === 'pt'" label="选择预约" required>
+          <el-select v-model="makeupForm.ptId" placeholder="请选择该日私教预约" style="width:100%" filterable>
+            <el-option
+                v-for="p in ptOptions"
+                :key="p.id"
+                :label="(p.trainerName || '教练') + ' ' + (p.appointmentTime || '')"
+                :value="p.id"
+            />
+          </el-select>
+          <div v-if="ptOptions.length === 0" class="form-tip">该会员在所选日期暂无未完成的私教预约</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="makeupVisible = false">取消</el-button>
+        <el-button type="primary" :loading="makeupSubmitting" @click="submitMakeup">
+          确认补签
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- ====== 添加/编辑对话框 ====== -->
     <el-dialog
@@ -232,6 +287,7 @@
           <el-col :span="12">
             <el-form-item label="会员等级" prop="level">
               <el-select v-model="formData.level" placeholder="请选择等级" style="width:100%">
+                <el-option label="访客" value="访客" />
                 <el-option label="普通会员" value="普通会员" />
                 <el-option label="黄金会员" value="黄金会员" />
                 <el-option label="铂金会员" value="铂金会员" />
@@ -297,6 +353,14 @@ const filterLevel = ref('')
 const filterStatus = ref('')
 const loading = ref(false)
 
+// ============ 补签 ============
+const makeupVisible = ref(false)
+const makeupSubmitting = ref(false)
+const makeupMember = ref(null)
+const makeupForm = ref({ date: '', type: 'normal', classId: null, ptId: null, durationMinutes: 45 })
+const classOptions = ref([])
+const ptOptions = ref([])
+
 // ============ 对话框 ============
 const dialogVisible = ref(false)
 const dialogTitle = ref('添加会员')
@@ -332,6 +396,9 @@ const getAvatarColor = (name) => {
   return colors[index]
 }
 
+const todayStart = () => new Date(new Date().toDateString()).getTime()
+const disableFutureDate = (date) => date.getTime() >= todayStart()
+
 const getExpireColor = (date) => {
   if (!date) return '#909399'
   const now = new Date()
@@ -358,8 +425,8 @@ const getStatusText = (date) => {
   const expire = new Date(date)
   const days = Math.ceil((expire - now) / (1000 * 60 * 60 * 24))
   if (days < 0) return '已过期'
-  if (days < 7) return `剩余${days}天`
-  return '正常'
+  if (days < 7) return '即将到期'
+  return '有效'
 }
 
 const showBenefits = async (row) => {
@@ -391,10 +458,97 @@ const showBenefits = async (row) => {
   }
 }
 
-// ====== 饮食记录 ======
-const goDietRecord = (row) => {
-  router.push("/admin/diet-record?memberId=" + row.id + "&name=" + encodeURIComponent(row.name))
-};
+// ============ 补签相关 ============
+const handleCheckIn = (row) => {
+  makeupMember.value = row
+  const yesterday = new Date(Date.now() - 86400000)
+  const y = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`
+  makeupForm.value = { date: y, type: 'normal', classId: null, ptId: null, durationMinutes: 45 }
+  classOptions.value = []
+  ptOptions.value = []
+  makeupVisible.value = true
+}
+
+const onMakeupDateChange = () => {
+  if (makeupForm.value.type === 'class') loadClassOptions()
+  if (makeupForm.value.type === 'pt') loadPtOptions()
+}
+
+const onMakeupTypeChange = (type) => {
+  if (type === 'class') loadClassOptions()
+  if (type === 'pt') loadPtOptions()
+}
+
+const loadClassOptions = async () => {
+  if (!makeupForm.value.date || !makeupMember.value) return
+  try {
+    const res = await axios.get(`/api/class-bookings/member/${makeupMember.value.id}/makeup-options`, {
+      params: { date: makeupForm.value.date }
+    })
+    classOptions.value = res.data || []
+  } catch (error) {
+    console.error('加载课程列表失败', error)
+  }
+}
+
+const loadPtOptions = async () => {
+  if (!makeupForm.value.date || !makeupMember.value) return
+  try {
+    const res = await axios.get('/api/personal-trainings', {
+      params: {
+        page: 1,
+        size: 50,
+        memberId: makeupMember.value.id,
+        startDate: makeupForm.value.date,
+        endDate: makeupForm.value.date
+      }
+    })
+    // 仅保留未取消、未完成的预约（scheduled/ongoing），不限制时间（可补过去）
+    ptOptions.value = ((res.data && res.data.list) || []).filter((p) => ['scheduled', 'ongoing'].includes(p.status))
+  } catch (error) {
+    console.error('加载私教预约失败', error)
+  }
+}
+
+const submitMakeup = async () => {
+  if (!makeupForm.value.date) {
+    ElMessage.warning('请选择补签日期')
+    return
+  }
+  if (makeupForm.value.type === 'class' && !makeupForm.value.classId) {
+    ElMessage.warning('请选择课程')
+    return
+  }
+  if (makeupForm.value.type === 'pt' && !makeupForm.value.ptId) {
+    ElMessage.warning('请选择私教预约')
+    return
+  }
+  makeupSubmitting.value = true
+  try {
+    const payload = {
+      memberId: makeupMember.value.id,
+      date: makeupForm.value.date,
+      type: makeupForm.value.type
+    }
+    if (makeupForm.value.type === 'class') payload.classId = makeupForm.value.classId
+    if (makeupForm.value.type === 'pt') payload.ptId = makeupForm.value.ptId
+    if (makeupForm.value.type === 'normal') payload.durationMinutes = makeupForm.value.durationMinutes || 0
+
+    const res = await axios.post('/api/check-in/makeup', payload)
+    if (res.data.success) {
+      ElMessage.success(`✅ ${res.data.memberName} 补签成功，积分+${res.data.pointsAwarded}`)
+      makeupVisible.value = false
+      refresh()
+    } else {
+      ElMessage.error(res.data.message || '补签失败')
+    }
+  } catch (error) {
+    console.error('补签失败', error)
+    ElMessage.error('补签失败，请重试')
+  } finally {
+    makeupSubmitting.value = false
+  }
+}
 
 // ============ 加载数据 ============
 const loadStats = async () => {
@@ -488,6 +642,11 @@ const saveMember = async () => {
   const submitData = { ...formData.value }
   if (submitData.birthday === '') submitData.birthday = null
   if (submitData.expireDate === '') submitData.expireDate = null
+  delete submitData.freePtRemaining
+  delete submitData.freePtQuota
+  delete submitData.packageRemaining
+  delete submitData.expireStatus
+  delete submitData.points
 
   saving.value = true
   try {
@@ -561,22 +720,6 @@ const exportMembers = async () => {
   }
 }
 
-// ====== 补签（管理员手动打卡） ======
-const handleCheckIn = async (row) => {
-  try {
-    const res = await axios.post(`/api/check-in/member/${row.id}`)
-    if (res.data.success) {
-      ElMessage.success(`✅ ${res.data.memberName || row.name} 补签成功！`)
-      refresh()
-    } else {
-      ElMessage.error(res.data.message || '补签失败')
-    }
-  } catch (error) {
-    console.error('补签失败', error)
-    ElMessage.error('补签失败，请重试')
-  }
-}
-
 // ============ 生命周期 ============
 onMounted(() => {
   loadStats()
@@ -592,7 +735,6 @@ onMounted(() => {
   transform: translateY(-4px);
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
 }
-
 .stat-item {
   display: flex;
   align-items: center;
@@ -621,12 +763,15 @@ onMounted(() => {
   font-size: 14px;
 }
 .stat-change {
-  margin-top: 2px;
+  margin-top: 4px;
   font-size: 13px;
 }
-.stat-change .up { color: #67C23A; }
-.stat-change .down { color: #F56C6C; }
-
+.stat-change .up {
+  color: #67C23A;
+}
+.stat-change .down {
+  color: #F56C6C;
+}
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -636,5 +781,11 @@ onMounted(() => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+.form-tip {
+  font-size: 12px;
+  color: #999;
+  line-height: 1.6;
+  margin-top: 4px;
 }
 </style>

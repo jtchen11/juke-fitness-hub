@@ -35,6 +35,7 @@
           <el-menu-item index="/admin/packages"><el-icon><Goods /></el-icon><span>私教套餐</span></el-menu-item>
           <el-menu-item index="/admin/bookings"><el-icon><Notebook /></el-icon><span>私教预约</span></el-menu-item>
           <el-menu-item index="/admin/trainer-leaves"><el-icon><Calendar /></el-icon><span>请假审批</span></el-menu-item>
+          <el-menu-item index="/admin/member-packages"><el-icon><Goods /></el-icon><span>会员课程包</span></el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="/admin/classes">
           <template #title>
@@ -56,6 +57,7 @@
             </template>
             <el-menu-item index="/admin/points"><el-icon><Checked /></el-icon><span>兑换审批</span></el-menu-item>
             <el-menu-item index="/admin/points-rewards"><el-icon><Goods /></el-icon><span>积分商品管理</span></el-menu-item>
+            <el-menu-item index="/admin/points-history"><el-icon><Tickets /></el-icon><span>积分流水</span></el-menu-item>
           </el-sub-menu>
           <el-menu-item index="/admin/settings/system"><el-icon><Tools /></el-icon><span>功能配置</span></el-menu-item>
         </el-sub-menu>
@@ -90,7 +92,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import {
   DataLine, User, Calendar, Notebook, TrendCharts,
-  Checked, Goods, Trophy, Setting, Tools, Fold, Search, Bell, Coin, Food
+  Checked, Goods, Trophy, Setting, Tools, Fold, Search, Bell, Coin, Food, Tickets
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

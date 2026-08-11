@@ -12,7 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,9 @@ public class CheckInController {
 
     @Autowired
     private MemberPrivatePackageMapper packageMapper;
+
+    @Autowired
+    private ClassBookingMapper classBookingMapper;
 
     @Autowired
     private PointsService pointsService;
@@ -123,6 +128,8 @@ public class CheckInController {
         long todayCheckOuts = checkInMapper.selectCount(countW);
 
         if (todayCheckOuts <= 2) {
+            ci.setPointsEarned(1);
+            checkInMapper.updateById(ci);
             pointsService.addPoints(memberId, 1, "NORMAL_TRAINING", ci.getId(), "自主训练积分");
             return successResponse("训练时长" + duration + "分钟，积分+1");
         }
@@ -145,17 +152,18 @@ public class CheckInController {
             return errorResponse("您已签到过该课程，请勿重复签到");
         }
 
+        GroupClass gc = groupClassMapper.selectById(classId);
+        int points = gc != null && "paid".equals(gc.getType()) ? 10 : 1;
         CheckIn checkIn = new CheckIn();
         checkIn.setMemberId(memberId);
         checkIn.setCheckInTime(LocalDateTime.now());
         checkIn.setCheckInType("class");
         checkIn.setClassId(classId);
+        checkIn.setPointsEarned(points);
         checkInMapper.insert(checkIn);
 
-        // 团课签到 +1 积分
+        // 团课签到积分（公益+1 / 付费+10）
         try {
-            GroupClass gc = groupClassMapper.selectById(classId);
-            int points = gc != null && "paid".equals(gc.getType()) ? 10 : 1;
             pointsService.addPoints(memberId, points, "CLASS_CHECKIN", classId, "团课签到");
         } catch (Exception ignored) {}
         return successResponse("团课签到成功");
@@ -247,6 +255,10 @@ public class CheckInController {
         }
         if (type != null && !type.isEmpty()) {
             wrapper.eq(CheckIn::getCheckInType, type);
+            // 私教签到列表仅展示 remark='end'（下训签退，即发积分的那条）
+            if ("pt".equals(type)) {
+                wrapper.eq(CheckIn::getRemark, "end");
+            }
         }
 
         wrapper.orderByDesc(CheckIn::getCheckInTime);
@@ -294,12 +306,23 @@ public class CheckInController {
             }
         }
 
-        // 4. 封装返回结果
+        // 4. 计算训练时长与本次签到获得积分
+        for (CheckIn record : records) {
+            record.setDurationMinutes(null);
+            if ("normal".equals(record.getCheckInType())
+                    && record.getCheckInTime() != null && record.getCheckOutTime() != null) {
+                record.setDurationMinutes(java.time.Duration.between(record.getCheckInTime(), record.getCheckOutTime()).toMinutes());
+            }
+            // points_earned 直接取自数据库列（签到/补签时已写入实际积分）
+        }
+
+        // 5. 封装返回结果
         Map<String, Object> result = new HashMap<>();
         result.put("list", records);
         result.put("total", pageResult.getTotal());
         return result;
     }
+
 
     /**
      * 私教课签到（开始上课打卡）
@@ -339,6 +362,7 @@ public class CheckInController {
         checkIn.setCheckInTime(LocalDateTime.now());
         checkIn.setCheckInType("pt");
         checkIn.setRemark(action);  // 存储 start 或 end
+        checkIn.setPointsEarned("end".equals(action) ? 10 : 0);
         checkInMapper.insert(checkIn);
 
         // 4. 如果 action = end，标记预约完成
@@ -425,6 +449,146 @@ public class CheckInController {
         return successResponse(action.equals("end") ? "下课打卡成功" : "上课打卡成功");
     }
 
+    /**
+     * 管理员补签（会员管理页）：支持 自助训练 / 团课签到 / 私教签到
+     * 与正常签到积分规则一致，提交前做防重复校验
+     */
+    @PostMapping("/makeup")
+    @Transactional
+    public Map<String, Object> makeup(@RequestBody Map<String, Object> params) {
+        Long memberId = params.get("memberId") != null ? Long.valueOf(params.get("memberId").toString()) : null;
+        String dateStr = (String) params.get("date");
+        String type = (String) params.getOrDefault("type", "normal");
+        Long classId = params.get("classId") != null ? Long.valueOf(params.get("classId").toString()) : null;
+        Long ptId = params.get("ptId") != null ? Long.valueOf(params.get("ptId").toString()) : null;
+        Integer durationMinutes = params.get("durationMinutes") != null ? Integer.valueOf(params.get("durationMinutes").toString()) : null;
+
+        if (memberId == null || dateStr == null || dateStr.isEmpty()) {
+            return errorResponse("缺少会员或日期参数");
+        }
+        Member member = memberMapper.selectById(memberId);
+        if (member == null) {
+            return errorResponse("会员不存在");
+        }
+        LocalDate date;
+        try {
+            date = LocalDate.parse(dateStr);
+        } catch (Exception e) {
+            return errorResponse("日期格式不正确");
+        }
+        // 核心原则：补签只能补过去日期，不能补签未来
+        if (!date.isBefore(LocalDate.now())) {
+            return errorResponse("只能补签过去的日期");
+        }
+        LocalDateTime dayStart = date.atStartOfDay();
+        LocalDateTime dayEnd = date.plusDays(1).atStartOfDay();
+        LocalDateTime checkTime = date.atTime(LocalTime.now());
+        int pointsAwarded = 0;
+
+        if ("normal".equals(type)) {
+            // 自助训练：同一天允许多次补签，不限制次数；积分仅每日前2次 ≥40分钟 的有效
+            CheckIn ci = new CheckIn();
+            ci.setMemberId(memberId);
+            ci.setCheckInTime(checkTime);
+            ci.setCheckInType("normal");
+            checkInMapper.insert(ci);
+            // 达标且每日前2次发放积分
+            if (durationMinutes != null && durationMinutes >= 40) {
+                ci.setCheckOutTime(checkTime.plusMinutes(durationMinutes));
+                checkInMapper.updateById(ci);
+                long dayCheckouts = checkInMapper.selectCount(new LambdaQueryWrapper<CheckIn>()
+                        .eq(CheckIn::getMemberId, memberId)
+                        .eq(CheckIn::getCheckInType, "normal")
+                        .isNotNull(CheckIn::getCheckOutTime)
+                        .ge(CheckIn::getCheckInTime, dayStart).lt(CheckIn::getCheckInTime, dayEnd));
+                if (dayCheckouts <= 2) {
+                    pointsAwarded = 1;
+                    pointsService.addPoints(memberId, 1, "NORMAL_TRAINING", ci.getId(), "自助训练积分(补签)");
+                }
+            }
+            ci.setPointsEarned(pointsAwarded);
+            checkInMapper.updateById(ci);
+        } else if ("class".equals(type)) {
+            if (classId == null) {
+                return errorResponse("团课补签请选择课程");
+            }
+            GroupClass gc = groupClassMapper.selectById(classId);
+            if (gc == null) {
+                return errorResponse("课程不存在");
+            }
+            // 校验该会员预约了该课程（仅排除已取消，不限制课程开始时间）
+            long bookingCnt = classBookingMapper.selectCount(new LambdaQueryWrapper<ClassBooking>()
+                    .eq(ClassBooking::getMemberId, memberId)
+                    .eq(ClassBooking::getClassId, classId)
+                    .in(ClassBooking::getStatus, "booked", "checked_in"));
+            if (bookingCnt == 0) {
+                return errorResponse("该会员未预约该课程或预约已取消");
+            }
+            long dup = checkInMapper.selectCount(new LambdaQueryWrapper<CheckIn>()
+                    .eq(CheckIn::getMemberId, memberId)
+                    .eq(CheckIn::getClassId, classId)
+                    .eq(CheckIn::getCheckInType, "class"));
+            if (dup > 0) {
+                return errorResponse("该会员已签到过该课程，请勿重复补签");
+            }
+            int pts = "paid".equals(gc.getType()) ? 10 : 1;
+            CheckIn ci = new CheckIn();
+            ci.setMemberId(memberId);
+            ci.setCheckInTime(checkTime);
+            ci.setCheckInType("class");
+            ci.setClassId(classId);
+            ci.setPointsEarned(pts);
+            checkInMapper.insert(ci);
+            pointsService.addPoints(memberId, pts, "CLASS_CHECKIN", classId, "团课签到(补签)");
+            pointsAwarded = pts;
+        } else if ("pt".equals(type)) {
+            if (ptId == null) {
+                return errorResponse("私教补签请选择预约");
+            }
+            PersonalTraining pt = personalTrainingMapper.selectById(ptId);
+            if (pt == null) {
+                return errorResponse("私教预约不存在");
+            }
+            if (!pt.getMemberId().equals(memberId)) {
+                return errorResponse("该预约不属于此会员");
+            }
+            if (!"scheduled".equals(pt.getStatus()) && !"ongoing".equals(pt.getStatus())) {
+                return errorResponse("该预约已取消或已完成，无法补签");
+            }
+            long dup = checkInMapper.selectCount(new LambdaQueryWrapper<CheckIn>()
+                    .eq(CheckIn::getPtId, ptId)
+                    .eq(CheckIn::getMemberId, memberId)
+                    .eq(CheckIn::getCheckInType, "pt")
+                    .eq(CheckIn::getRemark, "end"));
+            if (dup > 0) {
+                return errorResponse("该预约已私教签退，请勿重复补签");
+            }
+            CheckIn ci = new CheckIn();
+            ci.setMemberId(memberId);
+            ci.setPtId(ptId);
+            ci.setCheckInTime(checkTime);
+            ci.setCheckInType("pt");
+            ci.setRemark("end");
+            ci.setPointsEarned(10);
+            checkInMapper.insert(ci);
+            if ("scheduled".equals(pt.getStatus())) {
+                pt.setStatus("completed");
+                personalTrainingMapper.updateById(pt);
+            }
+            pointsService.addPoints(memberId, 10, "PT_COMPLETED", ptId, "私教完成(补签)");
+            pointsAwarded = 10;
+        } else {
+            return errorResponse("不支持的签到类型");
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "补签成功" + (pointsAwarded > 0 ? "，积分+" + pointsAwarded : "（未达积分条件）"));
+        result.put("memberName", member.getName());
+        result.put("pointsAwarded", pointsAwarded);
+        return result;
+    }
+
     // =============================================
     // 工具方法
     // =============================================
@@ -508,16 +672,17 @@ public class CheckInController {
         w.eq(CheckIn::getClassId, classId).eq(CheckIn::getMemberId, memberId).eq(CheckIn::getCheckInType, "class");
         if (checkInMapper.selectCount(w) > 0) return errorResponse("已签到，无需重复签到");
         // 记录签到
+        int pts = gc.getType() != null && "paid".equals(gc.getType()) ? 10 : 1;
         CheckIn ci = new CheckIn();
         ci.setMemberId(memberId);
         ci.setClassId(classId);
         ci.setCheckInTime(now);
         ci.setCheckInType("class");
         ci.setRemark("code");
+        ci.setPointsEarned(pts);
         checkInMapper.insert(ci);
         // 团课签到积分
         try {
-            int pts = gc.getType() != null && "paid".equals(gc.getType()) ? 10 : 1;
             pointsService.addPoints(memberId, pts, "CLASS_CHECKIN", classId, "团课签到码签到");
         } catch (Exception ignored) {}
         return successResponse("签到成功");
