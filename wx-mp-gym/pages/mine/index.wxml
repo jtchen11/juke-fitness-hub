@@ -52,12 +52,9 @@
     <view class="service-grid">
       <view class="service-item" bindtap="goMessage"><text class="service-icon">💬</text><text class="service-text">消息通知</text><view wx:if="{{unreadCount > 0}}" class="msg-badge">{{unreadCount > 99 ? '99+' : unreadCount}}</view></view>
       <view class="service-item" bindtap="goFaceCheckin"><text class="service-icon">🗣️</text><text class="service-text">人脸签到</text></view>
-      <view class="service-item" bindtap="goDiet">
-        <text class="service-icon">🍎</text>
-        <text class="service-name">饮食记录</text>
-      </view>
+
       <view class="service-item" bindtap="goPointsMall"><text class="service-icon">🎁</text><text class="service-text">积分商城</text></view>
-      <view class="service-item" bindtap="goDietRecord"><text class="service-icon">🥗</text><text class="service-text">饮食记录</text></view>
+      <view class="service-item" wx:if="{{dietRecordEnabled}}" bindtap="goDietRecord"><text class="service-icon">🥗</text><text class="service-text">饮食记录</text></view>
     </view>
 
     <!-- 个人数据 -->

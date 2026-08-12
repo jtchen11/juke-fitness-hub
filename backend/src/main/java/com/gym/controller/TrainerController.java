@@ -82,7 +82,7 @@ public class TrainerController {
         LambdaQueryWrapper<Trainer> wrapper = new LambdaQueryWrapper<>();
 
         if (keyword != null && !keyword.isEmpty()) {
-            wrapper.like(Trainer::getName, keyword);
+            wrapper.and(w -> w.like(Trainer::getName, keyword).or().like(Trainer::getPhone, keyword));
         }
         if (status != null && !status.isEmpty()) {
             wrapper.eq(Trainer::getStatus, status);
@@ -102,8 +102,16 @@ public class TrainerController {
         // ====== 关键改动：使用 MyBatis-Plus 分页 ======
         IPage<Trainer> pageResult = trainerMapper.selectPage(new Page<>(page, size), wrapper);
 
-        // 填充 bookingCount（保持原逻辑）
-        pageResult.getRecords().forEach(t -> t.setBookingCount(0));
+        // 填充 bookingCount + totalClasses（累计上课节数）
+        pageResult.getRecords().forEach(t -> {
+            t.setBookingCount(0);
+            long completed = personalTrainingMapper.selectCount(
+                new LambdaQueryWrapper<com.gym.entity.PersonalTraining>()
+                    .eq(com.gym.entity.PersonalTraining::getTrainerId, t.getId())
+                    .eq(com.gym.entity.PersonalTraining::getStatus, "completed")
+            );
+            t.setTotalClasses((int) completed);
+        });
 
         Map<String, Object> result = new HashMap<>();
         result.put("list", pageResult.getRecords());
@@ -339,9 +347,67 @@ public class TrainerController {
                 .le(GroupClass::getStartTime, monthEnd);
         long classCheckins = groupClassMapper.selectCount(gcWrapper);
 
+        // ====== 累计统计（供 PC 端详情抽屉使用） ======
+        // 累计上课（全部已完成私教节数）
+        LambdaQueryWrapper<com.gym.entity.PersonalTraining> totalPtWrapper = new LambdaQueryWrapper<>();
+        totalPtWrapper.eq(com.gym.entity.PersonalTraining::getTrainerId, trainerId)
+                .eq(com.gym.entity.PersonalTraining::getStatus, "completed");
+        long totalClasses = personalTrainingMapper.selectCount(totalPtWrapper);
+
+        // 本月上课（复用本月 completed 数）
+        long monthClasses = completedSessions;
+
+        // 学员数（该教练名下有过私教预约的会员数，去重）
+        List<com.gym.entity.PersonalTraining> allPts = personalTrainingMapper.selectList(
+                new LambdaQueryWrapper<com.gym.entity.PersonalTraining>()
+                        .eq(com.gym.entity.PersonalTraining::getTrainerId, trainerId)
+                        .isNotNull(com.gym.entity.PersonalTraining::getMemberId));
+        long studentCount = allPts.stream()
+                .map(com.gym.entity.PersonalTraining::getMemberId)
+                .distinct().count();
+
+        // 近期上课记录（私教 + 团课合并，按时间倒序取最近 5 条）
+        List<Map<String, Object>> recentRecords = new ArrayList<>();
+        personalTrainingMapper.selectList(
+                new LambdaQueryWrapper<com.gym.entity.PersonalTraining>()
+                        .eq(com.gym.entity.PersonalTraining::getTrainerId, trainerId)
+                        .orderByDesc(com.gym.entity.PersonalTraining::getAppointmentTime)
+                        .last("LIMIT 5")).forEach(pt -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("time", pt.getAppointmentTime() != null
+                    ? pt.getAppointmentTime().toString().replace("T", " ") : "");
+            item.put("name", pt.getPackageName() != null ? pt.getPackageName() : "私教课");
+            item.put("status", pt.getStatus());
+            item.put("statusText", getScheduleStatusText(pt.getStatus()));
+            item.put("type", "pt");
+            recentRecords.add(item);
+        });
+        groupClassMapper.selectList(
+                new LambdaQueryWrapper<GroupClass>()
+                        .eq(GroupClass::getTrainerId, trainerId)
+                        .orderByDesc(GroupClass::getStartTime)
+                        .last("LIMIT 5")).forEach(gc -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("time", gc.getStartTime() != null
+                    ? gc.getStartTime().toString().replace("T", " ") : "");
+            item.put("name", gc.getName() != null ? gc.getName() : "团课");
+            item.put("status", gc.getStatus());
+            item.put("statusText", getScheduleStatusText(gc.getStatus()));
+            item.put("type", "class");
+            recentRecords.add(item);
+        });
+        recentRecords.sort((a, b) -> ((String) b.get("time")).compareTo((String) a.get("time")));
+        while (recentRecords.size() > 5) {
+            recentRecords.remove(recentRecords.size() - 1);
+        }
+
         result.put("thisMonthSessions", completedSessions);
         result.put("thisMonthBookings", totalBookings);
         result.put("thisMonthCheckins", classCheckins);
+        result.put("totalClasses", totalClasses);
+        result.put("monthClasses", monthClasses);
+        result.put("studentCount", studentCount);
+        result.put("recentRecords", recentRecords);
         return result;
     }
 

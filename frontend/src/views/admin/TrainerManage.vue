@@ -39,11 +39,7 @@
               @change="loadTrainers"
               style="width:100%"
           >
-            <el-option label="减脂" value="减脂" />
-            <el-option label="增肌" value="增肌" />
-            <el-option label="康复" value="康复" />
-            <el-option label="塑形" value="塑形" />
-            <el-option label="力量" value="力量" />
+            <el-option v-for="sp in specialtyPresets" :key="sp" :label="sp" :value="sp" />
           </el-select>
         </el-col>
         <el-col :span="4">
@@ -93,41 +89,53 @@
           v-loading="loading"
           row-key="id"
       >
-        <el-table-column prop="id" label="ID" width="70" align="center" />
-        <el-table-column label="教练" width="160">
+        <el-table-column label="头像" width="80" align="center">
+          <template #default="{ row }">
+            <el-avatar :size="36" :src="row.avatar" :style="{ backgroundColor: getAvatarColor(row.name) }">
+              {{ row.name?.charAt(0) || '?' }}
+            </el-avatar>
+          </template>
+        </el-table-column>
+        <el-table-column label="姓名" width="140">
           <template #default="{ row }">
             <div style="display:flex;align-items:center;gap:10px;cursor:pointer" @click="showDetail(row)">
-              <el-avatar :size="40" :style="{ backgroundColor: getAvatarColor(row.name) }">
-                {{ row.name?.charAt(0) || '?' }}
-              </el-avatar>
-              <div>
-                <div style="font-weight:500;color:#409EFF">{{ row.name }}</div>
-                <div style="font-size:12px;color:#999">ID: {{ row.id }}</div>
-              </div>
+              <span style="font-weight:500;color:#409EFF">{{ row.name }}</span>
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="phone" label="手机号" width="130" />
-        <el-table-column prop="specialty" label="专长" width="130">
+        <el-table-column label="专长" min-width="180">
           <template #default="{ row }">
-            <el-tag size="small" type="success" effect="plain">
-              {{ row.specialty || '未设置' }}
+            <el-tag
+                v-for="sp in splitSpecialties(row.specialty)"
+                :key="sp"
+                size="small"
+                type="success"
+                effect="plain"
+                style="margin-right:6px"
+            >
+              {{ sp }}
             </el-tag>
+            <span v-if="!row.specialty" style="color:#999">未设置</span>
           </template>
         </el-table-column>
-        <el-table-column prop="pricePerHour" label="价格(元/小时)" width="140" align="center">
+        <el-table-column label="价格" width="120" align="center">
           <template #default="{ row }">
-            <span style="font-weight:bold;color:#E6A23C">¥{{ row.pricePerHour }}</span>
+            <span style="font-weight:bold;color:#E6A23C">{{ fmtPrice(row.pricePerHour) }}/小时</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100" align="center">
+        <el-table-column prop="totalClasses" label="累计上课" width="100" align="center">
+          <template #default="{ row }">
+            <span>{{ row.totalClasses ?? 0 }} 节</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small" effect="dark">
               {{ getStatusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <!-- ====== 操作列：增加【请假】按钮 ====== -->
         <el-table-column label="操作" width="300" fixed="right" align="center">
           <template #default="{ row }">
             <el-button size="small" type="info" plain @click="showDetail(row)">
@@ -163,7 +171,7 @@
     <el-dialog
         v-model="dialogVisible"
         :title="dialogTitle"
-        width="560px"
+        width="600px"
         @close="resetForm"
         destroy-on-close
     >
@@ -171,7 +179,7 @@
           :model="formData"
           :rules="formRules"
           ref="formRef"
-          label-width="100px"
+          label-width="120px"
       >
         <el-row :gutter="20">
           <el-col :span="12">
@@ -185,12 +193,18 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-form-item label="专长" prop="specialty">
+          <el-select
+              v-model="formData.specialty"
+              multiple
+              collapse-tags
+              placeholder="请选择专长（可多选）"
+              style="width:100%"
+          >
+            <el-option v-for="sp in specialtyPresets" :key="sp" :label="sp" :value="sp" />
+          </el-select>
+        </el-form-item>
         <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="专长" prop="specialty">
-              <el-input v-model="formData.specialty" placeholder="如：减脂塑形" />
-            </el-form-item>
-          </el-col>
           <el-col :span="12">
             <el-form-item label="价格(元/小时)" prop="pricePerHour">
               <el-input-number
@@ -202,14 +216,16 @@
               />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="状态" prop="status">
+              <el-select v-model="formData.status" placeholder="请选择状态" style="width:100%">
+                <el-option label="在职" value="active" />
+                <el-option label="休假" value="vacation" />
+                <el-option label="离职" value="resigned" />
+              </el-select>
+            </el-form-item>
+          </el-col>
         </el-row>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="formData.status" placeholder="请选择状态" style="width:100%">
-            <el-option label="在职" value="active" />
-            <el-option label="休假" value="vacation" />
-            <el-option label="离职" value="resigned" />
-          </el-select>
-        </el-form-item>
         <el-form-item label="个人简介" prop="intro">
           <el-input
               v-model="formData.intro"
@@ -232,26 +248,72 @@
         v-model="detailVisible"
         :title="detailTitle"
         direction="rtl"
-        size="450px"
+        size="480px"
         destroy-on-close
     >
-      <div v-if="detailData">
-        <div style="text-align:center;margin-bottom:24px">
-          <el-avatar :size="80" :style="{ backgroundColor: getAvatarColor(detailData.name), fontSize: '32px' }">
+      <div v-if="detailData" v-loading="detailLoading">
+        <!-- 顶部：头像 + 姓名 + 状态 -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+          <el-avatar :size="56" :src="detailData.avatar" :style="{ backgroundColor: getAvatarColor(detailData.name), fontSize: '24px' }">
             {{ detailData.name?.charAt(0) || '?' }}
           </el-avatar>
-          <h2 style="margin-top:12px">{{ detailData.name }}</h2>
-          <el-tag :type="getStatusType(detailData.status)" size="large">
-            {{ getStatusText(detailData.status) }}
-          </el-tag>
+          <div style="flex:1">
+            <div style="font-size:20px;font-weight:bold">{{ detailData.name }}</div>
+            <el-tag :type="getStatusType(detailData.status)" size="small" style="margin-top:6px">
+              {{ getStatusText(detailData.status) }}
+            </el-tag>
+          </div>
         </div>
+
+        <!-- 统计卡片：横向三列 -->
+        <el-row :gutter="12" style="margin-bottom:20px">
+          <el-col :span="8" v-for="sc in statCards" :key="sc.label">
+            <el-card shadow="hover" :body-style="{ padding: '14px 10px', textAlign: 'center' }">
+              <div style="font-size:22px;font-weight:bold;color:#4A6CF7">{{ sc.value }}</div>
+              <div style="font-size:12px;color:#999;margin-top:4px">{{ sc.label }}</div>
+            </el-card>
+          </el-col>
+        </el-row>
+
+        <!-- 基本信息 -->
         <el-descriptions :column="1" border>
           <el-descriptions-item label="手机号">{{ detailData.phone || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="专长">{{ detailData.specialty || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="价格(元/小时)">¥{{ detailData.pricePerHour }}</el-descriptions-item>
-          <el-descriptions-item label="个人简介">{{ detailData.intro || '暂无简介' }}</el-descriptions-item>
+          <el-descriptions-item label="专长">
+            <el-tag
+                v-for="sp in splitSpecialties(detailData.specialty)"
+                :key="sp"
+                size="small"
+                type="success"
+                effect="plain"
+                style="margin-right:6px"
+            >{{ sp }}</el-tag>
+            <span v-if="!detailData.specialty">未设置</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="价格(元/小时)">{{ fmtPrice(detailData.pricePerHour) }}</el-descriptions-item>
         </el-descriptions>
-        <div style="margin-top:16px;text-align:right">
+
+        <!-- 个人简介 -->
+        <div style="margin-top:16px">
+          <div class="section-title">📝 个人简介</div>
+          <div style="color:#606266;line-height:1.7">{{ detailData.intro || '暂无简介' }}</div>
+        </div>
+
+        <!-- 近期上课记录 -->
+        <div style="margin-top:16px">
+          <div class="section-title">🕒 近期上课记录</div>
+          <div v-if="recentRecords.length === 0" style="color:#999;padding:8px 0">暂无记录</div>
+          <div v-for="(rec, i) in recentRecords" :key="i" class="recent-row">
+            <span style="color:#999;font-size:12px;flex-shrink:0">{{ rec.time }}</span>
+            <span style="flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              {{ rec.type === 'pt' ? '私教' : '团课' }} · {{ rec.name }}
+            </span>
+            <el-tag :type="getStatusType(rec.status)" size="small" effect="plain">
+              {{ rec.statusText || rec.status }}
+            </el-tag>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;text-align:right">
           <el-button type="primary" @click="handleEdit(detailData); detailVisible = false">
             编辑信息
           </el-button>
@@ -259,7 +321,7 @@
       </div>
     </el-drawer>
 
-    <!-- ====== 新增：请假对话框 ====== -->
+    <!-- ====== 请假对话框 ====== -->
     <el-dialog
         v-model="leaveDialogVisible"
         title="📅 教练请假设置"
@@ -305,9 +367,16 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download, Plus } from '@element-plus/icons-vue'
+
+// ============ 专长预设 ============
+const specialtyPresets = [
+  '减脂塑形', '增肌力量', '康复拉伸', '功能性训练',
+  '孕产康复', '瑜伽', '普拉提', '体能训练'
+]
 
 // ============ 统计数据 ============
 const stats = ref([
@@ -319,7 +388,6 @@ const stats = ref([
 
 // ============ 列表数据 ============
 const tableData = ref([])
-const allData = ref([])
 const total = ref(0)
 const pageNum = ref(1)
 const pageSize = ref(5)
@@ -339,7 +407,7 @@ const formData = ref({
   id: null,
   name: '',
   phone: '',
-  specialty: '',
+  specialty: [],
   pricePerHour: 300,
   status: 'active',
   intro: ''
@@ -349,6 +417,13 @@ const formData = ref({
 const detailVisible = ref(false)
 const detailTitle = ref('教练详情')
 const detailData = ref(null)
+const detailLoading = ref(false)
+const recentRecords = ref([])
+const statCards = ref([
+  { label: '累计上课', value: 0 },
+  { label: '本月上课', value: 0 },
+  { label: '学员数', value: 0 }
+])
 
 // ============ 请假相关 ============
 const leaveDialogVisible = ref(false)
@@ -424,7 +499,7 @@ const getAvatarColor = (name) => {
 }
 
 const getStatusType = (status) => {
-  const map = { active: 'success', vacation: 'warning', resigned: 'danger' }
+  const map = { active: 'success', vacation: 'warning', resigned: 'info' }
   return map[status] || 'info'
 }
 
@@ -433,24 +508,31 @@ const getStatusText = (status) => {
   return map[status] || '未知'
 }
 
+const splitSpecialties = (specialty) => {
+  if (!specialty) return []
+  return String(specialty).split(',').map(s => s.trim()).filter(Boolean)
+}
+
+const fmtPrice = (price) => {
+  if (price === null || price === undefined) return '¥0'
+  return '¥' + Number(price).toFixed(2).replace(/\.00$/, '')
+}
+
 // ============ 加载数据 ============
-// 替换原有的 loadTrainers 方法
 const loadTrainers = async () => {
   loading.value = true;
   try {
     const res = await axios.get('/api/trainers', {
       params: {
-        page: pageNum.value,          // ← 新增
-        size: pageSize.value,         // ← 新增
+        page: pageNum.value,
+        size: pageSize.value,
         keyword: searchKeyword.value || undefined,
         specialties: filterSpecialties.value.length ? filterSpecialties.value.join(',') : undefined,
         status: filterStatus.value || undefined
       }
     });
-    // ====== 直接使用后端返回的分页数据 ======
     tableData.value = res.data.list || [];
     total.value = res.data.total || 0;
-
   } catch (error) {
     console.error('加载教练失败', error);
     ElMessage.error('加载教练失败');
@@ -459,18 +541,19 @@ const loadTrainers = async () => {
   }
 };
 
-const updateStats = (data) => {
-  const totalCount = data.length
-  const fatLoss = data.filter(t => t.specialty?.includes('减脂')).length
-  const muscleGain = data.filter(t => t.specialty?.includes('增肌')).length
-  const rehab = data.filter(t => t.specialty?.includes('康复')).length
-
-  stats.value = [
-    { title: '总教练', value: totalCount, icon: 'UserFilled', color: '#409EFF' },
-    { title: '减脂专长', value: fatLoss, icon: 'Star', color: '#67C23A' },
-    { title: '增肌专长', value: muscleGain, icon: 'Star', color: '#E6A23C' },
-    { title: '康复专长', value: rehab, icon: 'Star', color: '#F56C6C' }
-  ]
+const loadStats = async () => {
+  try {
+    const res = await axios.get('/api/dashboard/coach-stats')
+    const specialties = res.data.specialties || {}
+    stats.value = [
+      { title: '总教练', value: res.data.total || 0, icon: 'UserFilled', color: '#409EFF' },
+      { title: '减脂专长', value: specialties['减脂塑形'] || 0, icon: 'Star', color: '#67C23A' },
+      { title: '增肌专长', value: specialties['增肌力量'] || 0, icon: 'Star', color: '#E6A23C' },
+      { title: '康复专长', value: specialties['康复拉伸'] || 0, icon: 'Star', color: '#F56C6C' }
+    ]
+  } catch (error) {
+    console.error('加载教练统计失败', error)
+  }
 }
 
 const resetSearch = () => {
@@ -483,35 +566,63 @@ const resetSearch = () => {
 
 const refresh = () => {
   loadTrainers()
+  loadStats()
 }
 
 // ============ 详情 ============
-const showDetail = (row) => {
-  detailData.value = row
+const showDetail = async (row) => {
+  detailData.value = { ...row }
   detailTitle.value = `${row.name} 的详情`
   detailVisible.value = true
+  detailLoading.value = true
+  try {
+    const [detailRes, statsRes] = await Promise.all([
+      axios.get(`/api/trainers/${row.id}`),
+      axios.get(`/api/trainers/${row.id}/stats`)
+    ])
+    detailData.value = { ...detailData.value, ...(detailRes.data || {}) }
+    const st = statsRes.data || {}
+    statCards.value = [
+      { label: '累计上课', value: st.totalClasses ?? 0 },
+      { label: '本月上课', value: st.monthClasses ?? st.thisMonthSessions ?? 0 },
+      { label: '学员数', value: st.studentCount ?? 0 }
+    ]
+    recentRecords.value = st.recentRecords || []
+  } catch (error) {
+    console.error('加载教练详情失败', error)
+    ElMessage.error('加载教练详情失败')
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 // ============ 添加/编辑 ============
-const handleAdd = () => {
-  isEdit.value = false
-  dialogTitle.value = '添加教练'
+const resetForm = () => {
   formData.value = {
     id: null,
     name: '',
     phone: '',
-    specialty: '',
+    specialty: [],
     pricePerHour: 300,
     status: 'active',
     intro: ''
   }
+}
+
+const handleAdd = () => {
+  isEdit.value = false
+  dialogTitle.value = '添加教练'
+  resetForm()
   dialogVisible.value = true
 }
 
 const handleEdit = (row) => {
   isEdit.value = true
   dialogTitle.value = '编辑教练'
-  formData.value = { ...row }
+  formData.value = {
+    ...row,
+    specialty: splitSpecialties(row.specialty)
+  }
   dialogVisible.value = true
 }
 
@@ -525,32 +636,25 @@ const saveTrainer = async () => {
 
   saving.value = true
   try {
+    const payload = {
+      ...formData.value,
+      specialty: (formData.value.specialty || []).join(',')
+    }
     if (isEdit.value) {
-      await axios.put(`/api/trainers/${formData.value.id}`, formData.value)
+      await axios.put(`/api/trainers/${formData.value.id}`, payload)
       ElMessage.success('更新成功')
     } else {
-      await axios.post('/api/trainers', formData.value)
+      await axios.post('/api/trainers', payload)
       ElMessage.success('添加成功')
     }
     dialogVisible.value = false
     loadTrainers()
+    loadStats()
   } catch (error) {
     console.error('保存失败', error)
     ElMessage.error('保存失败，请重试')
   } finally {
     saving.value = false
-  }
-}
-
-const resetForm = () => {
-  formData.value = {
-    id: null,
-    name: '',
-    phone: '',
-    specialty: '',
-    pricePerHour: 300,
-    status: 'active',
-    intro: ''
   }
 }
 
@@ -565,6 +669,7 @@ const handleDelete = (row) => {
       await axios.delete(`/api/trainers/${row.id}`)
       ElMessage.success('删除成功')
       loadTrainers()
+      loadStats()
     } catch (error) {
       console.error('删除失败', error)
       ElMessage.error('删除失败')
@@ -591,8 +696,12 @@ const exportTrainers = async () => {
 
 // ============ 生命周期 ============
 onMounted(() => {
+  const route = useRoute()
+  if (route.query.keyword) {
+    searchKeyword.value = String(route.query.keyword)
+  }
   loadTrainers()
-
+  loadStats()
 })
 </script>
 
@@ -640,5 +749,21 @@ onMounted(() => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+.section-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.recent-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed #eee;
+}
+.recent-row:last-child {
+  border-bottom: none;
+}
+:deep(.el-form-item__label) {
+  white-space: nowrap;
 }
 </style>

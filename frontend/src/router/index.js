@@ -110,6 +110,12 @@ const routes = [
                 component: () => import('@/views/admin/SystemSettings.vue'),
                 meta: { title: '功能配置' }
             },
+            {
+                path: 'messages',
+                name: 'AdminMessages',
+                component: () => import('@/views/admin/Messages.vue'),
+                meta: { title: '消息管理' }
+            },
             { path: '', redirect: '/admin/dashboard' }
         ]
     },

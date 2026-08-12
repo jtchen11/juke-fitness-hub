@@ -1,3 +1,4 @@
+
 package com.gym.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -23,4 +24,7 @@ public class Trainer {
 
     @TableField(exist = false)
     private Integer bookingCount;  // 暂时默认0
+
+    @TableField(exist = false)
+    private Integer totalClasses;  // 累计上课节数（status=completed）
 }

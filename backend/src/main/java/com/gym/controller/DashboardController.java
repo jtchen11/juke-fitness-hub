@@ -258,6 +258,36 @@ public class DashboardController {
         return result;
     }
 
+    /** 教练统计：在职教练总数 + 按专长分组数量 */
+    @GetMapping("/coach-stats")
+    public Map<String, Object> getCoachStats() {
+        Map<String, Object> result = new HashMap<>();
+        List<Trainer> activeTrainers = trainerMapper.selectList(
+                new LambdaQueryWrapper<Trainer>().eq(Trainer::getStatus, "active"));
+        result.put("total", activeTrainers.size());
+
+        int fatLoss = 0, muscleGain = 0, rehab = 0, other = 0;
+        for (Trainer t : activeTrainers) {
+            String specialty = t.getSpecialty() == null ? "" : t.getSpecialty();
+            boolean matched = false;
+            for (String tag : specialty.split(",")) {
+                String tt = tag.trim();
+                if (tt.isEmpty()) continue;
+                if (tt.contains("减脂")) { fatLoss++; matched = true; }
+                else if (tt.contains("增肌")) { muscleGain++; matched = true; }
+                else if (tt.contains("康复")) { rehab++; matched = true; }
+            }
+            if (!matched) other++;
+        }
+        Map<String, Object> specialties = new LinkedHashMap<>();
+        specialties.put("减脂塑形", fatLoss);
+        specialties.put("增肌力量", muscleGain);
+        specialties.put("康复拉伸", rehab);
+        specialties.put("其他", other);
+        result.put("specialties", specialties);
+        return result;
+    }
+
     @GetMapping("/hot-classes")
     public List<Map<String, Object>> getHotClasses() {
         List<GroupClass> classes = groupClassMapper.selectList(null);

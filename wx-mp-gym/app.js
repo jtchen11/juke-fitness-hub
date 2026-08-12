@@ -13,10 +13,13 @@ App({
     token: "",
     userInfo: null,
     apiBaseUrl: "http://localhost:8080",
-    appMode: "member"
+    appMode: "member",
+    systemConfig: {},
+    systemConfigLoaded: false
   },
 
   onLaunch() {
+    this.loadSystemConfig();
 
     const token = wx.getStorageSync("token");
 
@@ -67,6 +70,53 @@ App({
 
 
   // 閸掑洦宕查崚棰佺窗閸涙ɑ膩瀵?
+
+  // ====== 系统功能开关配置 ======
+  // 加载配置到 globalData；请求失败时使用默认值（全部开启），不影响正常使用
+  loadSystemConfig(callback) {
+    var self = this;
+    request.get("/api/system/config", {}, function(res) {
+      if (res && typeof res === "object") {
+        self.globalData.systemConfig = res;
+      } else {
+        self.globalData.systemConfig = self.getDefaultSystemConfig();
+      }
+      self.globalData.systemConfigLoaded = true;
+      typeof callback === "function" && callback();
+    }, function() {
+      // 请求失败：默认全部开启
+      self.globalData.systemConfig = self.getDefaultSystemConfig();
+      self.globalData.systemConfigLoaded = true;
+      typeof callback === "function" && callback();
+    });
+  },
+
+  // 默认配置：全部开启
+  getDefaultSystemConfig() {
+    return {
+      DIET_RECORD_ENABLED: "1",
+      FASTING_16_8_ENABLED: "1",
+      CARB_CYCLE_ENABLED: "1",
+      VISITOR_EXPERIENCE_ENABLED: "1"
+    };
+  },
+
+  // 配置是否开启：'1'/'true'/'ON' 视为开启；未配置时默认开启
+  isConfigEnabled(key) {
+    var cfg = this.globalData.systemConfig || {};
+    var v = cfg[key];
+    if (v === undefined || v === null || v === "") return true;
+    return v === "1" || v === "true" || v === "ON" || v === "on" || v === "yes";
+  },
+
+  // 确保配置已加载（未加载则拉取一次并等待完成）
+  ensureSystemConfig(callback) {
+    if (this.globalData.systemConfigLoaded) {
+      typeof callback === "function" && callback();
+      return;
+    }
+    this.loadSystemConfig(callback);
+  },
 
   switchToMemberMode() {
 
