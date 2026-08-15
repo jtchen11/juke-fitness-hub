@@ -2,6 +2,8 @@ package com.gym.ai.tool;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gym.ai.model.PaymentAction;
+import com.gym.ai.model.ToolResult;
 import com.gym.entity.*;
 import com.gym.mapper.*;
 import com.gym.service.GroupClassService;
@@ -56,27 +58,27 @@ public class GymTools {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Tool("查询指定时间范围内的可预约团课课程列表，参数：开始时间(yyyy-MM-dd HH:mm:ss)，结束时间(yyyy-MM-dd HH:mm:ss)")
-    public String queryAvailableClasses(String startTime, String endTime) {
+    public ToolResult<String> queryAvailableClasses(String startTime, String endTime) {
         return queryAvailableClasses(startTime, endTime, null);
     }
 
-    public String queryAvailableClasses(String startTime, String endTime, String type) {
+    public ToolResult<String> queryAvailableClasses(String startTime, String endTime, String type) {
         return queryAvailableClasses(startTime, endTime, type, null);
     }
 
-    public String queryAvailableClasses(String startTime, String endTime, String type, Boolean allowVisitor) {
+    public ToolResult<String> queryAvailableClasses(String startTime, String endTime, String type, Boolean allowVisitor) {
         try {
             LocalDateTime start = LocalDateTime.parse(startTime, FORMATTER);
             LocalDateTime end = LocalDateTime.parse(endTime, FORMATTER);
             List<GroupClass> classes = groupClassService.getAvailableClasses(start, end, type, allowVisitor);
 
             if (classes.isEmpty()) {
-                return "【最终回答】在 " + startTime + " 到 " + endTime + " 范围内没有可预约的团课。建议扩大时间范围或选择其他日期。无需继续调用工具。";
+                return ToolResult.success("在 " + startTime + " 到 " + endTime + " 范围内没有可预约的团课。建议扩大时间范围或选择其他日期。无需继续调用工具。");
             }
 
             StringBuilder sb = new StringBuilder();
             boolean isFreeFilter = "free".equals(type);
-            sb.append("【最终回答】共找到 ").append(classes.size()).append(isFreeFilter ? " 门免费可预约团课：\n" : " 门可预约团课：\n");
+            sb.append("共找到 ").append(classes.size()).append(isFreeFilter ? " 门免费可预约团课：\n" : " 门可预约团课：\n");
             java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("MM月dd日 HH:mm");
             for (int i = 0; i < classes.size(); i++) {
                 GroupClass gc = classes.get(i);
@@ -95,13 +97,13 @@ public class GymTools {
                         .append("（剩余 ").append(remaining).append(" 人）\n");
             }
             sb.append("\n请根据以上信息为用户推荐合适的团课。无需继续调用工具。");
-            return sb.toString();
+            return ToolResult.success(sb.toString());
         } catch (Exception e) {
-            return "【最终回答】查询团课失败，时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式。示例：2026-06-28 09:00:00。无需继续调用工具。";
+            return ToolResult.fail("查询团课失败，时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式。示例：2026-06-28 09:00:00。无需继续调用工具。");
         }
     }
 
-    public String recommendGroupClasses(String startTime, String endTime) {
+    public ToolResult<String> recommendGroupClasses(String startTime, String endTime) {
         try {
             LocalDateTime start = LocalDateTime.parse(startTime, FORMATTER);
             LocalDateTime end = LocalDateTime.parse(endTime, FORMATTER);
@@ -117,7 +119,7 @@ public class GymTools {
                 }
             }
             if (available.isEmpty()) {
-                return "【最终回答】当前时间段没有可推荐的团课（课程均已满员）。无需继续调用工具。";
+                return ToolResult.success("当前时间段没有可推荐的团课（课程均已满员）。无需继续调用工具。");
             }
 
             // 按预约人数降序排序，取前3门
@@ -130,7 +132,7 @@ public class GymTools {
             java.util.List<GroupClass> top = available.subList(0, limit);
 
             StringBuilder sb = new StringBuilder();
-            sb.append("【最终回答】为您推荐 ").append(top.size()).append(" 门热门团课：\n");
+            sb.append("为您推荐 ").append(top.size()).append(" 门热门团课：\n");
             java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("MM月dd日 HH:mm");
             for (int i = 0; i < top.size(); i++) {
                 GroupClass gc = top.get(i);
@@ -149,44 +151,44 @@ public class GymTools {
                         .append("（已约 ").append(gc.getEnrolled()).append(" 人，剩余 ").append(remaining).append(" 人）\n");
             }
             sb.append("\n如需预约请告诉我课程名称。无需继续调用工具。");
-            return sb.toString();
+            return ToolResult.success(sb.toString());
         } catch (Exception e) {
-            return "【最终回答】推荐团课失败，时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式。无需继续调用工具。";
+            return ToolResult.fail("推荐团课失败，时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式。无需继续调用工具。");
         }
     }
 
     @Tool("为会员预约团课，参数：会员ID，课程ID")
-    public String bookGroupClass(Long memberId, Long classId) {
+    public ToolResult<String> bookGroupClass(Long memberId, Long classId) {
         try {
             if (memberId == null || memberId <= 0) {
-                return "【最终回答】预约失败：会员ID无效，请确认后重试。无需继续调用工具。";
+                return ToolResult.fail("预约失败：会员ID无效，请确认后重试。无需继续调用工具。");
             }
             if (classId == null || classId <= 0) {
-                return "【最终回答】预约失败：课程ID无效，请确认后重试。无需继续调用工具。";
+                return ToolResult.fail("预约失败：课程ID无效，请确认后重试。无需继续调用工具。");
             }
             String result = groupClassService.bookClass(memberId, classId);
             if (result != null && result.contains("成功")) {
                                 com.gym.entity.Member m = memberMapper.selectById(memberId);
                 if (m != null && m.isVisitor()) {
-                    return "【最终回答】预约成功！您已使用免费体验券预约课程，剩余体验次数：0。无需继续调用工具。";
+                    return ToolResult.success("预约成功！您已使用免费体验券预约课程，剩余体验次数：0。无需继续调用工具。");
                 }
-                return "【最终回答】" + result + "无需继续调用工具。";
+                return ToolResult.success(result + "无需继续调用工具。");
             } else {
-                return "【最终回答】预约失败：" + (result != null ? result : "未知错误，请重试") + "。无需继续调用工具。";
+                return ToolResult.fail("预约失败：" + (result != null ? result : "未知错误，请重试") + "。无需继续调用工具。");
             }
         } catch (Exception e) {
-            return "【最终回答】预约失败，系统异常：" + e.getMessage() + "。无需继续调用工具。";
+            return ToolResult.fail("预约失败，系统异常：" + e.getMessage() + "。无需继续调用工具。");
         }
     }
 
     @Tool("预约私教课，参数：会员ID，教练ID，预约时间(yyyy-MM-dd HH:mm:ss)，时长(分钟，默认60)")
-    public String bookPersonalTraining(Long memberId, Long trainerId, String appointmentTime, Integer duration) {
+    public ToolResult<String> bookPersonalTraining(Long memberId, Long trainerId, String appointmentTime, Integer duration) {
         try {
             if (memberId == null || memberId <= 0) {
-                return "【最终回答】预约失败：会员ID无效，请确认后重试。无需继续调用工具。";
+                return ToolResult.fail("预约失败：会员ID无效，请确认后重试。无需继续调用工具。");
             }
             if (trainerId == null || trainerId <= 0) {
-                return "【最终回答】预约失败：教练ID无效，请确认后重试。无需继续调用工具。";
+                return ToolResult.fail("预约失败：教练ID无效，请确认后重试。无需继续调用工具。");
             }
             LocalDateTime time = LocalDateTime.parse(appointmentTime, FORMATTER);
             if (duration == null || duration <= 0) {
@@ -197,21 +199,21 @@ public class GymTools {
             if (result != null && result.startsWith("私教预约成功")) {
                 Trainer trainer = trainerMapper.selectById(trainerId);
                 String trainerName = (trainer != null) ? trainer.getName() : "该教练";
-                return "【最终回答】" + result + "。已为您预约 " + trainerName + " 的课程，时间：" + appointmentTime + "。无需继续调用工具。";
+                return ToolResult.success(result + "。已为您预约 " + trainerName + " 的课程，时间：" + appointmentTime + "。无需继续调用工具。");
             } else {
-                return "【最终回答】预约失败：" + (result != null ? result : "未知错误，请重试") + "。\n请检查：1) 教练是否在当天请假 2) 该时段是否已被预约 3) 选择其他时间再试。无需继续调用工具。";
+                return ToolResult.fail("预约失败：" + (result != null ? result : "未知错误，请重试") + "。\n请检查：1) 教练是否在当天请假 2) 该时段是否已被预约 3) 选择其他时间再试。无需继续调用工具。");
             }
         } catch (Exception e) {
-            return "【最终回答】预约失败，时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式。示例：2026-06-28 14:00:00。无需继续调用工具。";
+            return ToolResult.fail("预约失败，时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式。示例：2026-06-28 14:00:00。无需继续调用工具。");
         }
     }
 
     @Tool("查询所有教练列表")
-    public String listAllTrainers() {
+    public ToolResult<String> listAllTrainers() {
         try {
             List<Trainer> trainers = trainerMapper.selectList(null);
             if (trainers == null || trainers.isEmpty()) {
-                return "【最终回答】暂无教练信息。无需继续调用工具。";
+                return ToolResult.success("暂无教练信息。无需继续调用工具。");
             }
             java.util.List<Trainer> activeTrainers = new java.util.ArrayList<>();
             for (Trainer t : trainers) {
@@ -220,10 +222,10 @@ public class GymTools {
                 }
             }
             if (activeTrainers.isEmpty()) {
-                return "【最终回答】暂无在职教练信息。无需继续调用工具。";
+                return ToolResult.success("暂无在职教练信息。无需继续调用工具。");
             }
             StringBuilder sb = new StringBuilder();
-            sb.append("【最终回答】共 ").append(activeTrainers.size()).append(" 位在职教练：\n");
+            sb.append("共 ").append(activeTrainers.size()).append(" 位在职教练：\n");
             for (int i = 0; i < activeTrainers.size(); i++) {
                 Trainer t = activeTrainers.get(i);
                 sb.append(i + 1).append(". ").append(t.getName())
@@ -232,25 +234,25 @@ public class GymTools {
                         .append("，状态：在职\n");
             }
             sb.append("无需继续调用工具。");
-            return sb.toString();
+            return ToolResult.success(sb.toString());
         } catch (Exception e) {
-            return "【最终回答】获取教练列表异常：" + e.getMessage() + "。无需继续调用工具。";
+            return ToolResult.fail("获取教练列表异常：" + e.getMessage() + "。无需继续调用工具。");
         }
     }
 
     @Tool("根据会员等级和体测数据推荐适合的教练，参数：会员ID")
-    public String recommendTrainerByLevel(Long memberId) {
+    public ToolResult<String> recommendTrainerByLevel(Long memberId) {
         try {
             if (memberId == null || memberId <= 0) {
-                return "【最终回答】推荐失败：会员ID无效，请确认后重试。无需继续调用工具。";
+                return ToolResult.fail("推荐失败：会员ID无效，请确认后重试。无需继续调用工具。");
             }
             Member member = memberMapper.selectById(memberId);
             if (member == null) {
-                return "【最终回答】会员（ID：" + memberId + "）不存在，请确认会员ID是否正确。无需继续调用工具。";
+                return ToolResult.fail("会员（ID：" + memberId + "）不存在，请确认会员ID是否正确。无需继续调用工具。");
             }
             // P2-8: 访客拦截
             if (member.isVisitor()) {
-                return "【最终回答】访客暂不支持教练推荐功能，请注册会员后再使用。无需继续调用工具。";
+                return ToolResult.fail("访客暂不支持教练推荐功能，请注册会员后再使用。无需继续调用工具。");
             }
             String level = member.getLevel();
             if (level == null) level = "普通会员";
@@ -286,7 +288,7 @@ public class GymTools {
             }
             java.util.List<Trainer> trainers = trainerMapper.selectList(tw);
             StringBuilder sb = new StringBuilder();
-            sb.append("【最终回答】当前会员等级：").append(level);
+            sb.append("当前会员等级：").append(level);
             if (ft != null && ft.getBodyFatPercent() != null) {
                 sb.append("，体脂率：").append(ft.getBodyFatPercent()).append("%");
             }
@@ -304,16 +306,16 @@ public class GymTools {
                 }
             }
             sb.append("以上推荐仅供参考，具体可根据会员需求调整。无需继续调用工具。");
-            return sb.toString();
+            return ToolResult.success(sb.toString());
         } catch (Exception e) {
-            return "【最终回答】推荐失败，系统异常：" + e.getMessage() + "。无需继续调用工具。";
+            return ToolResult.fail("推荐失败，系统异常：" + e.getMessage() + "。无需继续调用工具。");
         }
     }
 
     @Tool("根据会员最近的体测数据生成锻炼建议和重点锻炼部位，参数：会员ID（从登录信息中获取）")
-    public String generateWorkoutAdvice(Long memberId) {
+    public ToolResult<String> generateWorkoutAdvice(Long memberId) {
         if (memberId == null || memberId <= 0) {
-            return "【最终回答】查询失败：会员ID无效，无法查询体测数据。请确认当前用户已登录。无需继续调用工具。";
+            return ToolResult.fail("查询失败：会员ID无效，无法查询体测数据。请确认当前用户已登录。无需继续调用工具。");
         }
 
         try {
@@ -324,12 +326,12 @@ public class GymTools {
             List<FitnessTest> tests = fitnessTestMapper.selectList(wrapper);
 
             if (tests == null || tests.isEmpty()) {
-                return "【最终回答】会员（ID：" + memberId + "）暂无体测数据。建议联系前台预约体测，数据录入后再查询。无需继续调用工具。";
+                return ToolResult.success("会员（ID：" + memberId + "）暂无体测数据。建议联系前台预约体测，数据录入后再查询。无需继续调用工具。");
             }
 
             FitnessTest latest = tests.get(0);
             StringBuilder advice = new StringBuilder();
-            advice.append("【最终回答】根据最新体测数据（").append(latest.getTestDate()).append("）：\n");
+            advice.append("根据最新体测数据（").append(latest.getTestDate()).append("）：\n");
 
             // 处理 BigDecimal 类型转换
             BigDecimal weightKg = latest.getWeightKg();
@@ -375,21 +377,21 @@ public class GymTools {
             }
 
             advice.append("\n以上建议仅供参考，具体训练计划请咨询专业教练。无需继续调用工具。");
-            return advice.toString();
+            return ToolResult.success(advice.toString());
         } catch (Exception e) {
-            return "【最终回答】体测数据分析异常：" + e.getMessage() + "，请稍后重试。无需继续调用工具。";
+            return ToolResult.fail("体测数据分析异常：" + e.getMessage() + "，请稍后重试。无需继续调用工具。");
         }
     }
 
     // ====== 新增：生成一周训练计划骨架（JSON格式） ======
         @Tool("根据会员体测数据动态生成一周训练计划骨架（JSON格式），体脂高增加有氧、肌肉量低增加力量")
-    public String generateWorkoutPlanSkeleton(Long memberId) {
+    public ToolResult<String> generateWorkoutPlanSkeleton(Long memberId) {
         if (memberId == null || memberId <= 0) {
-            return "{\"error\": \"会员ID无效\"}";
+            return ToolResult.fail("{\"error\": \"会员ID无效\"}");
         }
         Member member = memberMapper.selectById(memberId);
         if (member == null) {
-            return "{\"error\": \"未找到该会员\"}";
+            return ToolResult.fail("{\"error\": \"未找到该会员\"}");
         }
 
         FitnessTest latest = getLatestFitnessTest(memberId);
@@ -528,19 +530,19 @@ public class GymTools {
         plan.put("trainingPrinciples", principles);
 
         try {
-            return objectMapper.writeValueAsString(plan);
+            return ToolResult.success(objectMapper.writeValueAsString(plan));
         } catch (Exception e) {
-            return "{\"error\": \"生成训练计划失败：" + e.getMessage() + "\"}";
+            return ToolResult.fail("{\"error\": \"生成训练计划失败：" + e.getMessage() + "\"}");
         }
     }
 
-public String generateMealPlanSkeleton(Long memberId) {
+public ToolResult<String> generateMealPlanSkeleton(Long memberId) {
         if (memberId == null || memberId <= 0) {
-            return "{\"error\": \"会员ID无效\"}";
+            return ToolResult.fail("{\"error\": \"会员ID无效\"}");
         }
         Member member = memberMapper.selectById(memberId);
         if (member == null) {
-            return "{\"error\": \"未找到该会员\"}";
+            return ToolResult.fail("{\"error\": \"未找到该会员\"}");
         }
 
         FitnessTest latest = getLatestFitnessTest(memberId);
@@ -598,17 +600,17 @@ public String generateMealPlanSkeleton(Long memberId) {
         plan.put("weeklyMeals", weeklyMeals);
 
         try {
-            return objectMapper.writeValueAsString(plan);
+            return ToolResult.success(objectMapper.writeValueAsString(plan));
         } catch (Exception e) {
-            return "{\"error\": \"生成饮食计划失败：" + e.getMessage() + "\"}";
+            return ToolResult.fail("{\"error\": \"生成饮食计划失败：" + e.getMessage() + "\"}");
         }
     }
 
     // ======================== 高优先级工具方法 ========================
 
     @Tool("查询当前会员已预约的私教课列表（待上课和已完成）")
-    public String queryMyPTBookings(@Param("memberId") Long memberId) {
-        if (memberId == null || memberId <= 0) return "请先登录。";
+    public ToolResult<String> queryMyPTBookings(@Param("memberId") Long memberId) {
+        if (memberId == null || memberId <= 0) return ToolResult.fail("请先登录。");
 
         LambdaQueryWrapper<PersonalTraining> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PersonalTraining::getMemberId, memberId)
@@ -616,7 +618,7 @@ public String generateMealPlanSkeleton(Long memberId) {
                 .orderByDesc(PersonalTraining::getAppointmentTime);
         List<PersonalTraining> list = personalTrainingMapper.selectList(wrapper);
 
-        if (list.isEmpty()) return "您目前没有私教预约记录。";
+        if (list.isEmpty()) return ToolResult.success("您目前没有私教预约记录。");
 
         StringBuilder sb = new StringBuilder("📋 您的私教预约记录如下：\n");
         for (int i = 0; i < list.size(); i++) {
@@ -637,12 +639,12 @@ public String generateMealPlanSkeleton(Long memberId) {
                     
                     .append("\n");
         }
-        return sb.toString();
+        return ToolResult.success(sb.toString());
     }
 
     @Tool("查询当前会员已报名的团课列表")
-    public String queryMyClassBookings(@Param("memberId") Long memberId) {
-        if (memberId == null || memberId <= 0) return "请先登录。";
+    public ToolResult<String> queryMyClassBookings(@Param("memberId") Long memberId) {
+        if (memberId == null || memberId <= 0) return ToolResult.fail("请先登录。");
 
         LambdaQueryWrapper<ClassBooking> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ClassBooking::getMemberId, memberId)
@@ -650,7 +652,7 @@ public String generateMealPlanSkeleton(Long memberId) {
                 .orderByDesc(ClassBooking::getBookingTime);
         List<ClassBooking> bookings = classBookingMapper.selectList(wrapper);
 
-        if (bookings.isEmpty()) return "您目前没有团课报名记录。";
+        if (bookings.isEmpty()) return ToolResult.success("您目前没有团课报名记录。");
 
         StringBuilder sb = new StringBuilder("📅 您的团课报名记录如下：\n");
         for (int i = 0; i < bookings.size(); i++) {
@@ -670,12 +672,12 @@ public String generateMealPlanSkeleton(Long memberId) {
                     
                     .append("\n");
         }
-        return sb.toString();
+        return ToolResult.success(sb.toString());
     }
 
     @Tool("查询当前会员的私教课程包剩余次数和有效期")
-    public String getMyPackageInfo(@Param("memberId") Long memberId) {
-        if (memberId == null || memberId <= 0) return "请先登录。";
+    public ToolResult<String> getMyPackageInfo(@Param("memberId") Long memberId) {
+        if (memberId == null || memberId <= 0) return ToolResult.fail("请先登录。");
 
         LambdaQueryWrapper<MemberPrivatePackage> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MemberPrivatePackage::getMemberId, memberId)
@@ -703,9 +705,9 @@ public String generateMealPlanSkeleton(Long memberId) {
             allWrapper.eq(MemberPrivatePackage::getMemberId, memberId);
             int totalCount = Math.toIntExact(memberPrivatePackageMapper.selectCount(allWrapper));
             if (totalCount > 0) {
-                return "您有 " + totalCount + " 个课程包，但均已用完或已过期。如需购买新套餐，请联系前台或查看商城。";
+                return ToolResult.success("您有 " + totalCount + " 个课程包，但均已用完或已过期。如需购买新套餐，请联系前台或查看商城。");
             }
-            return "您目前没有有效的私教课程包，建议购买套餐更划算。";
+            return ToolResult.success("您目前没有有效的私教课程包，建议购买套餐更划算。");
         }
 
         int totalRemaining = 0;
@@ -719,15 +721,15 @@ public String generateMealPlanSkeleton(Long memberId) {
                     .append("\n");
         }
         sb.append("\n📊 总计剩余课时：").append(totalRemaining).append(" 节");
-        return sb.toString();
+        return ToolResult.success(sb.toString());
     }
 
     @Tool("查询当前会员的个人基本信息（姓名、等级、身高、体重、有效期）")
-    public String getMyProfile(@Param("memberId") Long memberId) {
-        if (memberId == null || memberId <= 0) return "请先登录。";
+    public ToolResult<String> getMyProfile(@Param("memberId") Long memberId) {
+        if (memberId == null || memberId <= 0) return ToolResult.fail("请先登录。");
 
         Member member = memberMapper.selectById(memberId);
-        if (member == null) return "会员信息不存在。";
+        if (member == null) return ToolResult.fail("会员信息不存在。");
 
         String expireStatus = "";
         if (member.getExpireDate() != null) {
@@ -737,7 +739,7 @@ public String generateMealPlanSkeleton(Long memberId) {
             else expireStatus = "✅ 有效";
         }
 
-        return String.format(
+        return ToolResult.success(String.format(
                 "👤 您的个人信息如下：\n" +
                         "- 姓名：%s\n" +
                         "- 等级：%s\n" +
@@ -752,23 +754,23 @@ public String generateMealPlanSkeleton(Long memberId) {
                 nullToEmpty(member.getExpireDate()),
                 expireStatus,
                 nullToEmpty(member.getPhone())
-        );
+        ));
     }
 
     // ======================== 新增工具方法 ========================
 
     @Tool("查询指定教练的详细信息（专长、价格、简介等）")
-    public String queryTrainerByName(@Param("trainerName") String trainerName) {
+    public ToolResult<String> queryTrainerByName(@Param("trainerName") String trainerName) {
         if (trainerName == null || trainerName.trim().isEmpty()) {
-            return "请提供教练姓名。";
+            return ToolResult.fail("请提供教练姓名。");
         }
         LambdaQueryWrapper<Trainer> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Trainer::getName, trainerName.trim());
         Trainer trainer = trainerMapper.selectOne(wrapper);
         if (trainer == null) {
-            return "未找到名为 " + trainerName + " 的教练，请确认姓名是否正确。";
+            return ToolResult.fail("未找到名为 " + trainerName + " 的教练，请确认姓名是否正确。");
         }
-        return String.format(
+        return ToolResult.success(String.format(
                 "🏋️ 教练信息：\n" +
                         "- 姓名：%s\n" +
                         "- 专长：%s\n" +
@@ -780,11 +782,11 @@ public String generateMealPlanSkeleton(Long memberId) {
                 trainer.getPricePerHour(),
                 nullToEmpty(trainer.getIntro()),
                 trainer.getStatus().equals("active") ? "在职" : "休假/离职"
-        );
+        ));
     }
 
     @Tool("查询当前可报名的比赛列表")
-    public String queryAvailableCompetitions() {
+    public ToolResult<String> queryAvailableCompetitions() {
         LambdaQueryWrapper<Competition> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Competition::getStatus, "open")
                 .ge(Competition::getDeadline, LocalDateTime.now())
@@ -792,7 +794,7 @@ public String generateMealPlanSkeleton(Long memberId) {
                 .orderByAsc(Competition::getDeadline);
         List<Competition> competitions = competitionMapper.selectList(wrapper);
         if (competitions.isEmpty()) {
-            return "目前没有正在报名的比赛。";
+            return ToolResult.success("目前没有正在报名的比赛。");
         }
         StringBuilder sb = new StringBuilder("🏆 可报名比赛如下：\n");
         for (Competition c : competitions) {
@@ -801,19 +803,19 @@ public String generateMealPlanSkeleton(Long memberId) {
                     .append("，名额：").append(c.getEnrolled() == null ? 0 : c.getEnrolled())
                     .append("/").append(c.getMaxParticipants()).append("）\n");
         }
-        return sb.toString();
+        return ToolResult.success(sb.toString());
     }
 
     @Tool("查询当前会员的历史体测记录（按时间倒序）")
-    public String queryMyTestHistory(@Param("memberId") Long memberId) {
-        if (memberId == null || memberId <= 0) return "请先登录。";
+    public ToolResult<String> queryMyTestHistory(@Param("memberId") Long memberId) {
+        if (memberId == null || memberId <= 0) return ToolResult.fail("请先登录。");
         LambdaQueryWrapper<FitnessTest> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(FitnessTest::getMemberId, memberId)
                 .orderByDesc(FitnessTest::getTestDate)
                 .last("LIMIT 5"); // 只取最近5条，避免太长
         List<FitnessTest> tests = fitnessTestMapper.selectList(wrapper);
         if (tests.isEmpty()) {
-            return "您暂无体测记录。";
+            return ToolResult.success("您暂无体测记录。");
         }
         StringBuilder sb = new StringBuilder("📊 您的体测历史（最近5条）：\n");
         for (FitnessTest t : tests) {
@@ -826,7 +828,7 @@ public String generateMealPlanSkeleton(Long memberId) {
             }
             sb.append("\n");
         }
-        return sb.toString();
+        return ToolResult.success(sb.toString());
     }
     // 辅助方法（如果类里没有）
     private String nullToEmpty(Object obj) {

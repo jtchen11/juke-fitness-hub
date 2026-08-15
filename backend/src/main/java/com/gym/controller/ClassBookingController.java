@@ -12,6 +12,7 @@ import com.gym.enums.MemberLevel;
 import com.gym.mapper.ClassBookingMapper;
 import com.gym.mapper.GroupClassMapper;
 import com.gym.mapper.MemberMapper;
+import com.gym.service.SystemConfigService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -42,6 +43,9 @@ public class ClassBookingController {
 
     @Autowired
     private com.gym.mapper.CheckInMapper checkInMapper;
+
+    @Autowired
+    private SystemConfigService systemConfigService;
     /**
      * 查询当前会员的团课预约列表（支持日期范围筛选）
      */
@@ -172,6 +176,12 @@ public class ClassBookingController {
             if (gc.getAllowVisitor() == null || !gc.getAllowVisitor()) {
                 result.put("success", false);
                 result.put("message", "仅限正式会员预约，请办理会员卡");
+                return result;
+            }
+            // 体验课功能开关校验（VISITOR_EXPERIENCE_ENABLED）
+            if (!isExperienceEnabled()) {
+                result.put("success", false);
+                result.put("message", "体验课功能暂未开放，请联系客服");
                 return result;
             }
             if (member.getExperienceUsed() != null && member.getExperienceUsed()) {
@@ -504,5 +514,13 @@ public class ClassBookingController {
             result.add(item);
         }
         return result;
+    }
+
+    /** 体验课功能开关：未配置时默认开启 */
+    private boolean isExperienceEnabled() {
+        Map<String, String> cfg = systemConfigService.getAll();
+        String v = cfg.get("VISITOR_EXPERIENCE_ENABLED");
+        if (v == null || v.isEmpty()) return true;
+        return v.equals("1") || v.equalsIgnoreCase("true") || v.equalsIgnoreCase("on");
     }
 }

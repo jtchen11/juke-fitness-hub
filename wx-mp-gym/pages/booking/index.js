@@ -152,6 +152,24 @@ Page({
   doBook: function() {
     var _this = this;
     var t = _this.data;
+    // 访客预约体验课前检查功能开关（VISITOR_EXPERIENCE_ENABLED）
+    if (_this.isVisitorUser() && t.course && t.course.allowVisitor) {
+      app.ensureSystemConfig(function() {
+        if (!app.isConfigEnabled('VISITOR_EXPERIENCE_ENABLED')) {
+          _this.setData({ loading: false });
+          wx.showToast({ title: '体验课功能暂未开放，请联系客服', icon: 'none' });
+          return;
+        }
+        _this.doBookRequest();
+      });
+      return;
+    }
+    _this.doBookRequest();
+  },
+
+  doBookRequest: function() {
+    var _this = this;
+    var t = _this.data;
     _this.setData({ loading: true });
     request.post('/api/class-bookings', {
       classId: t.course.id,

@@ -107,7 +107,7 @@ class GymToolsTest {
     @Test
     @DisplayName("正常查询：返回课程列表")
     void queryAvailableClasses_shouldReturnClassList() {
-        String result = gymTools.queryAvailableClasses("2026-07-01 09:00:00", "2026-07-01 18:00:00");
+        String result = gymTools.queryAvailableClasses("2026-07-01 09:00:00", "2026-07-01 18:00:00").getMessage();
         // At minimum, verify the format is valid (not a time format error)
         assertFalse(result.contains("时间格式错误"), "Should parse dates correctly: " + result);
     }
@@ -115,7 +115,7 @@ class GymToolsTest {
     @Test
     @DisplayName("无课程时间段：返回空列表提示")
     void queryAvailableClasses_shouldReturnNoClassesMessage() {
-        String result = gymTools.queryAvailableClasses("2026-07-01 09:00:00", "2026-07-01 18:00:00");
+        String result = gymTools.queryAvailableClasses("2026-07-01 09:00:00", "2026-07-01 18:00:00").getMessage();
         // Without functional mock, this tests the format is valid
         assertFalse(result.contains("时间格式错误"), "result: " + result);
     }
@@ -123,14 +123,14 @@ class GymToolsTest {
     @Test
     @DisplayName("时间格式错误：返回错误提示")
     void queryAvailableClasses_shouldReturnErrorWhenInvalidFormat() {
-        String result = gymTools.queryAvailableClasses("2026-07-01", "2026-07-02");
+        String result = gymTools.queryAvailableClasses("2026-07-01", "2026-07-02").getMessage();
         assertTrue(result.contains("时间格式错误"));
     }
 
     @Test
     @DisplayName("开始晚于结束：返回空列表提示（格式有效）")
     void queryAvailableClasses_shouldHandleStartAfterEnd() {
-        String result = gymTools.queryAvailableClasses("2026-07-01 18:00:00", "2026-07-01 09:00:00");
+        String result = gymTools.queryAvailableClasses("2026-07-01 18:00:00", "2026-07-01 09:00:00").getMessage();
         assertFalse(result.contains("时间格式错误"), "result: " + result);
     }
 
@@ -141,7 +141,7 @@ class GymToolsTest {
     void bookGroupClass_shouldSucceed() {
         when(groupClassService.bookClass(1001L, 1L))
                 .thenReturn("预约成功！课程名称：瑜伽基础（公益课免费）");
-        String result = gymTools.bookGroupClass(1001L, 1L);
+        String result = gymTools.bookGroupClass(1001L, 1L).getMessage();
         assertTrue(result.contains("预约成功"));
     }
 
@@ -150,7 +150,7 @@ class GymToolsTest {
     void bookGroupClass_shouldFailWhenFull() {
         when(groupClassService.bookClass(1001L, 1L))
                 .thenReturn("课程已满员，您的等级暂不支持超额预约");
-        String result = gymTools.bookGroupClass(1001L, 1L);
+        String result = gymTools.bookGroupClass(1001L, 1L).getMessage();
         assertTrue(result.contains("已满员"));
     }
 
@@ -158,7 +158,7 @@ class GymToolsTest {
     @DisplayName("课程不存在：返回失败提示")
     void bookGroupClass_shouldFailWhenNotFound() {
         when(groupClassService.bookClass(1001L, 999L)).thenReturn("课程不存在");
-        String result = gymTools.bookGroupClass(1001L, 999L);
+        String result = gymTools.bookGroupClass(1001L, 999L).getMessage();
         assertTrue(result.contains("课程不存在"));
     }
 
@@ -167,14 +167,14 @@ class GymToolsTest {
     void bookGroupClass_shouldFailWhenDuplicate() {
         when(groupClassService.bookClass(1001L, 1L))
                 .thenReturn("您已预约过该课程，请勿重复预约");
-        String result = gymTools.bookGroupClass(1001L, 1L);
+        String result = gymTools.bookGroupClass(1001L, 1L).getMessage();
         assertTrue(result.contains("已预约过"));
     }
 
     @Test
     @DisplayName("会员ID为空：参数校验失败")
     void bookGroupClass_shouldFailWhenMemberIdNull() {
-        String result = gymTools.bookGroupClass(null, 1L);
+        String result = gymTools.bookGroupClass(null, 1L).getMessage();
         assertTrue(result.contains("会员ID无效"));
         verify(groupClassService, never()).bookClass(any(), any());
     }
@@ -182,7 +182,7 @@ class GymToolsTest {
     @Test
     @DisplayName("课程ID为空：参数校验失败")
     void bookGroupClass_shouldFailWhenClassIdNull() {
-        String result = gymTools.bookGroupClass(1001L, null);
+        String result = gymTools.bookGroupClass(1001L, null).getMessage();
         assertTrue(result.contains("课程ID无效"));
         verify(groupClassService, never()).bookClass(any(), any());
     }
@@ -197,7 +197,7 @@ class GymToolsTest {
                 .thenReturn("私教预约成功！");
         when(trainerMapper.selectById(10L)).thenReturn(trainer);
 
-        String result = gymTools.bookPersonalTraining(1001L, 10L, "2026-07-02 14:00:00", 60);
+        String result = gymTools.bookPersonalTraining(1001L, 10L, "2026-07-02 14:00:00", 60).getMessage();
         assertTrue(result.contains("预约成功"));
         assertTrue(result.contains("张教练"));
     }
@@ -207,7 +207,7 @@ class GymToolsTest {
     void bookPersonalTraining_shouldFailWhenTimeConflict() {
         when(ptService.bookPersonalTraining(1001L, 10L, LocalDateTime.of(2026,7,2,14,0,0), 60))
                 .thenReturn("该时段已被其他会员预约");
-        String result = gymTools.bookPersonalTraining(1001L, 10L, "2026-07-02 14:00:00", 60);
+        String result = gymTools.bookPersonalTraining(1001L, 10L, "2026-07-02 14:00:00", 60).getMessage();
         assertTrue(result.contains("已被预约"));
     }
 
@@ -216,14 +216,14 @@ class GymToolsTest {
     void bookPersonalTraining_shouldFailWhenTrainerNotFound() {
         when(ptService.bookPersonalTraining(1001L, 999L, LocalDateTime.of(2026,7,2,14,0,0), 60))
                 .thenReturn("教练不存在");
-        String result = gymTools.bookPersonalTraining(1001L, 999L, "2026-07-02 14:00:00", 60);
+        String result = gymTools.bookPersonalTraining(1001L, 999L, "2026-07-02 14:00:00", 60).getMessage();
         assertTrue(result.contains("教练不存在"));
     }
 
     @Test
     @DisplayName("会员ID为空：参数校验失败")
     void bookPersonalTraining_shouldFailWhenMemberIdNull() {
-        String result = gymTools.bookPersonalTraining(null, 10L, "2026-07-02 14:00:00", 60);
+        String result = gymTools.bookPersonalTraining(null, 10L, "2026-07-02 14:00:00", 60).getMessage();
         assertTrue(result.contains("会员ID无效"));
         verify(ptService, never()).bookPersonalTraining(any(), any(), any(), any());
     }
@@ -231,7 +231,7 @@ class GymToolsTest {
     @Test
     @DisplayName("教练ID为空：参数校验失败")
     void bookPersonalTraining_shouldFailWhenTrainerIdNull() {
-        String result = gymTools.bookPersonalTraining(1001L, null, "2026-07-02 14:00:00", 60);
+        String result = gymTools.bookPersonalTraining(1001L, null, "2026-07-02 14:00:00", 60).getMessage();
         assertTrue(result.contains("教练ID无效"));
         verify(ptService, never()).bookPersonalTraining(any(), any(), any(), any());
     }
@@ -244,14 +244,14 @@ class GymToolsTest {
                 .thenReturn("私教预约成功！");
         when(trainerMapper.selectById(10L)).thenReturn(trainer);
 
-        String result = gymTools.bookPersonalTraining(1001L, 10L, "2026-07-02 14:00:00", null);
+        String result = gymTools.bookPersonalTraining(1001L, 10L, "2026-07-02 14:00:00", null).getMessage();
         assertTrue(result.contains("预约成功"));
     }
 
     @Test
     @DisplayName("时间格式错误：返回错误提示")
     void bookPersonalTraining_shouldFailWhenInvalidTime() {
-        String result = gymTools.bookPersonalTraining(1001L, 10L, "2026/07/02 14:00", 60);
+        String result = gymTools.bookPersonalTraining(1001L, 10L, "2026/07/02 14:00", 60).getMessage();
         assertTrue(result.contains("时间格式错误"));
     }
 
@@ -263,7 +263,7 @@ class GymToolsTest {
         Trainer trainer = createTrainer(1L, "李强", "增肌/减脂", new BigDecimal("300"), "active");
         when(trainerMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(trainer);
 
-        String result = gymTools.queryTrainerByName("李强");
+        String result = gymTools.queryTrainerByName("李强").getMessage();
         assertTrue(result.contains("李强"));
         assertTrue(result.contains("增肌/减脂"));
         assertTrue(result.contains("在职"));
@@ -273,16 +273,16 @@ class GymToolsTest {
     @DisplayName("教练不存在：返回未找到提示")
     void queryTrainerByName_shouldReturnNotFound() {
         when(trainerMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
-        String result = gymTools.queryTrainerByName("不存在教练");
+        String result = gymTools.queryTrainerByName("不存在教练").getMessage();
         assertTrue(result.contains("未找到"));
     }
 
     @Test
     @DisplayName("姓名为空：返回提示")
     void queryTrainerByName_shouldHandleEmptyName() {
-        String result = gymTools.queryTrainerByName("");
+        String result = gymTools.queryTrainerByName("").getMessage();
         assertTrue(result.contains("请提供教练姓名"));
-        result = gymTools.queryTrainerByName("   ");
+        result = gymTools.queryTrainerByName("   ").getMessage();
         assertTrue(result.contains("请提供教练姓名"));
         verify(trainerMapper, never()).selectOne(any());
     }
@@ -290,7 +290,7 @@ class GymToolsTest {
     @Test
     @DisplayName("姓名为null：返回提示")
     void queryTrainerByName_shouldHandleNullName() {
-        String result = gymTools.queryTrainerByName(null);
+        String result = gymTools.queryTrainerByName(null).getMessage();
         assertTrue(result.contains("请提供教练姓名"));
         verify(trainerMapper, never()).selectOne(any());
     }

@@ -14,6 +14,7 @@ import com.gym.enums.MemberLevel;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class GroupClassService {
@@ -29,6 +30,9 @@ public class GroupClassService {
 
     @Autowired
     private MemberMapper memberMapper;
+
+    @Autowired
+    private SystemConfigService systemConfigService;
 
     public List<GroupClass> getAvailableClasses(LocalDateTime start, LocalDateTime end) {
         return getAvailableClasses(start, end, null, null);
@@ -81,6 +85,10 @@ public class GroupClassService {
         if (member != null && member.isVisitor()) {
             if (gc.getAllowVisitor() == null || !gc.getAllowVisitor()) {
                 return "该课程不支持访客预约，请注册会员后再预约。";
+            }
+            // 体验课功能开关校验（VISITOR_EXPERIENCE_ENABLED）
+            if (!isExperienceEnabled()) {
+                return "体验课功能暂未开放，请联系客服";
             }
             if (Boolean.TRUE.equals(member.getExperienceUsed())) {
                 return "您已使用过体验课，请注册会员后再预约。";
@@ -142,5 +150,13 @@ public class GroupClassService {
             sb.append("（公益课免费）");
         }
         return sb.toString();
+    }
+
+    /** 体验课功能开关：未配置时默认开启 */
+    private boolean isExperienceEnabled() {
+        Map<String, String> cfg = systemConfigService.getAll();
+        String v = cfg.get("VISITOR_EXPERIENCE_ENABLED");
+        if (v == null || v.isEmpty()) return true;
+        return v.equals("1") || v.equalsIgnoreCase("true") || v.equalsIgnoreCase("on");
     }
 }
