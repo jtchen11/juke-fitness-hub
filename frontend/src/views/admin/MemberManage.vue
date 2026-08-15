@@ -331,6 +331,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download, Plus } from '@element-plus/icons-vue'
@@ -722,6 +723,10 @@ const exportMembers = async () => {
 
 // ============ 生命周期 ============
 onMounted(() => {
+  const route = useRoute()
+  if (route.query.keyword) {
+    searchKeyword.value = String(route.query.keyword)
+  }
   loadStats()
   loadMembers()
 })

@@ -56,7 +56,7 @@
         </el-sub-menu>
         <el-sub-menu index="/admin/settings">
           <template #title>
-            <el-icon><Setting /></el-icon>
+            <el-icon><Tools /></el-icon>
             <span>系统设置</span>
           </template>
           <el-menu-item index="/admin/settings/system"><el-icon><Tools /></el-icon><span>功能配置</span></el-menu-item>

@@ -188,9 +188,6 @@
         </el-table-column>
         <el-table-column label="操作" width="320" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button size="small" type="info" plain @click="showDetail(row)">
-              详情
-            </el-button>
             <el-button size="small" type="warning" plain @click="handleCopy(row)">
               复制
             </el-button>
