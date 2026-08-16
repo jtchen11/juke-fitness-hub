@@ -103,6 +103,7 @@ public class GymTools {
         }
     }
 
+    @Tool("推荐未来一段时间内适合报名的团课列表，参数：开始时间(yyyy-MM-dd HH:mm:ss)，结束时间(yyyy-MM-dd HH:mm:ss)")
     public ToolResult<String> recommendGroupClasses(String startTime, String endTime) {
         try {
             LocalDateTime start = LocalDateTime.parse(startTime, FORMATTER);
@@ -536,6 +537,7 @@ public class GymTools {
         }
     }
 
+    @Tool("根据会员体测数据动态生成一周饮食计划骨架（JSON格式）")
 public ToolResult<String> generateMealPlanSkeleton(Long memberId) {
         if (memberId == null || memberId <= 0) {
             return ToolResult.fail("{\"error\": \"会员ID无效\"}");

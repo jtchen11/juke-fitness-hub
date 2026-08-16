@@ -418,7 +418,6 @@ Page({
     var msgs = this.data.messages;
     for (var i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === "ai") {
-        // 如果当前内容为空，直接替换；否则追加
         if (!msgs[i].content) {
           msgs[i].content = text;
         } else {
@@ -431,9 +430,114 @@ Page({
     this.setData({ messages: msgs, scrollTarget: "bottom" });
   },
 
+  // 解析 **PAYMENT** / **PAYMENT_GROUP** 标记文本，渲染为可点击的支付按钮
+  // 逻辑与 tool_result / complete 分支中的解析代码保持一致（含 children 子项处理）
+  parsePaymentOptions: function(fullText) {
+    if (!fullText) return false;
+    if (fullText.indexOf("**PAYMENT_GROUP**") >= 0) {
+      var pparts = fullText.split("**PAYMENT_GROUP**");
+      var displayText = pparts[0].trim();
+      var optionsText = pparts[1] || "";
+      var payOptions = [];
+      if (optionsText.indexOf("confirm") >= 0 || optionsText.indexOf("确认") >= 0) {
+        payOptions.push({ label: "确认支付", sub: "", payValue: "confirm" });
+      }
+      console.log("[payment] parsePaymentOptions group parsed", payOptions.length, "options");
+      if (payOptions.length > 0) {
+        var msgs = this.data.messages;
+        for (var mi = msgs.length - 1; mi >= 0; mi--) {
+          if (msgs[mi].role === "ai") {
+            msgs[mi].content = displayText;
+            msgs[mi].paymentOptions = payOptions;
+            msgs[mi].isStreaming = false;
+            break;
+          }
+        }
+        this.setData({ messages: msgs, scrollTarget: "bottom" });
+        return true;
+      }
+      return false;
+    }
+    if (fullText.indexOf("**PAYMENT**") >= 0) {
+      var pparts = fullText.split("**PAYMENT**");
+      var displayText = pparts[0].trim();
+      var optionsText = pparts[1] || "";
+      var payOptions = [];
+      var optLines = optionsText.split("\n");
+      var lastMain = -1;
+      for (var oi = 0; oi < optLines.length; oi++) {
+        var optLine = optLines[oi].trim();
+        if (!optLine) continue;
+        // 子行（待激活课程包的展开项）：以 "-" 或 "·" 开头
+        if (optLine.indexOf("-") === 0 || optLine.indexOf("\u00b7") === 0) {
+          if (lastMain < 0) continue;
+          var restSub = optLine.substring(1).trim();
+          var childPay = "";
+          var pm2 = restSub.match(/\[pkg=(\d+)\]/);
+          if (pm2) {
+            childPay = "pkg=" + pm2[1];
+            restSub = restSub.replace(/\[pkg=\d+\]/, "").trim();
+          }
+          var labelSub = restSub;
+          var subSub = "";
+          var cpp1 = restSub.indexOf("(");
+          var cpp2 = restSub.indexOf("\uff08");
+          var cppos = (cpp1 >= 0 && (cpp2 < 0 || cpp1 < cpp2)) ? cpp1 : cpp2;
+          if (cppos >= 0) {
+            labelSub = restSub.substring(0, cppos).trim();
+            var csubEnd = restSub.lastIndexOf(")") >= 0 ? restSub.lastIndexOf(")") : restSub.lastIndexOf("\uff09");
+            if (csubEnd > cppos) { subSub = restSub.substring(cppos + 1, csubEnd).trim(); }
+          }
+          if (!payOptions[lastMain].children) payOptions[lastMain].children = [];
+          payOptions[lastMain].children.push({ label: labelSub, sub: subSub, payValue: childPay });
+          continue;
+        }
+        var dotPos = optLine.indexOf(".");
+        if (dotPos > 0 && dotPos < 3) {
+          var val = optLine.substring(0, dotPos).trim();
+          var rest = optLine.substring(dotPos + 1).trim();
+          var label = rest;
+          var sub = "";
+          var pp1 = rest.indexOf("(");
+          var pp2 = rest.indexOf("\uff08");
+          var ppos = (pp1 >= 0 && (pp2 < 0 || pp1 < pp2)) ? pp1 : pp2;
+          if (ppos >= 0) {
+            label = rest.substring(0, ppos).trim();
+            var subEnd = rest.lastIndexOf(")") >= 0 ? rest.lastIndexOf(")") : rest.lastIndexOf("\uff09");
+            if (subEnd > ppos) { sub = rest.substring(ppos + 1, subEnd).trim(); }
+          }
+          payOptions.push({ label: label, sub: sub, payValue: val, children: [] });
+          lastMain = payOptions.length - 1;
+        }
+      }
+      console.log("[payment] parsePaymentOptions parsed", payOptions.length, "options");
+      if (payOptions.length > 0) {
+        var msgs2 = this.data.messages;
+        for (var mi2 = msgs2.length - 1; mi2 >= 0; mi2--) {
+          if (msgs2[mi2].role === "ai") {
+            msgs2[mi2].content = displayText;
+            msgs2[mi2].paymentOptions = payOptions;
+            msgs2[mi2].isStreaming = false;
+            break;
+          }
+        }
+        this.setData({ messages: msgs2, scrollTarget: "bottom" });
+        return true;
+      }
+    }
+    return false;
+  },
   finishStreaming: function() {
     streamingReq = null;
     var msgs = this.data.messages;
+    var lastMsg = msgs[msgs.length - 1];
+    // 流结束时：若最后一条 AI 消息包含 **PAYMENT** / **PAYMENT_GROUP** 标记
+    // （delta 逐字推送场景，标记可能分散在多个 chunk 中），
+    // 调用 parsePaymentOptions 解析为可点击的支付按钮，随后再统一 setData
+    if (lastMsg && lastMsg.role === "ai" && lastMsg.content &&
+        (lastMsg.content.indexOf("**PAYMENT**") >= 0 || lastMsg.content.indexOf("**PAYMENT_GROUP**") >= 0)) {
+      this.parsePaymentOptions(lastMsg.content);
+    }
     for (var i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === "ai") {
         msgs[i].isStreaming = false;
